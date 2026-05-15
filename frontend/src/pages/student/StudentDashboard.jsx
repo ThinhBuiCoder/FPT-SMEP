@@ -56,9 +56,9 @@ const StudentDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Welcome, {user?.name?.split(' ')[0] || 'Student'} 🚀</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome, {user?.name?.split(' ')[0] || 'Student'} 🚀</h1>
           <p className="text-slate-500 mt-1">{myClass ? `${myClass.name} • ${myClass.semester}` : 'No class assigned yet'}</p>
         </div>
         {!startupIdea && hasTeam && (
@@ -71,7 +71,7 @@ const StudentDashboard = () => {
       ) : (
         <>
           {/* Stats */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard title="AI Score" value={aiAnalysis?.aiScore ? `${aiAnalysis.aiScore}/100` : 'N/A'} icon={Brain} color="primary" change={aiAnalysis ? 'Analyzed' : 'Not analyzed'} trend={aiAnalysis?.aiScore >= 70 ? 'up' : 'flat'} />
             <StatCard title="Lecturer Score" value={latestEvaluation?.totalScore ? `${latestEvaluation.totalScore.toFixed(1)}/10` : 'N/A'} icon={Star} color="secondary" change={latestEvaluation ? 'Evaluated' : 'Pending'} trend={latestEvaluation ? 'up' : 'flat'} />
             <StatCard title="Milestones" value={`${milestoneProgress?.done || 0}/${milestoneProgress?.total || 0}`} icon={CheckSquare} color="success" change={`${milestoneProgress?.percentage || 0}% complete`} trend="up" />

@@ -16,6 +16,7 @@ const mentoringSessionSchema = new mongoose.Schema(
     title:       { type: String, required: true },
     meetingDate: { type: Date, required: true },
     notes:       { type: String, default: '' },
+    meetingUrl:  { type: String, default: null },
     actionItems: { type: [actionItemSchema], default: [] },
   },
   { timestamps: true }

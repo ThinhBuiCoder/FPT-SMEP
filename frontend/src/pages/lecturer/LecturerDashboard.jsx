@@ -39,16 +39,16 @@ const LecturerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Welcome back, {user?.name?.split(' ')[0] || 'Lecturer'} 👋</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome back, {user?.name?.split(' ')[0] || 'Lecturer'} 👋</h1>
           <p className="text-slate-500 mt-1">Here's an overview of your startup classes</p>
         </div>
         <Button variant="gradient" size="sm" icon={Calendar} onClick={() => navigate('/sessions')}>Schedule Session</Button>
       </motion.div>
 
       {/* Stats */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard title="Active Classes" value={totalClasses || 0} icon={GraduationCap} color="primary" change="This semester" trend="up" />
         <StatCard title="Mentoring Teams" value={totalTeams || 0} icon={Users} color="secondary" change="All classes" trend="flat" />
         <StatCard title="Pending Reviews" value={pendingReviews || 0} icon={ClipboardList} color="warning" change="Need action" trend={pendingReviews > 0 ? 'up' : 'flat'} />

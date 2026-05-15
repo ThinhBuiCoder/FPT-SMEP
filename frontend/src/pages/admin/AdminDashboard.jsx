@@ -52,16 +52,16 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div {...fade(0)} className="flex justify-between items-end">
+      <motion.div {...fade(0)} className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Admin Overview</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Overview</h1>
           <p className="text-slate-500 mt-1">Platform analytics and system health</p>
         </div>
         <Button variant="outline" size="sm" icon={BarChart3} onClick={() => navigate('/rankings')}>View Rankings</Button>
       </motion.div>
 
       {/* Stat Cards */}
-      <motion.div {...fade(1)} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <motion.div {...fade(1)} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCard title="Total Users" value={(stats.totalUsers || 0).toLocaleString()} icon={Users} color="primary" change="+12% this month" trend="up" />
         <StatCard title="Classes" value={stats.totalClasses || 0} icon={GraduationCap} color="cyan" change="Active semester" trend="up" />
         <StatCard title="Teams" value={stats.totalTeams || 0} icon={Rocket} color="secondary" change="Startup teams" trend="up" />
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
       </motion.div>
 
       {/* Charts Row */}
-      <motion.div {...fade(2)} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <motion.div {...fade(2)} className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Bar chart */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" />Top Team Rankings</h3>

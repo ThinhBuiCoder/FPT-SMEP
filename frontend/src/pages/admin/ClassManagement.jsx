@@ -107,7 +107,7 @@ const ClassManagement = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Class Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Class Management</h1>
           <p className="text-slate-500 mt-1">{classes.length} active startup incubation classes</p>
         </div>
         <div className="flex gap-2">

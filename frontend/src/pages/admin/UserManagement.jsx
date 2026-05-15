@@ -9,8 +9,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import toast from 'react-hot-toast';
 import { userApi } from '../../api/userApi';
 
-const roleBadge = { ADMIN: 'Approved', LECTURER: 'Submitted', STUDENT: 'Reviewed' };
-const roleLabel = { ADMIN: 'Admin', LECTURER: 'Lecturer', STUDENT: 'Student' };
+const roleBadge = { ADMIN: 'Approved', LECTURER: 'Submitted', MENTOR: 'Review', STUDENT: 'Reviewed' };
+const roleLabel = { ADMIN: 'Admin', LECTURER: 'Lecturer', MENTOR: 'Mentor', STUDENT: 'Student' };
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -119,7 +119,7 @@ const UserManagement = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h1>
           <p className="text-slate-500 mt-1">{totalItems} users registered on the platform</p>
         </div>
         <Button variant="primary" icon={Plus} onClick={openAddModal}>Invite User</Button>
@@ -145,6 +145,7 @@ const UserManagement = () => {
             <option value="ALL">All Roles</option>
             <option value="STUDENT">Students</option>
             <option value="LECTURER">Lecturers</option>
+            <option value="MENTOR">Mentors</option>
             <option value="ADMIN">Admins</option>
           </select>
         </div>
@@ -217,13 +218,14 @@ const UserManagement = () => {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUser ? 'Edit User' : 'Invite User'} submitText="Save Changes" isSubmitting={isSubmitting} onSubmit={handleSubmit}>
         <div className="space-y-4">
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label><input type="text" className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Email *</label><input type="email" className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label><input type="text" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1">Email *</label><input type="email" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-            <select className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none bg-white" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+            <select className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none bg-white text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
               <option value="STUDENT">Student</option>
               <option value="LECTURER">Lecturer</option>
+              <option value="MENTOR">Mentor</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>

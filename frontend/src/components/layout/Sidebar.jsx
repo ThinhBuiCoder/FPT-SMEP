@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../utils/cn';
 import {
   LayoutDashboard, Users, GraduationCap, Trophy, CalendarDays,
-  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, PanelLeftClose, PanelLeft
+  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, X
 } from 'lucide-react';
 
 const iconMap = {
@@ -22,70 +21,82 @@ const iconMap = {
   video_chat: Video,
 };
 
-const Sidebar = () => {
+const Sidebar = ({ mobileOpen, onMobileClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const role = user?.role?.toUpperCase();
+
   const navItems = {
-    admin: [
+    ADMIN: [
       { path: '/admin', icon: 'dashboard', label: 'Overview' },
       { path: '/admin/users', icon: 'group', label: 'Users' },
       { path: '/admin/classes', icon: 'school', label: 'Classes' },
       { path: '/rankings', icon: 'leaderboard', label: 'Rankings' },
       { path: '/sessions', icon: 'calendar_month', label: 'Schedules' },
     ],
-    lecturer: [
+    LECTURER: [
       { path: '/lecturer', icon: 'dashboard', label: 'Dashboard' },
       { path: '/milestones', icon: 'view_kanban', label: 'Milestones' },
       { path: '/evaluations', icon: 'analytics', label: 'AI Reports' },
       { path: '/sessions', icon: 'event', label: 'Sessions' },
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
     ],
-    student: [
+    MENTOR: [
+      { path: '/lecturer', icon: 'dashboard', label: 'Dashboard' },
+      { path: '/sessions', icon: 'event', label: 'Sessions' },
+      { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
+    ],
+    STUDENT: [
       { path: '/student', icon: 'dashboard', label: 'Dashboard' },
-      { path: '/student/idea', icon: 'rocket_launch', label: 'My Idea' },
+      { path: '/student/idea/new', icon: 'rocket_launch', label: 'My Idea' },
       { path: '/milestones', icon: 'task_alt', label: 'Milestones' },
       { path: '/sessions', icon: 'video_chat', label: 'Mentoring' },
     ],
   };
 
-  const items = navItems[user?.role] || [];
+  const items = navItems[role] || navItems.STUDENT;
+
+  const handleNavClick = () => {
+    if (onMobileClose) onMobileClose();
+  };
 
   return (
-    <aside className={cn(
-      'fixed left-0 top-0 h-screen z-50 flex flex-col bg-white border-r border-slate-200/80 transition-all duration-300',
-      collapsed ? 'w-[68px]' : 'w-[260px]'
-    )}>
+    <aside
+      className={cn(
+        'fixed left-0 top-0 h-screen z-50 flex flex-col bg-white border-r border-slate-200/80 transition-transform duration-300 ease-out w-[260px]',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        'lg:translate-x-0'
+      )}
+    >
       {/* Brand */}
-      <div className={cn('flex items-center h-16 border-b border-slate-100 px-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shrink-0">
-          <Sparkles className="w-4 h-4" />
-        </div>
-        {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <h1 className="text-body-lg font-bold text-slate-900 leading-tight">FPT-SMEP</h1>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Startup Portal</p>
+      <div className="flex items-center justify-between h-16 border-b border-slate-100 px-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shrink-0 shadow-sm">
+            <Sparkles className="w-4.5 h-4.5" />
           </div>
-        )}
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">FPT-SMEP</h1>
+            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-[0.12em]">Startup Portal</p>
+          </div>
+        </div>
         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+          onClick={onMobileClose}
+          className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors lg:hidden"
+          aria-label="Close sidebar"
         >
-          {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-3 px-2.5 space-y-0.5 overflow-y-auto scrollbar-thin">
-        {!collapsed && (
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2 mt-1">Navigation</p>
-        )}
+      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-3 mt-1">Navigation</p>
         {items.map((item) => {
           const IconComp = iconMap[item.icon] || LayoutDashboard;
           return (
@@ -93,11 +104,11 @@ const Sidebar = () => {
               key={item.path}
               to={item.path}
               end={item.path === '/admin' || item.path === '/lecturer' || item.path === '/student'}
+              onClick={handleNavClick}
               className={({ isActive }) => cn(
-                'flex items-center gap-3 rounded-xl transition-all duration-200 group relative',
-                collapsed ? 'justify-center px-0 py-2.5 mx-0.5' : 'px-3 py-2.5',
+                'flex items-center gap-3 rounded-xl transition-all duration-200 group relative px-3 py-2.5',
                 isActive
-                  ? 'bg-primary-50 text-primary font-semibold'
+                  ? 'bg-primary-50 text-primary font-semibold shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
               )}
             >
@@ -106,8 +117,8 @@ const Sidebar = () => {
                   {isActive && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
                   )}
-                  <IconComp className={cn('w-[18px] h-[18px] shrink-0', isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600')} />
-                  {!collapsed && <span className="text-body truncate">{item.label}</span>}
+                  <IconComp className={cn('w-[18px] h-[18px] shrink-0 transition-colors', isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600')} />
+                  <span className="text-[13px] truncate">{item.label}</span>
                 </>
               )}
             </NavLink>
@@ -116,11 +127,11 @@ const Sidebar = () => {
       </nav>
 
       {/* Bottom Section */}
-      <div className={cn('border-t border-slate-100 p-2.5 space-y-1', collapsed && 'px-1.5')}>
-        {user?.role === 'student' && !collapsed && (
+      <div className="border-t border-slate-100 p-3 space-y-2">
+        {role === 'STUDENT' && (
           <button
-            onClick={() => navigate('/student/idea/new')}
-            className="w-full bg-gradient-to-r from-primary to-secondary text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 mb-2 shadow-sm hover:shadow-glow-primary transition-all active:scale-[0.98] text-body"
+            onClick={() => { navigate('/student/idea/new'); handleNavClick(); }}
+            className="w-full bg-gradient-to-r from-primary to-secondary text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow-glow-primary transition-all active:scale-[0.98] text-[13px]"
           >
             <Plus className="w-4 h-4" />
             New Idea
@@ -129,13 +140,10 @@ const Sidebar = () => {
 
         <button
           onClick={handleLogout}
-          className={cn(
-            'w-full flex items-center gap-3 rounded-xl text-danger hover:bg-danger-50 transition-all text-body font-medium',
-            collapsed ? 'justify-center py-2.5' : 'px-3 py-2.5'
-          )}
+          className="w-full flex items-center gap-3 rounded-xl text-danger hover:bg-danger-50 transition-all text-[13px] font-medium px-3 py-2.5"
         >
           <LogOut className="w-[18px] h-[18px]" />
-          {!collapsed && <span>Sign Out</span>}
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>

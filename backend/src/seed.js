@@ -27,7 +27,7 @@ const seed = async () => {
 
     // ── USERS ─────────────────────────────────────────────
     // NOTE: password pre-save hook sẽ tự hash
-    const [admin, lecturer, s1, s2, s3] = await User.create([
+    const [admin, lecturer, mentor, s1, s2, s3] = await User.create([
       {
         name: 'Admin FPT', email: 'admin@fpt.edu.vn', password: '123456',
         role: 'ADMIN', bio: 'System Administrator',
@@ -35,6 +35,10 @@ const seed = async () => {
       {
         name: 'TS. Nguyễn Văn Minh', email: 'lecturer@fpt.edu.vn', password: '123456',
         role: 'LECTURER', bio: 'Giảng viên Khởi nghiệp - ĐH FPT', phone: '0901234567',
+      },
+      {
+        name: 'Nguyễn Mentor', email: 'mentor@fpt.edu.vn', password: '123456',
+        role: 'MENTOR', bio: 'Expert Startup Mentor - 10 years experience', phone: '0908889999',
       },
       {
         name: 'Trần Thị Lan', email: 'student1@fpt.edu.vn', password: '123456',
@@ -49,7 +53,7 @@ const seed = async () => {
         role: 'STUDENT', studentId: 'BA171236', bio: 'Business Administration - K17',
       },
     ]);
-    console.log('✅ Users created (5)');
+    console.log('✅ Users created (6)');
 
     // ── CLASS ─────────────────────────────────────────────
     const cls = await Class.create({
@@ -196,6 +200,7 @@ const seed = async () => {
       lecturerId: lecturer._id,
       title: 'Mentoring #1 - Review Business Model',
       meetingDate: new Date(now - 5 * 24 * 3600 * 1000),
+      meetingUrl: 'https://meet.google.com/abc-defg-hij',
       notes:
         'Nhóm present Business Model Canvas. Điểm mạnh: Market analysis rõ ràng, có số liệu. Cần cải thiện: Revenue projection chưa realistic. Thảo luận GTM strategy: focus FPT University ecosystem trước.',
       actionItems: [
@@ -211,6 +216,7 @@ const seed = async () => {
     console.log('📧 Test accounts:');
     console.log('   admin@fpt.edu.vn    / 123456  [ADMIN]');
     console.log('   lecturer@fpt.edu.vn / 123456  [LECTURER]');
+    console.log('   mentor@fpt.edu.vn   / 123456  [MENTOR]');
     console.log('   student1@fpt.edu.vn / 123456  [STUDENT]');
     console.log('   student2@fpt.edu.vn / 123456  [STUDENT]');
     console.log('   student3@fpt.edu.vn / 123456  [STUDENT]');

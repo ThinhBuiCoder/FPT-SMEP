@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Key, User, ShieldCheck } from 'lucide-react';
+import { Mail, Key, User, ShieldCheck, Camera } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import Badge from '../../components/ui/Badge';
 import axiosClient from '../../api/axiosClient';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
+
+const roleBadgeVariant = { ADMIN: 'Approved', LECTURER: 'Submitted', MENTOR: 'Review', STUDENT: 'Reviewed' };
+const roleLabel = { ADMIN: 'Administrator', LECTURER: 'Lecturer', MENTOR: 'Mentor', STUDENT: 'Student' };
 
 const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
@@ -19,6 +24,8 @@ const ProfileSettings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+
+  const role = user?.role?.toUpperCase() || 'STUDENT';
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -61,101 +68,137 @@ const ProfileSettings = () => {
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Account Settings</h1>
-        <p className="text-slate-500 mt-1">Manage your profile and security preferences</p>
-      </div>
+  const tabs = [
+    { id: 'profile', label: 'Profile Info', icon: User },
+    { id: 'password', label: 'Security', icon: Key },
+  ];
 
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[500px]">
-        {/* Sidebar */}
-        <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200/60 p-4">
-          <div className="space-y-1">
-            <button
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === 'profile' ? 'bg-white text-primary shadow-sm border border-slate-200/50' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-              onClick={() => setActiveTab('profile')}
-            >
-              <User className="w-4 h-4" /> Profile Info
-            </button>
-            <button
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === 'password' ? 'bg-white text-primary shadow-sm border border-slate-200/50' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-              onClick={() => setActiveTab('password')}
-            >
-              <Key className="w-4 h-4" /> Security
-            </button>
+  return (
+    <div className="max-w-4xl mx-auto">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Account Settings</h1>
+        <p className="text-slate-500 mt-1">Manage your profile and security preferences</p>
+      </motion.div>
+
+      {/* Profile Banner */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+        className="bg-gradient-to-r from-primary to-secondary rounded-2xl p-6 sm:p-8 mb-6 text-white relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-1/3 w-24 h-24 bg-white/5 rounded-full translate-y-1/2" />
+        <div className="flex flex-col sm:flex-row items-center gap-4 relative z-10">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 backdrop-blur-sm border-2 border-white/30 flex items-center justify-center overflow-hidden shrink-0">
+            {user?.avatar ? (
+              <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl sm:text-3xl font-bold">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
+            )}
           </div>
+          <div className="text-center sm:text-left">
+            <h2 className="text-xl sm:text-2xl font-bold">{user?.name || 'User'}</h2>
+            <p className="text-white/70 text-sm">{user?.email || ''}</p>
+            <Badge variant={roleBadgeVariant[role]} size="sm" className="mt-2 bg-white/20 border-white/30 text-white">
+              {roleLabel[role] || role}
+            </Badge>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[420px]"
+      >
+        {/* Sidebar Tabs */}
+        <div className="w-full md:w-56 bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-200/60 p-3 md:p-4 flex md:flex-col gap-1 overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-white text-primary shadow-sm border border-slate-200/50'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+              }`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <tab.icon className="w-4 h-4 shrink-0" /> {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6 md:p-8">
+        <div className="flex-1 p-5 sm:p-8">
           {activeTab === 'profile' && (
-            <div className="max-w-md animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-900 mb-6">Profile Information</h2>
+            <div className="max-w-md">
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Profile Information</h2>
+              <p className="text-sm text-slate-500 mb-6">Update your personal details</p>
               <form onSubmit={handleUpdateProfile} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+                  <label htmlFor="profile-email" className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="email" value={user?.email} disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-500 cursor-not-allowed" />
+                    <input id="profile-email" type="email" value={user?.email || ''} disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-500 cursor-not-allowed text-sm" />
                   </div>
                   <p className="text-xs text-slate-400 mt-1.5">Email cannot be changed</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
+                  <label htmlFor="profile-role" className="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
                   <div className="relative">
                     <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="text" value={user?.role?.toUpperCase()} disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-500 cursor-not-allowed font-medium" />
+                    <input id="profile-role" type="text" value={roleLabel[role] || role} disabled className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-500 cursor-not-allowed font-medium text-sm" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                  <label htmlFor="profile-name" className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
+                  <input id="profile-name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Avatar URL (Optional)</label>
-                  <input type="url" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="https://..." className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                  <label htmlFor="profile-avatar" className="block text-sm font-medium text-slate-700 mb-1.5">Avatar URL (Optional)</label>
+                  <div className="relative">
+                    <Camera className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input id="profile-avatar" type="url" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="https://..." className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
+                  </div>
                 </div>
 
                 <div className="pt-2">
-                  <Button type="submit" variant="primary" isLoading={isSavingProfile}>Save Changes</Button>
+                  <Button type="submit" variant="gradient" isLoading={isSavingProfile}>Save Changes</Button>
                 </div>
               </form>
             </div>
           )}
 
           {activeTab === 'password' && (
-            <div className="max-w-md animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-900 mb-6">Change Password</h2>
+            <div className="max-w-md">
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Change Password</h2>
+              <p className="text-sm text-slate-500 mb-6">Ensure your account is secure</p>
               <form onSubmit={handleChangePassword} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Current Password</label>
-                  <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                  <label htmlFor="current-pw" className="block text-sm font-medium text-slate-700 mb-1.5">Current Password</label>
+                  <input id="current-pw" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
                 </div>
 
-                <div className="w-full h-px bg-slate-100 my-4" />
+                <div className="w-full h-px bg-slate-100 my-2" />
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
-                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                  <label htmlFor="new-pw" className="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
+                  <input id="new-pw" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6} placeholder="Min 6 characters" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                  <label htmlFor="confirm-pw" className="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
+                  <input id="confirm-pw" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6} placeholder="Re-enter new password" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
                 </div>
 
                 <div className="pt-2">
-                  <Button type="submit" variant="primary" isLoading={isSavingPassword}>Update Password</Button>
+                  <Button type="submit" variant="gradient" isLoading={isSavingPassword}>Update Password</Button>
                 </div>
               </form>
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
