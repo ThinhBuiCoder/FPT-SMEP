@@ -1,0 +1,47 @@
+// src/api/axiosClient.js
+import axios from 'axios';
+
+const axiosClient = axios.create({
+  baseURL: '/api', // Using Vite proxy
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor for attaching token
+axiosClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Interceptor for response handling
+axiosClient.interceptors.response.use(
+  (response) => {
+    if (response && response.data) {
+      return response.data;
+    }
+    return response;
+  },
+  (error) => {
+    // Handle global errors here
+    if (error.response) {
+      if (error.response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.dispatchEvent(new Event('session_expired'));
+      } else if (error.response.status === 403) {
+        window.location.href = '/403';
+      }
+    }
+    const errObj = error.response?.data || { success: false, message: error.message || 'Lỗi kết nối server' };
+    return Promise.reject(errObj);
+  }
+);
+
+export default axiosClient;
