@@ -79,13 +79,13 @@ const Register = () => {
                 <label className="cursor-pointer">
                   <input checked={role === 'STUDENT'} onChange={() => setRole('STUDENT')} className="peer sr-only" name="role" type="radio" value="STUDENT" />
                   <div className="text-center py-2.5 rounded-lg text-body text-slate-500 peer-checked:bg-white peer-checked:text-primary peer-checked:shadow-sm peer-checked:border peer-checked:border-primary-100 transition-all font-medium">
-                    🚀 Student
+                    Student
                   </div>
                 </label>
                 <label className="cursor-pointer">
                   <input checked={role === 'LECTURER'} onChange={() => setRole('LECTURER')} className="peer sr-only" name="role" type="radio" value="LECTURER" />
                   <div className="text-center py-2.5 rounded-lg text-body text-slate-500 peer-checked:bg-white peer-checked:text-primary peer-checked:shadow-sm peer-checked:border peer-checked:border-primary-100 transition-all font-medium">
-                    🎓 Lecturer
+                    Lecturer
                   </div>
                 </label>
               </div>
