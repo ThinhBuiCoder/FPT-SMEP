@@ -38,9 +38,9 @@ const Login = () => {
   };
 
   const demoAccounts = [
-    { label: 'Admin', email: 'admin@fpt.edu.vn', icon: '🛡️' },
-    { label: 'Lecturer', email: 'lecturer@fpt.edu.vn', icon: '🎓' },
-    { label: 'Student', email: 'student1@fpt.edu.vn', icon: '🚀' },
+    { label: 'Admin', email: 'admin@fpt.edu.vn'},
+    { label: 'Lecturer', email: 'lecturer@fpt.edu.vn'},
+    { label: 'Student', email: 'student1@fpt.edu.vn'},
   ];
 
   return (
@@ -59,20 +59,6 @@ const Login = () => {
             </div>
             <h1 className="text-heading font-bold text-slate-900">Welcome back</h1>
             <p className="text-body text-slate-500 mt-1">Sign in to FPT-SMEP Mentoring Portal</p>
-          </div>
-
-          {/* Demo Account Switcher */}
-          <div className="flex gap-2 mb-6">
-            {demoAccounts.map(acc => (
-              <button
-                key={acc.label}
-                onClick={(e) => fillDemo(e, acc.email)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-50 hover:bg-primary-50 border border-slate-200 hover:border-primary-200 rounded-xl text-caption font-medium text-slate-600 hover:text-primary transition-all"
-              >
-                <span>{acc.icon}</span>
-                <span>{acc.label}</span>
-              </button>
-            ))}
           </div>
 
           {/* Form */}
@@ -125,20 +111,6 @@ const Login = () => {
           <div className="mt-6 text-center text-body text-slate-500 pt-5 border-t border-slate-100">
             Don't have an account?{' '}
             <Link to="/register" className="text-primary font-semibold hover:text-primary-dark transition-colors">Create one</Link>
-          </div>
-
-          {/* Demo Accounts Info */}
-          <div className="mt-5 bg-slate-50 border border-slate-100 rounded-xl p-4">
-            <p className="text-overline text-slate-400 uppercase mb-2.5">Demo Accounts</p>
-            <div className="space-y-1.5">
-              {demoAccounts.map(acc => (
-                <div key={acc.email} className="flex items-center gap-2">
-                  <span className="text-caption">{acc.icon}</span>
-                  <code className="text-body-sm font-mono text-slate-600">{acc.email}</code>
-                </div>
-              ))}
-              <p className="text-caption text-slate-400 mt-1">Password: <code className="font-mono">123456</code></p>
-            </div>
           </div>
         </div>
       </div>

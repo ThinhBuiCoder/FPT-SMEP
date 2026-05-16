@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Play, GraduationCap, Users, Brain, BarChart3, Rocket, Zap, Menu, X } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useState } from 'react';
+import logo from '../assets/logo.png';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -27,8 +28,8 @@ const Home = () => {
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white">
-              <Sparkles className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
+              <img src={logo} alt="FPT-SMEP logo" className="w-full h-full object-cover" />
             </div>
             <span className="text-lg font-bold text-slate-900 tracking-tight">FPT-SMEP</span>
           </div>
@@ -92,7 +93,7 @@ const Home = () => {
               <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={1}
                 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-5 sm:mb-6 tracking-tight"
               >
-                AI-Powered Startup Classroom for{' '}
+                Startup Mentoring & Evaluation Platform for{' '}
                 <span className="text-gradient-primary">FPT University</span>
               </motion.h1>
 
@@ -106,7 +107,7 @@ const Home = () => {
                 className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center"
               >
                 <Link to="/login">
-                  <Button variant="gradient" size="lg" iconRight={ArrowRight} className="w-full sm:w-auto">Start Now — Free</Button>
+                  <Button variant="gradient" size="lg" iconRight={ArrowRight} className="w-full sm:w-auto">Start Now</Button>
                 </Link>
                 <Button variant="outline" size="lg" icon={Play} className="w-full sm:w-auto">Watch Demo</Button>
               </motion.div>
