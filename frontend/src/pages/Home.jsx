@@ -161,7 +161,7 @@ const Home = () => {
                         <div className="relative w-20 h-20">
                           <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                             <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" strokeWidth="3" />
-                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#4648d4" strokeWidth="3" strokeDasharray="86, 100" strokeLinecap="round" />
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#034EA2" strokeWidth="3" strokeDasharray="86, 100" strokeLinecap="round" />
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-subheading font-bold text-slate-900">86</span>

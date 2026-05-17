@@ -123,7 +123,7 @@ const Rankings = () => {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(v) => [v.toFixed(2), 'Score']} />
-                  <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#4648d4" />
+                  <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#034EA2" />
                 </BarChart>
               </ResponsiveContainer>
             </motion.div>

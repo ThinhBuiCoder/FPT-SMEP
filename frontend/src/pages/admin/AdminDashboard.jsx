@@ -10,7 +10,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
-const COLORS = ['#4648d4', '#7c3aed', '#06b6d4', '#22c55e', '#f59e0b'];
+const COLORS = ['#034EA2', '#F37021', '#51B848', '#3371b8', '#f58f4d'];
 
 const AdminDashboard = () => {
   const [data, setData] = useState(null);
@@ -83,7 +83,7 @@ const AdminDashboard = () => {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => [v.toFixed(2), 'Score']} />
-                <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#4648d4" />
+                <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#034EA2" />
               </BarChart>
             </ResponsiveContainer>
           )}
