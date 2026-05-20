@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Users, Trash2, MessageSquare, MessageSquareDashed, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { teamApi } from '../../api/teamApi';
@@ -18,6 +19,7 @@ const safeName = (ref) => {
 };
 
 function TeamCard({ team, onRefresh }) {
+  const navigate = useNavigate();
   const [expanded,  setExpanded]  = useState(false);
   const [deleting,  setDeleting]  = useState(false);
 
@@ -72,9 +74,15 @@ function TeamCard({ team, onRefresh }) {
             </span>
           )}
           <button
+            onClick={() => navigate(`/workspace/teams/${team._id}`)}
+            className="px-2.5 py-1 text-xs font-semibold border border-slate-200 text-slate-600 hover:border-primary hover:text-primary rounded-lg transition-all bg-white shrink-0 cursor-pointer shadow-2xs"
+          >
+            Workspace
+          </button>
+          <button
             onClick={handleDelete}
             disabled={deleting}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
           >
             {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>

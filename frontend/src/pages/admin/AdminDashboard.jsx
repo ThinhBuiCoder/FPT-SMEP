@@ -61,12 +61,15 @@ const AdminDashboard = () => {
       </motion.div>
 
       {/* Stat Cards */}
-      <motion.div {...fade(1)} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <StatCard title="Total Users" value={(stats.totalUsers || 0).toLocaleString()} icon={Users} color="primary" change="+12% this month" trend="up" />
+      <motion.div {...fade(1)} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard title="Total Users" value={(stats.totalUsers || 0).toLocaleString()} icon={Users} color="primary" change="Platform users" trend="up" />
         <StatCard title="Classes" value={stats.totalClasses || 0} icon={GraduationCap} color="cyan" change="Active semester" trend="up" />
         <StatCard title="Teams" value={stats.totalTeams || 0} icon={Rocket} color="secondary" change="Startup teams" trend="up" />
-        <StatCard title="Ideas" value={stats.totalIdeas || 0} icon={Brain} color="success" change="Registered ideas" trend="up" />
-        <StatCard title="Evaluations" value={stats.totalEvaluations || 0} icon={TrendingUp} color="warning" change="Submitted" trend="up" />
+        <StatCard title="Sprint Progress" value={`${stats.overallTaskProgress || 0}%`} icon={Activity} color="success" change={`${stats.completedTasks || 0} / ${stats.totalTasks || 0} tasks done`} trend="up" />
+        <StatCard title="Ideas" value={stats.totalIdeas || 0} icon={Brain} color="indigo" change="Registered ideas" trend="up" />
+        <StatCard title="Proposals" value={stats.submittedProposals || 0} icon={Brain} color="violet" change="Submitted" trend="up" />
+        <StatCard title="Evaluations" value={stats.totalEvaluations || 0} icon={TrendingUp} color="warning" change="Completed" trend="up" />
+        <StatCard title="Sessions" value={stats.totalMentoringSessions || 0} icon={TrendingUp} color="orange" change="Mentoring sessions" trend="up" />
       </motion.div>
 
       {/* Charts Row */}
@@ -81,7 +84,7 @@ const AdminDashboard = () => {
               <BarChart data={scoreBarData} barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => [v.toFixed(2), 'Score']} />
                 <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#034EA2" />
               </BarChart>
@@ -163,7 +166,7 @@ const AdminDashboard = () => {
                   <td className="px-6 py-3.5 text-slate-500 text-sm">{t.team?.classId?.name || '—'}</td>
                   <td className="px-6 py-3.5 text-slate-700 text-sm">{t.startupName || '—'}</td>
                   <td className="px-6 py-3.5 text-right">
-                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-sm font-bold ${t.avgScore >= 8 ? 'bg-green-100 text-green-700' : t.avgScore >= 6 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-sm font-bold ${t.avgScore >= 80 ? 'bg-green-100 text-green-700' : t.avgScore >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                       {t.avgScore?.toFixed(2) || '—'}
                     </span>
                   </td>

@@ -1,9 +1,10 @@
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
-import { Search, Bell, ChevronDown, User, LogOut, Menu, Settings } from 'lucide-react';
+import { Search, ChevronDown, User, LogOut, Menu, Settings } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Badge from '../ui/Badge';
+import NotificationDropdown from './NotificationDropdown';
 
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
@@ -74,14 +75,7 @@ const Navbar = ({ onMenuClick }) => {
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Notification */}
-        <button
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-          onClick={() => toast('No new notifications at this time.', { icon: '🔔' })}
-          aria-label="Notifications"
-        >
-          <Bell className="w-[18px] h-[18px]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-white" />
-        </button>
+        <NotificationDropdown />
 
         <div className="w-px h-6 bg-slate-200 hidden sm:block" />
 

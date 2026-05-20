@@ -6,8 +6,11 @@ const { protect } = require('../middlewares/auth.middleware');
 const router = express.Router();
 router.use(protect);
 
-router.post('/', createMilestone);
+// Team-scoped routes
 router.get('/team/:teamId', getMilestonesByTeam);
+router.post('/team/:teamId', createMilestone);
+
+// Milestone-specific routes
 router.put('/:id', updateMilestone);
 router.delete('/:id', deleteMilestone);
 

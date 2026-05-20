@@ -17,6 +17,12 @@ const mentoringRoutes  = require('./routes/mentoring.routes');
 const milestoneRoutes  = require('./routes/milestone.routes');
 const dashboardRoutes  = require('./routes/dashboard.routes');
 const chatRoutes       = require('./routes/chat.routes');
+const workspaceRoutes  = require('./routes/workspace.routes');
+const commentRoutes    = require('./routes/comment.routes');
+const sprintTaskRoutes = require('./routes/sprintTask.routes');
+const rankingRoutes     = require('./routes/ranking.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const workshopRoutes    = require('./routes/workshop.routes');
 
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
@@ -26,6 +32,7 @@ const app = express();
 
 // Serve static uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads/pitch-decks', express.static(path.join(__dirname, '../uploads/pitch-decks')));
 
 // ─── MIDDLEWARE ───────────────────────────────────────────
 app.use(cors({
@@ -45,7 +52,7 @@ app.get('/', (_req, res) => res.json({
   message: '🚀 FPT Startup Mentoring Platform API',
   version: '2.0.0',
   db: 'MongoDB',
-  modules: ['Auth', 'User', 'Class Management', 'Team', 'AI', 'Evaluation', 'Milestone', 'Mentoring'],
+  modules: ['Auth', 'User', 'Class Management', 'Team', 'AI', 'Evaluation', 'Milestone', 'Mentoring', 'Dashboard', 'Notifications', 'Workshops', 'Rankings'],
 }));
 
 // ─── API ROUTES ───────────────────────────────────────────
@@ -62,6 +69,12 @@ app.use('/api/mentoring-sessions', mentoringRoutes);
 app.use('/api/milestones',         milestoneRoutes);
 app.use('/api/dashboard',          dashboardRoutes);
 app.use('/api/chat',               chatRoutes);
+app.use('/api/workspace',          workspaceRoutes);
+app.use('/api/comments',           commentRoutes);
+app.use('/api/sprint-tasks',       sprintTaskRoutes);
+app.use('/api/rankings',           rankingRoutes);
+app.use('/api/notifications',      notificationRoutes);
+app.use('/api/workshops',          workshopRoutes);
 
 // ─── ERROR HANDLERS ───────────────────────────────────────
 app.use(notFound);

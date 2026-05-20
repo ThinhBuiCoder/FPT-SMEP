@@ -143,7 +143,72 @@ FPT-SMEP System
   }
 }
 
+async function sendWorkshopNotificationEmail({ to, workshop, recipientName }) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("Email service is not configured");
+    return { sent: false, error: "Email service is not configured" };
+  }
+
+  if (!to) {
+    return { sent: false, error: "Recipient email is required" };
+  }
+
+  const dateStr = new Date(workshop.startDate).toLocaleDateString();
+  const locationInfo = workshop.location ? `Room: ${workshop.location}` : `Meeting Link: ${workshop.meetingLink || "TBD"}`;
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;">
+      <h2 style="color: #034EA2; border-bottom: 2px solid #51B848; padding-bottom: 12px;">New ${workshop.type} Scheduled</h2>
+      <p>Hello ${recipientName || "Student"},</p>
+      <p>A new ${workshop.type.toLowerCase()} has been announced that you are invited to attend.</p>
+      <div style="background-color: #f8fafc; border-left: 4px solid #034EA2; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: #1e293b;">${workshop.title}</h3>
+        <p style="margin: 6px 0; font-size: 14px; color: #475569;">${workshop.description || "No description provided."}</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;"/>
+        <ul style="list-style: none; padding-left: 0; margin: 0; font-size: 14px; color: #334155;">
+          <li><strong>📅 Date:</strong> ${dateStr}</li>
+          <li><strong>🕒 Time:</strong> ${workshop.startTime} - ${workshop.endTime}</li>
+          <li><strong>📍 Location:</strong> ${locationInfo}</li>
+        </ul>
+      </div>
+      <p>Please log in to FPT-SMEP system to view details and mark your attendance.</p>
+      <p>Regards,<br/>FPT-SMEP Team</p>
+    </div>
+  `;
+
+  const textBody = `
+Hello ${recipientName || "Student"},
+
+A new ${workshop.type.toLowerCase()} has been announced: "${workshop.title}"
+
+Description: ${workshop.description || "No description"}
+Date: ${dateStr}
+Time: ${workshop.startTime} - ${workshop.endTime}
+Location: ${locationInfo}
+
+Please login to the FPT-SMEP system to view details.
+
+Regards,
+FPT-SMEP Team
+  `.trim();
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || '"FPT-SMEP System" <de180359letrungkien@gmail.com>',
+      to,
+      subject: `[FPT-SMEP] New ${workshop.type} Scheduled: ${workshop.title}`,
+      text: textBody,
+      html: htmlBody,
+    });
+    return { sent: true, to };
+  } catch (err) {
+    console.error("Failed to send workshop email notification:", err.message);
+    return { sent: false, error: err.message };
+  }
+}
+
 module.exports = {
   sendClassCreatedNotification,
   sendStudentImportedNotification,
+  sendWorkshopNotificationEmail,
 };

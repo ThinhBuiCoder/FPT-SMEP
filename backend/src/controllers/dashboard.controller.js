@@ -1,5 +1,5 @@
 // src/controllers/dashboard.controller.js
-const { getAdminDashboard, getLecturerDashboard, getStudentDashboard } = require('../services/dashboard.service');
+const { getAdminDashboard, getLecturerDashboard, getStudentDashboard, getMentorDashboard } = require('../services/dashboard.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
 // GET /api/dashboard/admin
@@ -24,6 +24,17 @@ const lecturerDashboard = async (req, res) => {
   }
 };
 
+// GET /api/dashboard/mentor
+const mentorDashboard = async (req, res) => {
+  try {
+    const data = await getMentorDashboard(req.user.id);
+    return successResponse(res, data);
+  } catch (error) {
+    console.error('MentorDashboard error:', error);
+    return errorResponse(res, 'Lỗi khi lấy mentor dashboard.', 500);
+  }
+};
+
 // GET /api/dashboard/student
 const studentDashboard = async (req, res) => {
   try {
@@ -35,4 +46,4 @@ const studentDashboard = async (req, res) => {
   }
 };
 
-module.exports = { adminDashboard, lecturerDashboard, studentDashboard };
+module.exports = { adminDashboard, lecturerDashboard, mentorDashboard, studentDashboard };

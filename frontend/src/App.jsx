@@ -36,6 +36,9 @@ import IdeaDetail from './pages/common/IdeaDetail';
 import MilestoneTracking from './pages/common/MilestoneTracking';
 import MentoringSessions from './pages/common/MentoringSessions';
 import GroupChat from './pages/common/GroupChat';
+import TeamWorkspace from './pages/workspace/TeamWorkspace';
+import ProposalEditor from './pages/workspace/ProposalEditor';
+import Workshops from './pages/workshops/Workshops';
 
 // Shared Pages
 import ProfileSettings from './pages/shared/ProfileSettings';
@@ -96,11 +99,18 @@ function App() {
               <Route path="/student/classes/:id"                  element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentClassDetail /></ProtectedRoute>} />
               <Route path="/student/team"                         element={<ProtectedRoute allowedRoles={['STUDENT']}><MyTeam /></ProtectedRoute>} />
 
+              {/* Workspace Routes */}
+              <Route path="/student/workspace"          element={<ProtectedRoute allowedRoles={['STUDENT']}><TeamWorkspace /></ProtectedRoute>} />
+              <Route path="/student/workspace/proposal" element={<ProtectedRoute allowedRoles={['STUDENT']}><ProposalEditor /></ProtectedRoute>} />
+              <Route path="/workspace/teams/:teamId"          element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','MENTOR','STUDENT']}><TeamWorkspace /></ProtectedRoute>} />
+              <Route path="/workspace/teams/:teamId/proposal" element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','MENTOR','STUDENT']}><ProposalEditor /></ProtectedRoute>} />
+
               {/* Shared */}
               <Route path="/rankings"   element={<Rankings />} />
               <Route path="/evaluations" element={<IdeaDetail />} />
               <Route path="/milestones"  element={<MilestoneTracking />} />
               <Route path="/sessions"    element={<MentoringSessions />} />
+              <Route path="/workshops"   element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','STUDENT','MENTOR']}><Workshops /></ProtectedRoute>} />
               <Route path="/chat"        element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','STUDENT','MENTOR']}><GroupChat /></ProtectedRoute>} />
               <Route path="/settings"    element={<ProfileSettings />} />
             </Route>

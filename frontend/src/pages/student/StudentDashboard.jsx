@@ -73,7 +73,7 @@ const StudentDashboard = () => {
           {/* Stats */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard title="AI Score" value={aiAnalysis?.aiScore ? `${aiAnalysis.aiScore}/100` : 'N/A'} icon={Brain} color="primary" change={aiAnalysis ? 'Analyzed' : 'Not analyzed'} trend={aiAnalysis?.aiScore >= 70 ? 'up' : 'flat'} />
-            <StatCard title="Lecturer Score" value={latestEvaluation?.totalScore ? `${latestEvaluation.totalScore.toFixed(1)}/10` : 'N/A'} icon={Star} color="secondary" change={latestEvaluation ? 'Evaluated' : 'Pending'} trend={latestEvaluation ? 'up' : 'flat'} />
+            <StatCard title="Lecturer Score" value={latestEvaluation?.totalScore ? `${latestEvaluation.totalScore.toFixed(1)}/100` : 'N/A'} icon={Star} color="secondary" change={latestEvaluation ? 'Evaluated' : 'Pending'} trend={latestEvaluation ? 'up' : 'flat'} />
             <StatCard title="Milestones" value={`${milestoneProgress?.done || 0}/${milestoneProgress?.total || 0}`} icon={CheckSquare} color="success" change={`${milestoneProgress?.percentage || 0}% complete`} trend="up" />
             <StatCard title="Sessions" value={mentoringSessions.length || 0} icon={Calendar} color="cyan" change="Mentoring done" trend="flat" />
           </motion.div>
@@ -186,7 +186,7 @@ const StudentDashboard = () => {
                   <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><Star className="w-4 h-4 text-amber-500" />Latest Feedback</h3>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-3xl font-black text-slate-900">{latestEvaluation.totalScore?.toFixed(1)}</span>
-                    <span className="text-slate-400">/10</span>
+                    <span className="text-slate-400">/100</span>
                   </div>
                   <p className="text-sm text-slate-500 line-clamp-3">{latestEvaluation.comment}</p>
                   <Button variant="ghost-primary" size="xs" className="mt-2 w-full" onClick={() => navigate('/student/feedback')}>View Full Feedback →</Button>

@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { mentoringApi } from '../../api/mentoringApi';
 import { dashboardApi } from '../../api/dashboardApi';
 import { teamApi } from '../../api/teamApi';
+import { classApi } from '../../api/classApi';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -19,6 +20,8 @@ const MentoringSessions = () => {
   const [sessions, setSessions] = useState([]);
   const [teamId, setTeamId] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [myClasses, setMyClasses] = useState([]);
+  const [activeView, setActiveView] = useState('timetable'); // default to timetable so they see schedules immediately
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -53,6 +56,20 @@ const MentoringSessions = () => {
         }
       }
       setSessions(Array.isArray(list) ? list : []);
+
+      // Fetch user classes for Timetable
+      try {
+        let classesRes;
+        if (user?.role === 'STUDENT') {
+          classesRes = await classApi.getMyClasses();
+        } else {
+          classesRes = await classApi.getAll();
+        }
+        const classesList = classesRes.data?.classes || classesRes.classes || classesRes.data || [];
+        setMyClasses(classesList);
+      } catch (classesErr) {
+        console.error('Failed to load user classes:', classesErr);
+      }
     } catch {
       toast.error('Failed to load sessions');
     } finally {
@@ -142,19 +159,122 @@ const MentoringSessions = () => {
   const upcomingSessions = sessions.filter(s => new Date(s.meetingDate) >= new Date()).sort((a, b) => new Date(a.meetingDate) - new Date(b.meetingDate));
   const pastSessions = sessions.filter(s => new Date(s.meetingDate) < new Date()).sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
 
+  const renderTimetable = () => {
+    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const slots = [1, 2, 3, 4];
+    const slotTimes = {
+      1: '07:30 - 09:00',
+      2: '09:10 - 10:40',
+      3: '12:30 - 14:00',
+      4: '14:10 - 15:40'
+    };
+
+    const getClassForSlot = (day, slot) => {
+      return myClasses.find(c => {
+        return c.schedule && 
+               c.schedule.dayOfWeek && 
+               c.schedule.dayOfWeek.toUpperCase() === day.toUpperCase() && 
+               parseInt(c.schedule.slot, 10) === slot;
+      });
+    };
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 overflow-x-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              {user?.role === 'LECTURER' || user?.role === 'LECTURE' ? 'Teaching Timetable' : 'Class Timetable'}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">Weekly schedule of all your classes and slots</p>
+          </div>
+        </div>
+        <table className="w-full min-w-[700px] border-collapse">
+          <thead>
+            <tr className="bg-slate-50/70 border-b border-slate-200">
+              <th className="py-3 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[150px]">Time / Slot</th>
+              {days.map(d => (
+                <th key={d} className="py-3 px-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  {d}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {slots.map(slot => (
+              <tr key={slot} className="hover:bg-slate-50/10 transition-colors">
+                <td className="py-4 px-4 align-top border-r border-slate-100/60">
+                  <div className="font-semibold text-slate-800 text-sm">Slot {slot}</div>
+                  <div className="text-xs text-slate-400 mt-1">{slotTimes[slot]}</div>
+                </td>
+                {days.map(day => {
+                  const cls = getClassForSlot(day, slot);
+                  return (
+                    <td key={day} className="py-3 px-3 align-middle border-r border-slate-100 last:border-r-0 text-center">
+                      {cls ? (
+                        <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50/60 to-primary-100/30 border border-primary-200/60 shadow-xs inline-block w-full">
+                          <div className="font-bold text-primary text-sm truncate">{cls.classCode}</div>
+                          <div className="text-[11px] font-semibold text-slate-500 mt-1">{cls.subjectCode}</div>
+                          <div className="inline-flex items-center gap-1 mt-2 text-[10px] bg-white px-2.5 py-0.5 rounded-full border border-primary-200 text-primary font-medium">
+                            Room: {cls.schedule.room || 'TBD'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 text-xs italic">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   if (loading) return <LoadingSkeleton />;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Mentoring Sessions</h1>
-          <p className="text-slate-500 mt-1">{sessions.length} sessions • {upcomingSessions.length} upcoming</p>
+          <h1 className="text-3xl font-bold text-slate-900">Schedules & Timetable</h1>
+          <p className="text-slate-500 mt-1">Manage your weekly learning classes and mentoring sessions</p>
         </div>
-        <Button variant="gradient" size="sm" icon={Plus} onClick={openAdd}>Schedule Session</Button>
+        {activeView === 'mentoring' && (
+          <Button variant="gradient" size="sm" icon={Plus} onClick={openAdd}>Schedule Session</Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200/80 gap-6">
+        <button
+          onClick={() => setActiveView('timetable')}
+          className={`pb-3 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 relative ${
+            activeView === 'timetable'
+              ? 'border-primary text-primary font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          Weekly Timetable
+        </button>
+        <button
+          onClick={() => setActiveView('mentoring')}
+          className={`pb-3 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 relative ${
+            activeView === 'mentoring'
+              ? 'border-primary text-primary font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Mentoring Sessions
+        </button>
+      </div>
+
+      {activeView === 'mentoring' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Calendar */}
         <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
@@ -261,6 +381,9 @@ const MentoringSessions = () => {
           </div>
         </div>
       </div>
+      ) : (
+        renderTimetable()
+      )}
 
       <Modal
         isOpen={isModalOpen}

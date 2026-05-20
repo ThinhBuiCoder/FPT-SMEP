@@ -126,9 +126,9 @@ const LecturerDashboard = () => {
                     <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-amber-100 text-amber-600' : i === 1 ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-400'}`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">{t.team?.name || '—'}</p>
-                      <ProgressBar value={t.avgScore ? (t.avgScore / 10) * 100 : 0} size="xs" />
+                      <ProgressBar value={t.avgScore || 0} size="xs" />
                     </div>
-                    <span className={`text-sm font-bold shrink-0 ${t.avgScore >= 8 ? 'text-green-600' : t.avgScore >= 6 ? 'text-amber-600' : 'text-slate-400'}`}>
+                    <span className={`text-sm font-bold shrink-0 ${t.avgScore >= 80 ? 'text-green-600' : t.avgScore >= 60 ? 'text-amber-600' : 'text-slate-400'}`}>
                       {t.avgScore?.toFixed(1) || '—'}
                     </span>
                   </div>
