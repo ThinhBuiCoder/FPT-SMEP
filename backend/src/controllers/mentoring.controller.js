@@ -66,4 +66,52 @@ const updateSession = async (req, res) => {
   }
 };
 
-module.exports = { createSession, getSessionsByTeam, getMyLecturerSessions, updateSession };
+const getAllSessions = async (req, res) => {
+  try {
+    let query = {};
+    if (req.user.role === 'LECTURER' || req.user.role === 'LECTURE') {
+      query.lecturerId = req.user._id;
+    } else if (req.user.role === 'MENTOR') {
+      const Team = require('../models/Team');
+      const Class = require('../models/Class');
+      const mentoredClasses = await Class.find({ mentorIds: req.user._id });
+      const classIds = mentoredClasses.map(c => c._id);
+      const mentoredTeams = await Team.find({ classId: { $in: classIds } });
+      const teamIds = mentoredTeams.map(t => t._id);
+      query.teamId = { $in: teamIds };
+    }
+    const sessions = await MentoringSession.find(query)
+      .populate('lecturerId', 'name email avatar')
+      .populate('teamId', 'teamName teamCode')
+      .sort({ meetingDate: -1 });
+
+    return successResponse(res, { sessions });
+  } catch (err) {
+    console.error('getAllSessions error:', err);
+    return errorResponse(res, 'Lỗi server.', 500);
+  }
+};
+
+const deleteSession = async (req, res) => {
+  try {
+    const session = await MentoringSession.findById(req.params.id);
+    if (!session) return errorResponse(res, 'Không tìm thấy session.', 404);
+    if (session.lecturerId.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN')
+      return errorResponse(res, 'Không có quyền xóa.', 403);
+
+    await MentoringSession.findByIdAndDelete(req.params.id);
+    return successResponse(res, null, 'Xóa mentoring session thành công!');
+  } catch (err) {
+    console.error('deleteSession error:', err);
+    return errorResponse(res, 'Lỗi server.', 500);
+  }
+};
+
+module.exports = {
+  createSession,
+  getSessionsByTeam,
+  getMyLecturerSessions,
+  updateSession,
+  getAllSessions,
+  deleteSession
+};

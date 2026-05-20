@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { mentoringApi } from '../../api/mentoringApi';
 import { dashboardApi } from '../../api/dashboardApi';
+import { teamApi } from '../../api/teamApi';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -17,6 +18,7 @@ const MentoringSessions = () => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [teamId, setTeamId] = useState(null);
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -24,7 +26,7 @@ const MentoringSessions = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [calMonth, setCalMonth] = useState(new Date());
-  const [form, setForm] = useState({ title: '', meetingDate: '', notes: '', actionItems: [''] });
+  const [form, setForm] = useState({ title: '', meetingDate: '', notes: '', actionItems: [''], teamId: '' });
 
   const fetchData = async () => {
     try {
@@ -41,6 +43,14 @@ const MentoringSessions = () => {
       } else {
         const res = await mentoringApi.getAll();
         list = res.data?.sessions || res.sessions || res.data || [];
+        
+        try {
+          const teamsRes = await teamApi.getAll();
+          const teamsData = teamsRes.data?.teams || teamsRes.teams || teamsRes.data || [];
+          setTeams(teamsData);
+        } catch (teamsErr) {
+          console.error('Failed to load teams:', teamsErr);
+        }
       }
       setSessions(Array.isArray(list) ? list : []);
     } catch {
@@ -55,7 +65,7 @@ const MentoringSessions = () => {
 
   const openAdd = () => {
     setEditingSession(null);
-    setForm({ title: '', meetingDate: '', notes: '', actionItems: [''] });
+    setForm({ title: '', meetingDate: '', notes: '', actionItems: [''], teamId: teamId || '' });
     setIsModalOpen(true);
   };
 
@@ -66,6 +76,7 @@ const MentoringSessions = () => {
       meetingDate: s.meetingDate ? new Date(s.meetingDate).toISOString().slice(0, 16) : '',
       notes: s.notes || '',
       actionItems: s.actionItems?.map(a => a.item || a) || [''],
+      teamId: s.teamId?._id || s.teamId || '',
     });
     setIsModalOpen(true);
   };
@@ -92,25 +103,23 @@ const MentoringSessions = () => {
 
   const handleSubmit = async () => {
     if (!form.title || !form.meetingDate) { toast.error('Title and date required'); return; }
+    if (user?.role !== 'STUDENT' && !form.teamId) { toast.error('Please select a team'); return; }
     setIsSubmitting(true);
     try {
       const payload = {
         ...form,
-        teamId: teamId || sessions[0]?.teamId,
+        teamId: user?.role === 'STUDENT' ? teamId : form.teamId,
         actionItems: form.actionItems.filter(a => a.trim()).map(a => ({ item: a, done: false })),
       };
       if (editingSession) {
-        const res = await mentoringApi.update(editingSession._id, payload);
-        const updated = res.data?.session || res.session || { ...editingSession, ...payload };
-        setSessions(sessions.map(s => s._id === editingSession._id ? updated : s));
+        await mentoringApi.update(editingSession._id, payload);
         toast.success('Session updated!');
       } else {
-        const res = await mentoringApi.create(payload);
-        const newS = res.data?.session || res.session || res.data;
-        if (newS) setSessions([newS, ...sessions]);
+        await mentoringApi.create(payload);
         toast.success('Session scheduled!');
       }
       setIsModalOpen(false);
+      await fetchData();
     } catch (err) {
       toast.error(err.message || 'Failed to save');
     } finally {
@@ -262,6 +271,23 @@ const MentoringSessions = () => {
         onSubmit={handleSubmit}
       >
         <div className="space-y-4">
+          {user?.role !== 'STUDENT' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Select Team *</label>
+              <select
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
+                value={form.teamId}
+                onChange={(e) => setForm({ ...form, teamId: e.target.value })}
+              >
+                <option value="">-- Choose Team --</option>
+                {teams.map(t => (
+                  <option key={t._id} value={t._id}>
+                    {t.teamName} ({t.teamCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Session Title *</label>
             <input type="text" className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Business Model Review" />
