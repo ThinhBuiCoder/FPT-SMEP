@@ -14,7 +14,13 @@ const authorize = (...roles) => {
       return errorResponse(res, 'Chưa xác thực.', 401);
     }
 
-    if (!roles.includes(req.user.role)) {
+    // If allowed roles include STUDENT, we also allow USER
+    const allowed = [...roles];
+    if (allowed.includes('STUDENT') && !allowed.includes('USER')) {
+      allowed.push('USER');
+    }
+
+    if (!allowed.includes(req.user.role)) {
       return errorResponse(
         res,
         `Bạn không có quyền truy cập. Yêu cầu role: ${roles.join(' hoặc ')}.`,

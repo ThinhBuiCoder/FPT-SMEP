@@ -21,7 +21,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.map(r => r.toUpperCase()).includes(user.role?.toUpperCase())) {
+  const userRole = user.role?.toUpperCase();
+  const normalizedUserRole = userRole === 'USER' ? 'STUDENT' : userRole;
+  const mappedAllowedRoles = allowedRoles ? allowedRoles.map(r => r.toUpperCase()) : null;
+  const hasAccess = !mappedAllowedRoles || 
+    mappedAllowedRoles.includes(userRole) || 
+    (normalizedUserRole === 'STUDENT' && mappedAllowedRoles.includes('STUDENT'));
+
+  if (!hasAccess) {
     return <Navigate to="/403" replace />;
   }
 

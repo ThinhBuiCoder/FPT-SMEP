@@ -40,7 +40,8 @@ const Navbar = ({ onMenuClick }) => {
     STUDENT: 'Reviewed',
   };
 
-  const role = user.role?.toUpperCase() || 'STUDENT';
+  const rawRole = user.role?.toUpperCase() || 'STUDENT';
+  const role = rawRole === 'USER' ? 'STUDENT' : rawRole;
 
   return (
     <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6 gap-4">

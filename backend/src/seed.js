@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 // Import models
 const User             = require('./models/User');
 const Class            = require('./models/Class');
+const Student          = require('./models/Student');
 const Team             = require('./models/Team');
 const StartupIdea      = require('./models/StartupIdea');
 const Evaluation       = require('./models/Evaluation');
@@ -19,7 +20,7 @@ const seed = async () => {
 
     // ── CLEANUP ──────────────────────────────────────────
     await Promise.all([
-      User.deleteMany(), Class.deleteMany(), Team.deleteMany(),
+      User.deleteMany(), Class.deleteMany(), Student.deleteMany(), Team.deleteMany(),
       StartupIdea.deleteMany(), Evaluation.deleteMany(),
       AiAnalysis.deleteMany(), MentoringSession.deleteMany(), Milestone.deleteMany(),
     ]);
@@ -27,7 +28,7 @@ const seed = async () => {
 
     // ── USERS ─────────────────────────────────────────────
     // NOTE: password pre-save hook sẽ tự hash
-    const [admin, lecturer, mentor, s1, s2, s3] = await User.create([
+    const [admin, lecturer, mentor, u1, u2, u3] = await User.create([
       {
         name: 'Admin FPT', email: 'admin@fpt.edu.vn', password: '123456',
         role: 'ADMIN', bio: 'System Administrator',
@@ -57,27 +58,80 @@ const seed = async () => {
 
     // ── CLASS ─────────────────────────────────────────────
     const cls = await Class.create({
-      name: 'Startup Idea Development',
-      code: 'ENT301_K17_01',
-      semester: 'Fall 2024',
+      classCode: 'ENT301_EXE101_1',
+      subjectCode: 'EXE101',
+      classIndex: 1,
+      semester: 'FA', // SP/SU/FA
+      year: 2024,
       description: 'Lớp học phát triển ý tưởng khởi nghiệp và xây dựng Startup MVP',
-      lecturerId: lecturer._id,
-      members: [s1._id, s2._id, s3._id],
+      lectureId: lecturer._id,
     });
     console.log('✅ Class created');
+
+    // ── STUDENTS ──────────────────────────────────────────
+    // Create Student roster entries linked to the created user accounts
+    const [s1, s2, s3] = await Student.create([
+      {
+        rollNumber: 'SE171234',
+        memberCode: 'MC0001',
+        lastName: 'Tran',
+        middleName: 'Thi',
+        firstName: 'Lan',
+        fullName: 'Trần Thị Lan',
+        email: 'student1@fpt.edu.vn',
+        major: 'SE',
+        classId: cls._id,
+        userId: u1._id,
+      },
+      {
+        rollNumber: 'SE171235',
+        memberCode: 'MC0002',
+        lastName: 'Le',
+        middleName: 'Van',
+        firstName: 'Hung',
+        fullName: 'Lê Văn Hùng',
+        email: 'student2@fpt.edu.vn',
+        major: 'SE',
+        classId: cls._id,
+        userId: u2._id,
+      },
+      {
+        rollNumber: 'BA171236',
+        memberCode: 'MC0003',
+        lastName: 'Pham',
+        middleName: 'Thi',
+        firstName: 'Mai',
+        fullName: 'Phạm Thị Mai',
+        email: 'student3@fpt.edu.vn',
+        major: 'BA',
+        classId: cls._id,
+        userId: u3._id,
+      },
+    ]);
+    console.log('✅ Students created (3)');
 
     // ── TEAM ──────────────────────────────────────────────
     const team = await Team.create({
       classId: cls._id,
-      name: 'EduTech Innovators',
+      teamName: 'EduTech Innovators',
+      teamCode: 'ENT301_EXE101_1_TEAM_1',
+      lectureId: lecturer._id,
+      mentorId: mentor._id,
+      createdBy: admin._id,
       description: 'Nhóm phát triển giải pháp EdTech cho thị trường Việt Nam',
       members: [
-        { userId: s1._id, roleInTeam: 'CEO' },
-        { userId: s2._id, roleInTeam: 'CTO' },
-        { userId: s3._id, roleInTeam: 'CMO' },
+        { studentId: s1._id, roleInTeam: 'CEO' },
+        { studentId: s2._id, roleInTeam: 'CTO' },
+        { studentId: s3._id, roleInTeam: 'CMO' },
       ],
     });
     console.log('✅ Team created');
+
+    // Update students with teamId
+    await Student.updateMany(
+      { _id: { $in: [s1._id, s2._id, s3._id] } },
+      { $set: { teamId: team._id } }
+    );
 
     // ── STARTUP IDEA ──────────────────────────────────────
     const idea = await StartupIdea.create({

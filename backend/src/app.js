@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const authRoutes       = require('./routes/auth.routes');
 const userRoutes       = require('./routes/user.routes');
 const classRoutes      = require('./routes/class.routes');
+const classTeamRoutes  = require('./routes/classTeam.routes');  // Module 2: class-scoped team routes
 const teamRoutes       = require('./routes/team.routes');
 const startupRoutes    = require('./routes/startupIdea.routes');
 const evaluationRoutes = require('./routes/evaluation.routes');
@@ -15,6 +16,7 @@ const aiRoutes         = require('./routes/ai.routes');
 const mentoringRoutes  = require('./routes/mentoring.routes');
 const milestoneRoutes  = require('./routes/milestone.routes');
 const dashboardRoutes  = require('./routes/dashboard.routes');
+const chatRoutes       = require('./routes/chat.routes');
 
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
@@ -36,14 +38,17 @@ if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 app.get('/', (_req, res) => res.json({
   success: true,
   message: '🚀 FPT Startup Mentoring Platform API',
-  version: '1.0.0',
+  version: '2.0.0',
   db: 'MongoDB',
+  modules: ['Auth', 'User', 'Class Management', 'Team', 'AI', 'Evaluation', 'Milestone', 'Mentoring'],
 }));
 
 // ─── API ROUTES ───────────────────────────────────────────
 app.use('/api/auth',               authRoutes);
 app.use('/api/users',              userRoutes);
 app.use('/api/classes',            classRoutes);
+// Module 2: team generation under /api/classes/:classId/teams
+app.use('/api/classes/:classId/teams', classTeamRoutes);
 app.use('/api/teams',              teamRoutes);
 app.use('/api/startup-ideas',      startupRoutes);
 app.use('/api/evaluations',        evaluationRoutes);
@@ -51,6 +56,7 @@ app.use('/api/ai',                 aiRoutes);
 app.use('/api/mentoring-sessions', mentoringRoutes);
 app.use('/api/milestones',         milestoneRoutes);
 app.use('/api/dashboard',          dashboardRoutes);
+app.use('/api/chat',               chatRoutes);
 
 // ─── ERROR HANDLERS ───────────────────────────────────────
 app.use(notFound);

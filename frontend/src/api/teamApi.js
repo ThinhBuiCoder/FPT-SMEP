@@ -1,9 +1,16 @@
+// src/api/teamApi.js — Module 2 Team Management API
 import axiosClient from './axiosClient';
 
 export const teamApi = {
-  getAll: (params) => axiosClient.get('/teams', { params }),
-  getById: (id) => axiosClient.get(`/teams/${id}`),
-  create: (data) => axiosClient.post('/teams', data),
-  update: (id, data) => axiosClient.put(`/teams/${id}`, data),
-  addMembers: (id, data) => axiosClient.post(`/teams/${id}/members`, data),
+  // ─── Team CRUD ───────────────────────────────────────────────────────────
+  getAll:      (params) => axiosClient.get('/teams', { params }),
+  getById:     (id)     => axiosClient.get(`/teams/${id}`),
+  update:      (teamId, data) => axiosClient.put(`/teams/${teamId}`, data),
+  delete:      (teamId)       => axiosClient.delete(`/teams/${teamId}`),
+
+  // ─── Assignment ──────────────────────────────────────────────────────────
+  assignMentor: (teamId, mentorId) => axiosClient.put(`/teams/${teamId}/assign-mentor`, { mentorId }),
+
+  // ─── Chat Group ──────────────────────────────────────────────────────────
+  getChatGroup: (teamId) => axiosClient.get(`/teams/${teamId}/chat-group`),
 };

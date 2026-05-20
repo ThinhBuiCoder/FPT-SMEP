@@ -1,138 +1,502 @@
-// src/controllers/class.controller.js
-const Class = require('../models/Class');
-const User = require('../models/User');
+// src/controllers/class.controller.js — Full Class Management (Module 2)
+const mongoose = require('mongoose');
+const Class   = require('../models/Class');
+const Student = require('../models/Student');
+const Team    = require('../models/Team');
+const User    = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
+const { importStudents }  = require('../services/studentImport.service');
+const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
+const multer  = require('multer');
 
-// POST /api/classes
-const createClass = async (req, res) => {
-  const { name, code, semester, description, lecturerId } = req.body;
-  if (!name || !code || !semester) return errorResponse(res, 'Thiếu: name, code, semester.', 400);
+// ─── Multer: memory storage for Excel parsing ─────────────────────────────────
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel',                                           // .xls
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .xlsx and .xls files are accepted'), false);
+    }
+  },
+});
+exports.uploadMiddleware = upload.single('file');
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Determine which semesters a LECTURER can see.
+ * Currently active semester + 2 most recent.
+ * Simplified: we just return the 3 latest distinct (semester,year) combos.
+ */
+const getLecturerSemesterFilter = async (lecturerId) => {
+  // Cast to ObjectId for aggregation pipeline (aggregation doesn't auto-cast)
+  const lecturerOid = new mongoose.Types.ObjectId(lecturerId);
+  const distinct = await Class.aggregate([
+    { $match: { lectureId: lecturerOid } },
+    { $group: { _id: { semester: '$semester', year: '$year' } } },
+    { $sort: { '_id.year': -1, '_id.semester': -1 } },
+    { $limit: 3 },
+  ]);
+  if (distinct.length === 0) return null;
+  return distinct.map(d => ({ semester: d._id.semester, year: d._id.year }));
+};
+
+// ─── POST /api/classes/bulk-create ────────────────────────────────────────────
+exports.bulkCreateClasses = async (req, res) => {
+  const { subjectCode, count, numberOfClasses, semester, year, lectureId, mentorIds } = req.body;
+
+  // --- Validate inputs ---
+  if (!subjectCode) return errorResponse(res, 'subjectCode is required', 400);
+  if (!['EXE101', 'EXE201'].includes(subjectCode?.toUpperCase()))
+    return errorResponse(res, 'subjectCode must be EXE101 or EXE201', 400);
+  if (!semester || !['SP', 'SU', 'FA'].includes(semester?.toUpperCase()))
+    return errorResponse(res, 'semester must be SP, SU or FA', 400);
+  const numCount = parseInt(count || numberOfClasses, 10);
+  if (!numCount || numCount < 1 || numCount > 100)
+    return errorResponse(res, 'count must be between 1 and 100', 400);
+  const numYear = parseInt(year, 10);
+  if (!numYear || numYear < 2020 || numYear > 2100)
+    return errorResponse(res, 'Invalid year', 400);
+
+  const semUpper = semester.toUpperCase();
+  const subjectUpper = subjectCode.toUpperCase();
+
+  // Optionally validate lecturer
+  if (lectureId) {
+    const lecturer = await User.findById(lectureId);
+    if (!lecturer || (lecturer.role !== 'LECTURER' && lecturer.role !== 'LECTURE'))
+      return errorResponse(res, 'lectureId must reference a valid LECTURER or LECTURE', 400);
+  }
+
+  // Optionally validate mentors
+  const uniqueMentorIds = Array.isArray(mentorIds) ? [...new Set(mentorIds.filter(Boolean))] : [];
+  if (uniqueMentorIds.length > 0) {
+    const mentors = await User.find({ _id: { $in: uniqueMentorIds } });
+    if (mentors.length !== uniqueMentorIds.length) {
+      return errorResponse(res, 'One or more mentor IDs are invalid', 400);
+    }
+    for (const mentor of mentors) {
+      if (mentor.role !== 'MENTOR') {
+        return errorResponse(res, `User ${mentor.name} is not a MENTOR`, 400);
+      }
+    }
+  }
+
   try {
-    if (await Class.findOne({ code: code.toUpperCase() }))
-      return errorResponse(res, 'Mã lớp đã tồn tại.', 409);
+    // Find highest existing classIndex for this subject/semester/year to continue numbering
+    const lastClass = await Class.findOne({ subjectCode: subjectUpper, semester: semUpper, year: numYear })
+      .sort({ classIndex: -1 });
+    const startIndex = lastClass ? lastClass.classIndex + 1 : 1;
 
-    const assignedLecturer = (req.user.role === 'ADMIN' && lecturerId) ? lecturerId : req.user._id;
-    const cls = await Class.create({ name, code, semester, description, lecturerId: assignedLecturer });
-    await cls.populate('lecturerId', 'name email avatar');
-    return successResponse(res, { class: cls }, 'Tạo lớp học thành công!', 201);
+    const toCreate = [];
+    for (let i = 0; i < numCount; i++) {
+      const idx = startIndex + i;
+      toCreate.push({
+        classCode:   `${subjectUpper}_${idx}`,
+        subjectCode: subjectUpper,
+        classIndex:  idx,
+        semester:    semUpper,
+        year:        numYear,
+        lectureId:   lectureId || null,
+        mentorIds:   uniqueMentorIds,
+        status:      'active',
+      });
+    }
+
+    // insertMany with ordered:false to report individual duplicate conflicts
+    const created = await Class.insertMany(toCreate, { ordered: false });
+    return successResponse(res, { classes: created, count: created.length }, `Created ${created.length} class(es)`, 201);
   } catch (err) {
+    if (err.code === 11000 || err.name === 'MongoBulkWriteError') {
+      return errorResponse(res, 'Some class codes already exist for this semester/year', 409);
+    }
     console.error(err);
-    return errorResponse(res, 'Lỗi khi tạo lớp.', 500);
+    return errorResponse(res, 'Failed to create classes', 500);
   }
 };
 
-// GET /api/classes
-const getClasses = async (req, res) => {
+// ─── GET /api/classes ─────────────────────────────────────────────────────────
+exports.getClasses = async (req, res) => {
   try {
-    const { semester, search } = req.query;
-    const query = {};
+    const { semester, year, subjectCode, search, status } = req.query;
+    // Use $and array to avoid $or key conflicts
+    const andConditions = [];
 
-    if (req.user.role === 'LECTURER') query.lecturerId = req.user._id;
-    if (req.user.role === 'STUDENT') query.members = req.user._id;
-    if (semester) query.semester = semester;
-    if (search) query.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { code: { $regex: search, $options: 'i' } },
-    ];
+    // LECTURER sees only their classes + limited to current + 2 recent semesters
+    if (req.user.role === 'LECTURER') {
+      andConditions.push({ lectureId: req.user._id });
+      if (!semester && !year) {
+        const allowed = await getLecturerSemesterFilter(req.user._id);
+        if (allowed && allowed.length > 0) {
+          andConditions.push({ $or: allowed.map(s => ({ semester: s.semester, year: s.year })) });
+        }
+      }
+    }
+
+    if (semester)    andConditions.push({ semester: semester.toUpperCase() });
+    if (year)        andConditions.push({ year: parseInt(year, 10) });
+    if (subjectCode) andConditions.push({ subjectCode: subjectCode.toUpperCase() });
+    if (status)      andConditions.push({ status });
+    if (search) {
+      andConditions.push({ classCode: { $regex: search, $options: 'i' } });
+    }
+
+    const query = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const classes = await Class.find(query)
-      .populate('lecturerId', 'name email avatar')
-      .populate('members', 'name email studentId avatar')
-      .sort({ createdAt: -1 });
+      .populate('lectureId', 'name email avatar role')
+      .populate('mentorIds', 'name email avatar role')
+      .sort({ year: -1, semester: 1, classIndex: 1 });
 
-    return successResponse(res, { classes });
+    // Attach student & team counts
+    const classIds = classes.map(c => c._id);
+    const [studentCounts, teamCounts] = await Promise.all([
+      Student.aggregate([
+        { $match: { classId: { $in: classIds } } },
+        { $group: { _id: '$classId', count: { $sum: 1 } } },
+      ]),
+      Team.aggregate([
+        { $match: { classId: { $in: classIds } } },
+        { $group: { _id: '$classId', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const studentMap = Object.fromEntries(studentCounts.map(s => [s._id.toString(), s.count]));
+    const teamMap    = Object.fromEntries(teamCounts.map(t => [t._id.toString(), t.count]));
+
+    const result = classes.map(c => ({
+      ...c.toObject(),
+      studentCount: studentMap[c._id.toString()] || 0,
+      teamCount:    teamMap[c._id.toString()]    || 0,
+    }));
+
+    return successResponse(res, { classes: result });
   } catch (err) {
-    return errorResponse(res, 'Lỗi khi lấy danh sách lớp.', 500);
+    console.error(err);
+    return errorResponse(res, 'Failed to get classes', 500);
   }
 };
 
-// GET /api/classes/:id
-const getClassById = async (req, res) => {
+// ─── GET /api/classes/:id ─────────────────────────────────────────────────────
+exports.getClassById = async (req, res) => {
   try {
     const cls = await Class.findById(req.params.id)
-      .populate('lecturerId', 'name email avatar bio')
-      .populate('members', 'name email studentId avatar role');
+      .populate('lectureId', 'name email avatar role bio')
+      .populate('mentorIds', 'name email avatar role bio');
+    if (!cls) return errorResponse(res, 'Class not found', 404);
 
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp học.', 404);
+    // Access control
+    if (req.user.role === 'LECTURER' && (!cls.lectureId || cls.lectureId._id.toString() !== req.user._id.toString()))
+      return errorResponse(res, 'You do not have permission to access this class', 403);
 
-    // Check access
-    if (req.user.role === 'LECTURER' && cls.lecturerId._id.toString() !== req.user._id.toString())
-      return errorResponse(res, 'Không có quyền xem lớp này.', 403);
-    if (req.user.role === 'STUDENT' && !cls.members.some(m => m._id.toString() === req.user._id.toString()))
-      return errorResponse(res, 'Bạn không thuộc lớp này.', 403);
+    // Students & teams
+    const [students, teams] = await Promise.all([
+      Student.find({ classId: cls._id }).sort({ fullName: 1 }),
+      Team.find({ classId: cls._id })
+        .populate('members.studentId', 'fullName email rollNumber major avatarUrl')
+        .populate('lectureId', 'name email')
+        .populate('mentorId', 'name email')
+        .sort({ createdAt: 1 }),
+    ]);
 
-    return successResponse(res, { class: cls });
+    return successResponse(res, { class: cls, students, teams });
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
-// PUT /api/classes/:id
-const updateClass = async (req, res) => {
-  const { name, semester, description, isActive } = req.body;
+// ─── PUT /api/classes/:id ─────────────────────────────────────────────────────
+exports.updateClass = async (req, res) => {
+  const { semester, year, status, lectureId } = req.body;
   try {
     const cls = await Class.findById(req.params.id);
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp.', 404);
-    if (req.user.role === 'LECTURER' && cls.lecturerId.toString() !== req.user._id.toString())
-      return errorResponse(res, 'Không có quyền chỉnh sửa.', 403);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
 
-    const updated = await Class.findByIdAndUpdate(
-      req.params.id, { name, semester, description, isActive }, { new: true }
-    ).populate('lecturerId', 'name email');
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString())
+      return errorResponse(res, 'No permission to edit this class', 403);
 
-    return successResponse(res, { class: updated }, 'Cập nhật lớp thành công!');
+    const updates = {};
+    if (semester && ['SP','SU','FA'].includes(semester.toUpperCase())) updates.semester = semester.toUpperCase();
+    if (year)   updates.year   = parseInt(year, 10);
+    if (status && ['active','disabled'].includes(status)) updates.status = status;
+    if (lectureId) {
+      const lect = await User.findById(lectureId);
+      if (!lect || lect.role !== 'LECTURER') return errorResponse(res, 'Invalid lectureId', 400);
+      updates.lectureId = lectureId;
+    }
+
+    const updated = await Class.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate('lectureId', 'name email avatar role')
+      .populate('mentorIds', 'name email avatar role');
+    return successResponse(res, { class: updated }, 'Class updated');
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
-// DELETE /api/classes/:id
-const deleteClass = async (req, res) => {
+// ─── DELETE /api/classes/:id (soft disable) ───────────────────────────────────
+exports.deleteClass = async (req, res) => {
   try {
     const cls = await Class.findById(req.params.id);
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp.', 404);
-    if (req.user.role === 'LECTURER' && cls.lecturerId.toString() !== req.user._id.toString())
-      return errorResponse(res, 'Không có quyền xóa.', 403);
-    await Class.findByIdAndDelete(req.params.id);
-    return successResponse(res, null, 'Xóa lớp thành công!');
-  } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
-  }
-};
+    if (!cls) return errorResponse(res, 'Class not found', 404);
 
-// POST /api/classes/:id/members — Thêm nhiều sinh viên
-const addMembers = async (req, res) => {
-  const { userIds } = req.body;
-  if (!userIds?.length) return errorResponse(res, 'Cần cung cấp userIds.', 400);
-  try {
-    const cls = await Class.findById(req.params.id);
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp.', 404);
-    if (req.user.role === 'LECTURER' && cls.lecturerId.toString() !== req.user._id.toString())
-      return errorResponse(res, 'Không có quyền.', 403);
-
-    // Add unique members
-    const existing = cls.members.map(m => m.toString());
-    const toAdd = userIds.filter(id => !existing.includes(id));
-    cls.members.push(...toAdd);
+    // Soft delete — set status to disabled
+    cls.status = 'disabled';
     await cls.save();
-    await cls.populate('members', 'name email studentId avatar');
-    return successResponse(res, { class: cls }, `Đã thêm ${toAdd.length} thành viên!`);
+    return successResponse(res, null, 'Class disabled successfully');
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
-// DELETE /api/classes/:id/members/:userId
-const removeMember = async (req, res) => {
+// ─── PUT /api/classes/:id/assign-lecture ─────────────────────────────────────
+exports.assignLecture = async (req, res) => {
+  const { lectureId } = req.body;
+  if (!lectureId) return errorResponse(res, 'lectureId is required', 400);
+
+  try {
+    const [cls, lecturer] = await Promise.all([
+      Class.findById(req.params.id),
+      User.findById(lectureId),
+    ]);
+
+    if (!cls)      return errorResponse(res, 'Class not found', 404);
+    if (!lecturer) return errorResponse(res, 'Lecturer not found', 404);
+    if (lecturer.role !== 'LECTURER' && lecturer.role !== 'LECTURE') {
+      return errorResponse(res, 'User is not a LECTURER or LECTURE', 400);
+    }
+
+    cls.lectureId = lectureId;
+    await cls.save();
+    await cls.populate([
+      { path: 'lectureId', select: 'name email avatar role bio' },
+      { path: 'mentorIds', select: 'name email avatar role bio' }
+    ]);
+
+    return successResponse(res, { class: cls }, 'Lecturer assigned');
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PUT /api/classes/:id/assign-mentors ─────────────────────────────────────
+exports.assignMentors = async (req, res) => {
+  const { mentorIds } = req.body;
+  if (!Array.isArray(mentorIds)) return errorResponse(res, 'mentorIds must be an array', 400);
+
   try {
     const cls = await Class.findById(req.params.id);
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp.', 404);
-    cls.members = cls.members.filter(m => m.toString() !== req.params.userId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Deduplicate
+    const uniqueMentorIds = [...new Set(mentorIds.filter(Boolean))];
+
+    if (uniqueMentorIds.length > 0) {
+      const mentors = await User.find({ _id: { $in: uniqueMentorIds } });
+      if (mentors.length !== uniqueMentorIds.length) {
+        return errorResponse(res, 'One or more mentor IDs are invalid', 400);
+      }
+      for (const mentor of mentors) {
+        if (mentor.role !== 'MENTOR') {
+          return errorResponse(res, `User ${mentor.name} is not a MENTOR`, 400);
+        }
+      }
+    }
+
+    cls.mentorIds = uniqueMentorIds;
     await cls.save();
-    return successResponse(res, null, 'Đã xóa thành viên!');
+    await cls.populate([
+      { path: 'lectureId', select: 'name email avatar role bio' },
+      { path: 'mentorIds', select: 'name email avatar role bio' }
+    ]);
+
+    return successResponse(res, { class: cls }, 'Mentors assigned successfully');
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    console.error('assignMentors error:', err);
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
-module.exports = { createClass, getClasses, getClassById, updateClass, deleteClass, addMembers, removeMember };
+// ─── POST /api/classes/:classId/import-students ───────────────────────────────
+exports.importStudents = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // LECTURER can only import into their own class
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString())
+      return errorResponse(res, 'You do not have permission to import into this class', 403);
+
+    if (!req.file) return errorResponse(res, 'Please upload an Excel file', 400);
+
+    const result = await importStudents(req.file.buffer, cls._id);
+
+    // Send email to imported students
+    let emailNotification = { sent: false, error: "Not attempted" };
+    if (result.imported && result.imported.length > 0) {
+      try {
+        emailNotification = await sendStudentImportedNotification({
+          importedStudents: result.imported,
+          classInfo: cls,
+        });
+      } catch (emailError) {
+        console.error("Failed to send import notification:", emailError.message);
+        emailNotification = { sent: false, error: emailError.message };
+      }
+    }
+
+    const msg = `Import complete: ${result.successCount} added, ${result.failedCount} failed. ${emailNotification.sent ? 'Notification sent.' : 'Notification skipped/failed.'}`;
+    return successResponse(res, { ...result, emailNotification }, msg);
+  } catch (err) {
+    return errorResponse(res, err.message || 'Import failed', 400);
+  }
+};
+
+// ─── GET /api/classes/:classId/students ───────────────────────────────────────
+exports.getStudents = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString())
+      return errorResponse(res, 'You do not have permission to view this class', 403);
+
+    const { search, major } = req.query;
+    const query = { classId: cls._id };
+    if (search) query.$or = [
+      { fullName:   { $regex: search, $options: 'i' } },
+      { rollNumber: { $regex: search, $options: 'i' } },
+      { email:      { $regex: search, $options: 'i' } },
+    ];
+    if (major) query.major = { $regex: major, $options: 'i' };
+
+    const students = await Student.find(query).sort({ fullName: 1 });
+    return successResponse(res, { students });
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── GET /api/classes/my-classes ──────────────────────────────────────────────
+exports.getMyClasses = async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      $or: [
+        { userId: req.user._id },
+        { email: req.user.email.toLowerCase() }
+      ]
+    });
+
+    if (!student) {
+      return successResponse(res, { classes: [] }, 'Student not enrolled in any class');
+    }
+
+    const cls = await Class.findById(student.classId)
+      .populate('lectureId', 'name email avatar role bio')
+      .populate('mentorIds', 'name email avatar role bio');
+
+    const classes = cls ? [cls] : [];
+    return successResponse(res, { classes });
+  } catch (err) {
+    console.error('getMyClasses error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── GET /api/classes/my-team ─────────────────────────────────────────────────
+exports.getMyTeam = async (req, res) => {
+  try {
+    let student = await Student.findOne({
+      $or: [
+        { userId: req.user._id },
+        { email: req.user.email.toLowerCase() }
+      ],
+      teamId: { $ne: null }
+    });
+
+    if (!student) {
+      student = await Student.findOne({
+        $or: [
+          { userId: req.user._id },
+          { email: req.user.email.toLowerCase() }
+        ]
+      });
+    }
+
+    if (!student) {
+      return successResponse(res, null, 'Student record not found');
+    }
+
+    if (!student.teamId) {
+      return successResponse(res, null, 'You have not been assigned to a team yet.');
+    }
+
+    const team = await Team.findById(student.teamId)
+      .populate('lectureId', 'name email avatar')
+      .populate('mentorId', 'name email avatar')
+      .populate('chatGroupId');
+
+    if (!team) {
+      return successResponse(res, null, 'You have not been assigned to a team yet.');
+    }
+
+    const cls = await Class.findById(team.classId);
+    const members = await Student.find({ teamId: team._id }).sort({ fullName: 1 });
+
+    return successResponse(res, {
+      team,
+      class: cls,
+      members,
+      chatGroup: team.chatGroupId
+    });
+  } catch (err) {
+    console.error('getMyTeam error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── GET /api/classes/my-class-detail/:classId ─────────────────────────────────
+exports.getMyClassDetail = async (req, res) => {
+  try {
+    const classId = req.params.classId;
+
+    const student = await Student.findOne({
+      classId,
+      $or: [
+        { userId: req.user._id },
+        { email: req.user.email.toLowerCase() }
+      ]
+    });
+
+    if (!student) {
+      return errorResponse(res, 'You do not belong to this class', 403);
+    }
+
+    const cls = await Class.findById(classId)
+      .populate('lectureId', 'name email avatar role bio')
+      .populate('mentorIds', 'name email avatar role bio');
+
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    const [students, teams] = await Promise.all([
+      Student.find({ classId: cls._id }).sort({ fullName: 1 }),
+      Team.find({ classId: cls._id })
+        .populate('members.studentId', 'fullName email rollNumber major avatarUrl')
+        .populate('lectureId', 'name email')
+        .populate('mentorId', 'name email')
+        .sort({ createdAt: 1 }),
+    ]);
+
+    return successResponse(res, { class: cls, students, teams });
+  } catch (err) {
+    console.error('getMyClassDetail error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+

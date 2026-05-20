@@ -1,117 +1,320 @@
-// src/controllers/team.controller.js
-const Team = require('../models/Team');
-const Class = require('../models/Class');
+// src/controllers/team.controller.js — Full Team Management (Module 2)
+const mongoose  = require('mongoose');
+const Team      = require('../models/Team');
+const Class     = require('../models/Class');
+const Student   = require('../models/Student');
+const User      = require('../models/User');
+const ChatGroup = require('../models/ChatGroup');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
+const { validateTeamStudents, generateTeamCode } = require('../services/teamGeneration.service');
+const { createChatGroupForTeam } = require('../services/chatGroup.service');
 
-// POST /api/teams
-const createTeam = async (req, res) => {
-  const { classId, name, description } = req.body;
-  if (!classId || !name) return errorResponse(res, 'Thiếu: classId, name.', 400);
+// ─── POST /api/classes/:classId/teams/generate ───────────────────────────────
+exports.generateTeam = async (req, res) => {
+  const { studentIds, mode = 'auto', mentorId } = req.body;
+  const { classId } = req.params;
+
+  if (!['auto', 'manual'].includes(mode))
+    return errorResponse(res, 'mode must be "auto" or "manual"', 400);
+
+  // 1. Validate students
+  const { students, error } = await validateTeamStudents(studentIds, classId, mode);
+  if (error) return errorResponse(res, error, 400);
+
+  // 2. Load class for teamCode generation
+  const cls = await Class.findById(classId);
+  if (!cls) return errorResponse(res, 'Class not found', 404);
+
+  // 3. LECTURER permission check
+  if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString())
+    return errorResponse(res, 'You do not have permission to manage this class', 403);
+
+  // Validate mentorId
+  let assignedMentorId = null;
+  if (mentorId) {
+    const classMentorIds = cls.mentorIds || [];
+    const isValid = classMentorIds.some(m => m.toString() === mentorId.toString());
+    if (!isValid) {
+      return errorResponse(res, 'Selected mentor is not assigned to this class', 400);
+    }
+    assignedMentorId = mentorId;
+  } else {
+    // Auto assign if class has exactly 1 mentor
+    if (cls.mentorIds && cls.mentorIds.length === 1) {
+      assignedMentorId = cls.mentorIds[0];
+    }
+  }
+
+  // 4. Generate team code/name
+  const { teamCode, teamName } = await generateTeamCode(cls.classCode, classId);
+
+  // 5. Run inside a transaction for atomicity (Team + ChatGroup)
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const cls = await Class.findById(classId);
-    if (!cls) return errorResponse(res, 'Không tìm thấy lớp.', 404);
+    // Create team
+    const [team] = await Team.create(
+      [{
+        classId,
+        teamName,
+        teamCode,
+        lectureId: cls.lectureId || null,
+        mentorId: assignedMentorId,
+        createdBy: req.user._id,
+        members: students.map(s => ({ studentId: s._id, roleInTeam: 'Member' })),
+      }],
+      { session }
+    );
 
-    // Student phải thuộc lớp
-    if (req.user.role === 'STUDENT' && !cls.members.some(m => m.toString() === req.user._id.toString()))
-      return errorResponse(res, 'Bạn không thuộc lớp này.', 403);
+    // Update each student's teamId
+    await Student.updateMany(
+      { _id: { $in: students.map(s => s._id) } },
+      { $set: { teamId: team._id } },
+      { session }
+    );
 
-    const members = req.user.role === 'STUDENT'
-      ? [{ userId: req.user._id, roleInTeam: 'CEO' }]
-      : [];
+    // Auto-create chat group
+    const chatGroup = await createChatGroupForTeam(
+      team._id,
+      { session, createdBy: req.user._id }
+    );
 
-    const team = await Team.create({ classId, name, description, members });
+    // Link chat group back to team
+    team.chatGroupId = chatGroup._id;
+    await team.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Populate for response
     await team.populate([
-      { path: 'classId', select: 'name code semester' },
-      { path: 'members.userId', select: 'name email avatar studentId' },
+      { path: 'members.studentId', select: 'fullName email rollNumber major' },
+      { path: 'lectureId', select: 'name email' },
+      { path: 'mentorId', select: 'name email' }
     ]);
-    return successResponse(res, { team }, 'Tạo team thành công!', 201);
+
+    return successResponse(
+      res,
+      { team, chatGroup },
+      `Team "${teamName}" created with chat group successfully`,
+      201
+    );
   } catch (err) {
-    console.error(err);
-    return errorResponse(res, 'Lỗi khi tạo team.', 500);
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Team generation error:', err);
+    return errorResponse(res, err.message || 'Failed to create team', 500);
   }
 };
 
-// GET /api/teams?classId=
-const getTeams = async (req, res) => {
+// ─── GET /api/classes/:classId/teams ─────────────────────────────────────────
+exports.getTeamsByClass = async (req, res) => {
   try {
-    const { classId } = req.query;
-    const query = {};
-    if (classId) query.classId = classId;
-    if (req.user.role === 'STUDENT') query['members.userId'] = req.user._id;
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
 
-    const teams = await Team.find(query)
-      .populate('classId', 'name code semester')
-      .populate('members.userId', 'name email avatar studentId')
-      .sort({ createdAt: -1 });
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString())
+      return errorResponse(res, 'You do not have permission to view this class', 403);
+
+    const teams = await Team.find({ classId: req.params.classId })
+      .populate('members.studentId', 'fullName email rollNumber major avatarUrl')
+      .populate('lectureId', 'name email avatar')
+      .populate('mentorId', 'name email avatar')
+      .sort({ createdAt: 1 });
 
     return successResponse(res, { teams });
   } catch (err) {
-    return errorResponse(res, 'Lỗi khi lấy teams.', 500);
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
-// GET /api/teams/:id
-const getTeamById = async (req, res) => {
+// ─── PUT /api/teams/:teamId ───────────────────────────────────────────────────
+exports.updateTeam = async (req, res) => {
+  const { teamName, description } = req.body;
+  try {
+    const team = await Team.findById(req.params.teamId);
+    if (!team) return errorResponse(res, 'Team not found', 404);
+
+    if (teamName)    team.teamName    = teamName;
+    if (description !== undefined) team.description = description;
+    await team.save();
+
+    return successResponse(res, { team }, 'Team updated');
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── DELETE /api/teams/:teamId ────────────────────────────────────────────────
+exports.deleteTeam = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const team = await Team.findById(req.params.teamId).session(session);
+    if (!team) { await session.abortTransaction(); session.endSession(); return errorResponse(res, 'Team not found', 404); }
+
+    // Unassign students
+    await Student.updateMany(
+      { teamId: team._id },
+      { $set: { teamId: null } },
+      { session }
+    );
+
+    // Remove chat group
+    if (team.chatGroupId) {
+      await ChatGroup.findByIdAndDelete(team.chatGroupId).session(session);
+    }
+
+    await Team.findByIdAndDelete(team._id).session(session);
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(res, null, 'Team deleted');
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PUT /api/teams/:teamId/assign-mentor ─────────────────────────────────────
+exports.assignMentor = async (req, res) => {
+  const { mentorId } = req.body;
+  if (!mentorId) return errorResponse(res, 'mentorId is required', 400);
+
+  try {
+    const [team, mentor] = await Promise.all([
+      Team.findById(req.params.teamId),
+      User.findById(mentorId),
+    ]);
+    if (!team)   return errorResponse(res, 'Team not found', 404);
+    if (!mentor) return errorResponse(res, 'Mentor not found', 404);
+    if (mentor.role !== 'MENTOR') return errorResponse(res, 'User is not a MENTOR', 400);
+
+    team.mentorId = mentorId;
+    await team.save();
+    await team.populate('mentorId', 'name email avatar');
+
+    return successResponse(res, { team }, 'Mentor assigned');
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── GET /api/teams/:teamId/chat-group ───────────────────────────────────────
+exports.getChatGroup = async (req, res) => {
+  try {
+    const team = await Team.findById(req.params.teamId);
+    if (!team) return errorResponse(res, 'Team not found', 404);
+
+    const chatGroup = await ChatGroup.findOne({ teamId: team._id })
+      .populate('members.userId', 'name email avatar')
+      .populate('members.studentId', 'fullName email');
+
+    if (!chatGroup) return errorResponse(res, 'No chat group found for this team', 404);
+    return successResponse(res, { chatGroup });
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── Keep legacy routes functional (old Class.members-based system) ────────────
+exports.createTeam  = async (req, res) => errorResponse(res, 'Use POST /api/classes/:classId/teams/generate', 400);
+exports.getTeams    = async (req, res) => {
+  // Redirect to class-scoped query if classId provided
+  const { classId } = req.query;
+  if (classId) {
+    req.params.classId = classId;
+    return exports.getTeamsByClass(req, res);
+  }
+  try {
+    const teams = await Team.find()
+      .populate('members.studentId', 'fullName email rollNumber')
+      .sort({ createdAt: -1 });
+    return successResponse(res, { teams });
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+exports.getTeamById = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id)
-      .populate('classId', 'name code semester lecturerId')
-      .populate('members.userId', 'name email avatar studentId bio');
-    if (!team) return errorResponse(res, 'Không tìm thấy team.', 404);
+      .populate('classId', 'classCode semester year')
+      .populate('members.studentId', 'fullName email rollNumber major avatarUrl');
+    if (!team) return errorResponse(res, 'Team not found', 404);
     return successResponse(res, { team });
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    return errorResponse(res, 'Server error', 500);
   }
 };
+exports.addMember    = async (req, res) => errorResponse(res, 'Use team generation API', 400);
+exports.removeMember = async (req, res) => errorResponse(res, 'Use team generation API', 400);
 
-// PUT /api/teams/:id
-const updateTeam = async (req, res) => {
-  const { name, description } = req.body;
+// ─── POST /api/classes/:classId/backfill-chats ───────────────────────────────
+exports.backfillChatGroups = async (req, res) => {
+  const { id } = req.params; // Class ID
+  const classId = id || req.params.classId;
   try {
-    const team = await Team.findByIdAndUpdate(req.params.id, { name, description }, { new: true })
-      .populate('members.userId', 'name email avatar');
-    if (!team) return errorResponse(res, 'Không tìm thấy team.', 404);
-    return successResponse(res, { team }, 'Cập nhật team thành công!');
-  } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
-  }
-};
+    const cls = await Class.findById(classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
 
-// POST /api/teams/:id/members
-const addMember = async (req, res) => {
-  const { userId, roleInTeam = 'Member' } = req.body;
-  if (!userId) return errorResponse(res, 'Thiếu userId.', 400);
-  try {
-    const team = await Team.findById(req.params.id);
-    if (!team) return errorResponse(res, 'Không tìm thấy team.', 404);
+    const teams = await Team.find({ classId });
+    let createdCount = 0;
+    let attachedExistingCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
 
-    // Prevent duplicate
-    if (team.members.some(m => m.userId.toString() === userId)) {
-      // Update role instead
-      team.members = team.members.map(m =>
-        m.userId.toString() === userId ? { userId: m.userId, roleInTeam } : m
-      );
-    } else {
-      team.members.push({ userId, roleInTeam });
+    for (const team of teams) {
+      try {
+        if (team.chatGroupId) {
+          const chatGroupObj = await ChatGroup.findById(team.chatGroupId);
+          if (chatGroupObj) {
+            skippedCount++;
+            continue;
+          }
+        }
+
+        // Check if ChatGroup exists by teamId
+        const existing = await ChatGroup.findOne({ teamId: team._id });
+        if (existing) {
+          team.chatGroupId = existing._id;
+          await team.save();
+          attachedExistingCount++;
+          continue;
+        }
+
+        // Otherwise create one
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+          const chatGroup = await createChatGroupForTeam(team._id, { session, createdBy: req.user._id });
+          team.chatGroupId = chatGroup._id;
+          await team.save({ session });
+          await session.commitTransaction();
+          session.endSession();
+          createdCount++;
+        } catch (innerErr) {
+          await session.abortTransaction();
+          session.endSession();
+          console.error(`Failed to backfill chat for team ${team.teamName}:`, innerErr);
+          failedCount++;
+        }
+      } catch (err) {
+        console.error(`Error processing backfill for team ${team._id}:`, err);
+        failedCount++;
+      }
     }
-    await team.save();
-    await team.populate('members.userId', 'name email avatar studentId');
-    return successResponse(res, { team }, 'Đã thêm thành viên!');
+
+    return successResponse(res, {
+      totalTeams: teams.length,
+      createdCount,
+      attachedExistingCount,
+      skippedCount,
+      failedCount,
+    }, 'Backfill completed');
   } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
+    console.error('backfillChatGroups error:', err);
+    return errorResponse(res, 'Server error', 500);
   }
 };
-
-// DELETE /api/teams/:id/members/:userId
-const removeMember = async (req, res) => {
-  try {
-    const team = await Team.findById(req.params.id);
-    if (!team) return errorResponse(res, 'Không tìm thấy team.', 404);
-    team.members = team.members.filter(m => m.userId.toString() !== req.params.userId);
-    await team.save();
-    return successResponse(res, null, 'Đã xóa thành viên!');
-  } catch (err) {
-    return errorResponse(res, 'Lỗi server.', 500);
-  }
-};
-
-module.exports = { createTeam, getTeams, getTeamById, updateTeam, addMember, removeMember };

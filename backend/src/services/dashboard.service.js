@@ -6,7 +6,8 @@ const StartupIdea = require('../models/StartupIdea');
 const Evaluation = require('../models/Evaluation');
 const AiAnalysis = require('../models/AiAnalysis');
 const MentoringSession = require('../models/MentoringSession');
-const Milestone = require('../models/Milestone');
+const Milestone        = require('../models/Milestone');
+const Student          = require('../models/Student');
 
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
@@ -101,16 +102,54 @@ const getLecturerDashboard = async (lecturerId) => {
 
 // ─── STUDENT ──────────────────────────────────────────────
 const getStudentDashboard = async (userId) => {
-  const myTeam = await Team.findOne({ 'members.userId': userId })
-    .populate('classId', 'name code semester')
-    .populate('members.userId', 'name email avatar studentId');
+  const userObj = await User.findById(userId);
+  if (!userObj) {
+    return { hasTeam: false, myClass: null, team: null, startupIdea: null };
+  }
 
-  const myClass = await Class.findOne({ members: userId }, 'name code semester lecturerId')
-    .populate('lecturerId', 'name email avatar');
+  const student = await Student.findOne({
+    $or: [
+      { userId: userObj._id },
+      { email: userObj.email.toLowerCase() }
+    ]
+  });
 
-  if (!myTeam) return { hasTeam: false, myClass, team: null, startupIdea: null };
+  if (!student) {
+    return { hasTeam: false, myClass: null, team: null, startupIdea: null };
+  }
 
-  const teamMember = myTeam.members.find(m => m.userId._id.toString() === userId.toString());
+  const myClass = await Class.findById(student.classId)
+    .populate('lectureId', 'name email avatar');
+
+  const myTeam = student.teamId
+    ? await Team.findById(student.teamId)
+        .populate('classId', 'classCode subjectCode semester year')
+        .populate('members.studentId', 'fullName email rollNumber major')
+    : null;
+
+  const semesterLabel = (sem) => {
+    if (sem === 'SP') return 'Spring';
+    if (sem === 'SU') return 'Summer';
+    if (sem === 'FA') return 'Fall';
+    return sem || '';
+  };
+
+  const mappedClass = myClass ? {
+    _id: myClass._id,
+    name: myClass.description || 'Startup Idea Development',
+    code: myClass.classCode,
+    semester: `${semesterLabel(myClass.semester)} ${myClass.year || ''}`,
+    lecturerId: myClass.lectureId,
+  } : null;
+
+  if (!myTeam) {
+    return { hasTeam: false, myClass: mappedClass, team: null, startupIdea: null };
+  }
+
+  const teamMember = myTeam.members.find(
+    m => m.studentId?._id?.toString() === student._id.toString() ||
+         m.studentId?.toString() === student._id.toString()
+  );
 
   const [startupIdea, milestones, sessions] = await Promise.all([
     StartupIdea.findOne({ teamId: myTeam._id }).sort({ createdAt: -1 }),
@@ -136,11 +175,28 @@ const getStudentDashboard = async (userId) => {
   });
   const done = processedMilestones.filter(m => m.status === 'DONE').length;
 
+  const mappedMembers = myTeam.members.map(m => ({
+    userId: {
+      _id: m.studentId?._id,
+      name: m.studentId?.fullName || 'Unknown Student',
+      email: m.studentId?.email || '',
+      studentId: m.studentId?.rollNumber || '',
+    },
+    roleInTeam: m.roleInTeam
+  }));
+
+  const mappedTeam = {
+    _id: myTeam._id,
+    name: myTeam.teamName,
+    code: myTeam.teamCode,
+    members: mappedMembers,
+  };
+
   return {
     hasTeam: true,
-    myClass,
-    team: myTeam,
-    roleInTeam: teamMember?.roleInTeam,
+    myClass: mappedClass,
+    team: mappedTeam,
+    roleInTeam: teamMember?.roleInTeam || 'Member',
     startupIdea,
     aiAnalysis,
     latestEvaluation,
