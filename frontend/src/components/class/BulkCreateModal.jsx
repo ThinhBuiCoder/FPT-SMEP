@@ -15,7 +15,7 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], onCl
     semester:    'SP',
     year:        String(CURRENT_YR),
     count:       '5',
-    lectureId:   '',
+    lecturerIds: [],
     mentorIds:   [],
   });
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +80,7 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], onCl
         semester:    form.semester,
         year:        parseInt(form.year, 10),
         count:       parseInt(form.count, 10),
-        lectureId:   form.lectureId || undefined,
+        lecturerIds: form.lecturerIds.length > 0 ? form.lecturerIds : undefined,
         mentorIds:   form.mentorIds.length > 0 ? form.mentorIds : undefined,
       });
       const count = res?.data?.count || res?.count || parseInt(form.count, 10);
@@ -164,17 +164,34 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], onCl
             </div>
           ) : (
             <>
-              {/* Lecturer */}
+              {/* Lecturers */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Assign Lecturer (optional)</label>
-                <select
-                  value={form.lectureId}
-                  onChange={(e) => handleChange('lectureId', e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                >
-                  <option value="">— No lecturer —</option>
-                  {allLecturers.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Assign Lecturers (optional)</label>
+                <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5">
+                  {allLecturers.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-2">No lecturers found</p>
+                  ) : (
+                    allLecturers.map(l => {
+                      const checked = form.lecturerIds.includes(l._id);
+                      return (
+                        <label key={l._id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const nextIds = checked
+                                ? form.lecturerIds.filter(id => id !== l._id)
+                                : [...form.lecturerIds, l._id];
+                              handleChange('lecturerIds', nextIds);
+                            }}
+                            className="rounded border-slate-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <span>{l.name} ({l.email})</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               {/* Mentors */}

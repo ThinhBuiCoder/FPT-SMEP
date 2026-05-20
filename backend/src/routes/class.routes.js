@@ -25,9 +25,11 @@ router.put('/:id',           authorize('ADMIN', 'LECTURER'), ctrl.updateClass);
 // Soft-delete (disable) class
 router.delete('/:id',        authorize('ADMIN'), ctrl.deleteClass);
 
-// ─── Lecturer Assignment ─────────────────────────────────────────────────────
+// ─── Lecturer Assignment & Schedule ──────────────────────────────────────────
 router.put('/:id/assign-lecture', authorize('ADMIN'), ctrl.assignLecture);
 router.put('/:id/assign-mentors', authorize('ADMIN'), ctrl.assignMentors);
+router.put('/:classId/schedule', authorize('ADMIN', 'LECTURER'), ctrl.updateSchedule);
+router.put('/:classId/teaching-assignment', authorize('ADMIN'), ctrl.updateTeachingAssignment);
 router.post('/:id/backfill-chats', authorize('ADMIN', 'LECTURER'), teamCtrl.backfillChatGroups);
 
 // ─── Student Import ──────────────────────────────────────────────────────────

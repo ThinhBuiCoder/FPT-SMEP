@@ -39,9 +39,9 @@ io.on('connection', (socket) => {
   // Real-time message receiver
   socket.on('send_message', async (data) => {
     try {
-      const { chatGroupId, senderId, senderName, senderRole, text } = data;
+      const { chatGroupId, senderId, senderName, senderRole, text, attachment } = data;
 
-      if (!chatGroupId || !senderId || !text) {
+      if (!chatGroupId || !senderId || (!text && !attachment)) {
         console.error('⚠️ Invalid send_message data received:', data);
         return;
       }
@@ -52,7 +52,8 @@ io.on('connection', (socket) => {
         senderId,
         senderName,
         senderRole,
-        text,
+        text: text || '',
+        attachment: attachment || null,
       });
 
       // Populate senderId for consistent frontend avatars/rendering

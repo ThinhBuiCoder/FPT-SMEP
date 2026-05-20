@@ -7,7 +7,7 @@ const User      = require('../models/User');
 const ChatGroup = require('../models/ChatGroup');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { validateTeamStudents, generateTeamCode } = require('../services/teamGeneration.service');
-const { createChatGroupForTeam } = require('../services/chatGroup.service');
+const { createChatGroupForTeam, createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
 
 // ─── POST /api/classes/:classId/teams/generate ───────────────────────────────
 exports.generateTeam = async (req, res) => {
@@ -304,6 +304,13 @@ exports.backfillChatGroups = async (req, res) => {
         console.error(`Error processing backfill for team ${team._id}:`, err);
         failedCount++;
       }
+    }
+
+    // Also backfill the class general chat group
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (classChatErr) {
+      console.error(`Failed to backfill general chat for class ${cls.classCode}:`, classChatErr);
     }
 
     return successResponse(res, {

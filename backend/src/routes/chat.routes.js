@@ -13,4 +13,7 @@ router.get('/groups', ctrl.getMyChatGroups);
 // message history
 router.get('/groups/:chatGroupId/messages', ctrl.getGroupMessages);
 
+// upload file/image in chat
+router.post('/upload', ctrl.uploadChatFile);
+
 module.exports = router;

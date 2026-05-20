@@ -7,6 +7,8 @@ const User    = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
+const { autoGenerateSchedule, validateScheduleConflict } = require('../services/schedule.service');
+const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
 const multer  = require('multer');
 
 // ─── Multer: memory storage for Excel parsing ─────────────────────────────────
@@ -49,7 +51,7 @@ const getLecturerSemesterFilter = async (lecturerId) => {
 
 // ─── POST /api/classes/bulk-create ────────────────────────────────────────────
 exports.bulkCreateClasses = async (req, res) => {
-  const { subjectCode, count, numberOfClasses, semester, year, lectureId, mentorIds } = req.body;
+  const { subjectCode, count, numberOfClasses, semester, year, lecturerIds, lectureId, mentorIds } = req.body;
 
   // --- Validate inputs ---
   if (!subjectCode) return errorResponse(res, 'subjectCode is required', 400);
@@ -67,11 +69,21 @@ exports.bulkCreateClasses = async (req, res) => {
   const semUpper = semester.toUpperCase();
   const subjectUpper = subjectCode.toUpperCase();
 
-  // Optionally validate lecturer
-  if (lectureId) {
-    const lecturer = await User.findById(lectureId);
-    if (!lecturer || (lecturer.role !== 'LECTURER' && lecturer.role !== 'LECTURE'))
-      return errorResponse(res, 'lectureId must reference a valid LECTURER or LECTURE', 400);
+  // Validate lecturers (support both singular lectureId for backward compatibility and array lecturerIds)
+  const validLecturerIds = [];
+  const incomingLecturers = Array.isArray(lecturerIds) ? lecturerIds : (lectureId ? [lectureId] : []);
+  if (incomingLecturers.length > 0) {
+    const uniqueLecturerIds = [...new Set(incomingLecturers.filter(Boolean))];
+    const lecturers = await User.find({ _id: { $in: uniqueLecturerIds } });
+    if (lecturers.length !== uniqueLecturerIds.length) {
+      return errorResponse(res, 'One or more lecturer IDs are invalid', 400);
+    }
+    for (const lect of lecturers) {
+      if (lect.role !== 'LECTURER' && lect.role !== 'LECTURE') {
+        return errorResponse(res, `User ${lect.name} is not a LECTURER`, 400);
+      }
+      validLecturerIds.push(lect._id.toString());
+    }
   }
 
   // Optionally validate mentors
@@ -97,13 +109,20 @@ exports.bulkCreateClasses = async (req, res) => {
     const toCreate = [];
     for (let i = 0; i < numCount; i++) {
       const idx = startIndex + i;
+      
+      // Round-robin lecturer assignment
+      let assignedLecturerId = null;
+      if (validLecturerIds.length > 0) {
+        assignedLecturerId = validLecturerIds[i % validLecturerIds.length];
+      }
+
       toCreate.push({
         classCode:   `${subjectUpper}_${idx}`,
         subjectCode: subjectUpper,
         classIndex:  idx,
         semester:    semUpper,
         year:        numYear,
-        lectureId:   lectureId || null,
+        lectureId:   assignedLecturerId,
         mentorIds:   uniqueMentorIds,
         status:      'active',
       });
@@ -111,7 +130,25 @@ exports.bulkCreateClasses = async (req, res) => {
 
     // insertMany with ordered:false to report individual duplicate conflicts
     const created = await Class.insertMany(toCreate, { ordered: false });
-    return successResponse(res, { classes: created, count: created.length }, `Created ${created.length} class(es)`, 201);
+    
+    // Auto-schedule newly created classes
+    const scheduleResult = await autoGenerateSchedule(created);
+
+    // Auto-create chat groups for all created classes
+    for (const cls of created) {
+      try {
+        await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+      } catch (chatErr) {
+        console.error(`Failed to create chat group for class ${cls.classCode}:`, chatErr.message);
+      }
+    }
+
+    return successResponse(res, { 
+      classes: created, 
+      count: created.length,
+      scheduledCount: scheduleResult.scheduledCount,
+      scheduleWarnings: scheduleResult.warnings
+    }, `Created ${created.length} class(es). Scheduled ${scheduleResult.scheduledCount}.`, 201);
   } catch (err) {
     if (err.code === 11000 || err.name === 'MongoBulkWriteError') {
       return errorResponse(res, 'Some class codes already exist for this semester/year', 409);
@@ -234,6 +271,13 @@ exports.updateClass = async (req, res) => {
     const updated = await Class.findByIdAndUpdate(req.params.id, updates, { new: true })
       .populate('lectureId', 'name email avatar role')
       .populate('mentorIds', 'name email avatar role');
+
+    try {
+      await createOrUpdateChatGroupForClass(updated._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group for class ${updated.classCode}:`, chatErr.message);
+    }
+
     return successResponse(res, { class: updated }, 'Class updated');
   } catch (err) {
     return errorResponse(res, 'Server error', 500);
@@ -274,12 +318,27 @@ exports.assignLecture = async (req, res) => {
 
     cls.lectureId = lectureId;
     await cls.save();
+
+    let scheduleWarnings = [];
+    if (!cls.schedule || !cls.schedule.dayOfWeek) {
+      const scheduleResult = await autoGenerateSchedule([cls]);
+      if (scheduleResult.warnings && scheduleResult.warnings.length > 0) {
+        scheduleWarnings = scheduleResult.warnings;
+      }
+    }
+
     await cls.populate([
       { path: 'lectureId', select: 'name email avatar role bio' },
       { path: 'mentorIds', select: 'name email avatar role bio' }
     ]);
 
-    return successResponse(res, { class: cls }, 'Lecturer assigned');
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group for class ${cls.classCode}:`, chatErr.message);
+    }
+
+    return successResponse(res, { class: cls, scheduleWarnings }, 'Lecturer assigned');
   } catch (err) {
     return errorResponse(res, 'Server error', 500);
   }
@@ -316,6 +375,12 @@ exports.assignMentors = async (req, res) => {
       { path: 'mentorIds', select: 'name email avatar role bio' }
     ]);
 
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group for class ${cls.classCode}:`, chatErr.message);
+    }
+
     return successResponse(res, { class: cls }, 'Mentors assigned successfully');
   } catch (err) {
     console.error('assignMentors error:', err);
@@ -336,6 +401,13 @@ exports.importStudents = async (req, res) => {
     if (!req.file) return errorResponse(res, 'Please upload an Excel file', 400);
 
     const result = await importStudents(req.file.buffer, cls._id);
+
+    // Update class chat group members to include the new students
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group members for class ${cls.classCode}:`, chatErr.message);
+    }
 
     // Send email to imported students
     let emailNotification = { sent: false, error: "Not attempted" };
@@ -496,6 +568,100 @@ exports.getMyClassDetail = async (req, res) => {
     return successResponse(res, { class: cls, students, teams });
   } catch (err) {
     console.error('getMyClassDetail error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PUT /api/classes/:classId/schedule ─────────────────────────────────────
+exports.updateSchedule = async (req, res) => {
+  const { dayOfWeek, slot, room } = req.body;
+  if (!dayOfWeek || !slot) return errorResponse(res, 'dayOfWeek and slot are required', 400);
+
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (cls.lectureId) {
+      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, dayOfWeek, slot, cls._id);
+      if (hasConflict) {
+        return errorResponse(res, 'Lecturer already has another class in this time slot.', 409);
+      }
+    }
+
+    const SLOT_TIMES = {
+      1: { startTime: '07:30', endTime: '09:00' },
+      2: { startTime: '09:10', endTime: '10:40' },
+      3: { startTime: '12:30', endTime: '14:00' },
+      4: { startTime: '14:10', endTime: '15:40' }
+    };
+
+    cls.schedule = {
+      dayOfWeek,
+      slot: parseInt(slot, 10),
+      startTime: SLOT_TIMES[slot].startTime,
+      endTime: SLOT_TIMES[slot].endTime,
+      room: room || 'TBD'
+    };
+
+    await cls.save();
+    return successResponse(res, { class: cls }, 'Schedule updated successfully');
+  } catch (err) {
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PUT /api/classes/:classId/teaching-assignment ────────────────────────────
+exports.updateTeachingAssignment = async (req, res) => {
+  const { lectureId, schedule } = req.body;
+
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (lectureId) {
+      const lecturer = await User.findById(lectureId);
+      if (!lecturer || (lecturer.role !== 'LECTURER' && lecturer.role !== 'LECTURE')) {
+        return errorResponse(res, 'Invalid lectureId', 400);
+      }
+      cls.lectureId = lectureId;
+    }
+
+    if (schedule && schedule.dayOfWeek && schedule.slot) {
+      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, schedule.dayOfWeek, schedule.slot, cls._id);
+      if (hasConflict) {
+        return errorResponse(res, 'Lecturer already has another class in this time slot.', 409);
+      }
+
+      const SLOT_TIMES = {
+        1: { startTime: '07:30', endTime: '09:00' },
+        2: { startTime: '09:10', endTime: '10:40' },
+        3: { startTime: '12:30', endTime: '14:00' },
+        4: { startTime: '14:10', endTime: '15:40' }
+      };
+
+      cls.schedule = {
+        dayOfWeek: schedule.dayOfWeek,
+        slot: parseInt(schedule.slot, 10),
+        startTime: SLOT_TIMES[schedule.slot].startTime,
+        endTime: SLOT_TIMES[schedule.slot].endTime,
+        room: schedule.room || 'TBD'
+      };
+    }
+
+    await cls.save();
+    await cls.populate([
+      { path: 'lectureId', select: 'name email avatar role bio' },
+      { path: 'mentorIds', select: 'name email avatar role bio' }
+    ]);
+
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group for class ${cls.classCode}:`, chatErr.message);
+    }
+
+    return successResponse(res, { class: cls }, 'Teaching assignment updated successfully');
+  } catch (err) {
     return errorResponse(res, 'Server error', 500);
   }
 };

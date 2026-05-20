@@ -14,7 +14,7 @@ const chatGroupMemberSchema = new mongoose.Schema(
 
 const chatGroupSchema = new mongoose.Schema(
   {
-    teamId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, unique: true },
+    teamId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
     classId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
     groupName: { type: String, required: true, trim: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

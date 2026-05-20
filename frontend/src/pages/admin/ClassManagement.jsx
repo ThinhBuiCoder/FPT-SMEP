@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, RefreshCw, Search, Filter, GraduationCap,
-  Users, BookOpen, ChevronRight, Upload, Eye,
+  Users, BookOpen, ChevronRight, Upload, Eye, Calendar,
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -216,7 +216,7 @@ export default function ClassManagement() {
 
                   {/* Mentors */}
                   {cls.mentorIds && cls.mentorIds.length > 0 ? (
-                    <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded-xl">
                       <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
                         <Users className="w-4 h-4 text-amber-500" />
                       </div>
@@ -228,8 +228,27 @@ export default function ClassManagement() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mb-4 p-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    <div className="mb-2 p-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                       <p className="text-xs text-slate-400">No mentors assigned</p>
+                    </div>
+                  )}
+
+                  {/* Schedule */}
+                  {cls.schedule && cls.schedule.dayOfWeek ? (
+                    <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 rounded-xl">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                        <Calendar className="w-4 h-4 text-indigo-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-400">Schedule (Room: {cls.schedule.room})</p>
+                        <p className="text-sm font-medium text-slate-800 truncate">
+                          {cls.schedule.dayOfWeek}, Slot {cls.schedule.slot} ({cls.schedule.startTime} - {cls.schedule.endTime})
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4 p-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                      <p className="text-xs text-slate-400">Schedule TBD</p>
                     </div>
                   )}
 

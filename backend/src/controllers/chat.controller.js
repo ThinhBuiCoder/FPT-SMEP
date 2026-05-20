@@ -79,7 +79,62 @@ const getMyChatGroups = async (req, res) => {
   }
 };
 
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+
+// Configure multer disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+}).single('file');
+
+const uploadChatFile = (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('File upload error:', err);
+      return errorResponse(res, err.message || 'File upload failed.', 400);
+    }
+
+    if (!req.file) {
+      return errorResponse(res, 'No file uploaded.', 400);
+    }
+
+    // Determine type
+    let fileType = 'file';
+    if (req.file.mimetype.startsWith('image/')) {
+      fileType = 'image';
+    }
+
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const url = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+    return successResponse(res, {
+      url,
+      name: req.file.originalname,
+      fileType
+    }, 'File uploaded successfully.');
+  });
+};
+
 module.exports = {
   getGroupMessages,
   getMyChatGroups,
+  uploadChatFile,
 };

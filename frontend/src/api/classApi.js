@@ -9,9 +9,11 @@ export const classApi = {
   update:      (id, data) => axiosClient.put(`/classes/${id}`, data),
   delete:      (id)     => axiosClient.delete(`/classes/${id}`),
 
-  // ─── Lecturer Assignment ─────────────────────────────────────────────────
+  // ─── Lecturer Assignment & Schedule ──────────────────────────────────────────
   assignLecture: (id, lectureId) => axiosClient.put(`/classes/${id}/assign-lecture`, { lectureId }),
   assignMentors: (id, mentorIds) => axiosClient.put(`/classes/${id}/assign-mentors`, { mentorIds }),
+  updateSchedule: (id, schedule) => axiosClient.put(`/classes/${id}/schedule`, schedule),
+  updateTeachingAssignment: (id, data) => axiosClient.put(`/classes/${id}/teaching-assignment`, data),
   backfillChats: (id)            => axiosClient.post(`/classes/${id}/backfill-chats`),
 
   // ─── Students ────────────────────────────────────────────────────────────

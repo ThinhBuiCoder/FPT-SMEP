@@ -5,7 +5,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { chatApi } from '../../api/chatApi';
 import {
   MessageSquare, Send, Users, Shield, GraduationCap, Star,
-  Search, Loader2, ArrowLeft, Clock, User
+  Search, Loader2, ArrowLeft, Clock, User, Paperclip
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -38,8 +38,12 @@ export default function GroupChat() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // ─── Socket.io Connection & Listeners ──────────────────────────────────────
   useEffect(() => {
@@ -128,10 +132,44 @@ export default function GroupChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size cannot exceed 10MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
   // ─── Send Message ─────────────────────────────────────────────────────────
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputText.trim() || !selectedChannel || !socketRef.current) return;
+    if (!selectedChannel || !socketRef.current) return;
+    if (!inputText.trim() && !selectedFile) return;
+
+    let attachmentPayload = null;
+
+    if (selectedFile) {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        const res = await chatApi.uploadFile(formData);
+        const data = res?.data || res;
+        attachmentPayload = {
+          url: data.url,
+          name: data.name,
+          fileType: data.fileType
+        };
+      } catch (err) {
+        toast.error(err?.message || 'Failed to upload file');
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
 
     const messagePayload = {
       chatGroupId: selectedChannel._id,
@@ -139,11 +177,16 @@ export default function GroupChat() {
       senderName: user?.name || 'Anonymous User',
       senderRole: user?.role || 'STUDENT',
       text: inputText.trim(),
+      attachment: attachmentPayload
     };
 
     // Emit via Socket.io for instant real-time broadcast and DB persist
     socketRef.current.emit('send_message', messagePayload);
     setInputText('');
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Filter channels
@@ -298,7 +341,36 @@ export default function GroupChat() {
                             ? 'bg-primary text-white rounded-tr-none'
                             : 'bg-white border border-slate-200/60 text-slate-800 rounded-tl-none shadow-3xs'
                         }`}>
-                          <p className="whitespace-pre-line">{m.text}</p>
+                          {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                          
+                          {m.attachment && m.attachment.url && (
+                            <div className="mt-2 max-w-xs">
+                              {m.attachment.fileType === 'image' ? (
+                                <a href={m.attachment.url} target="_blank" rel="noopener noreferrer">
+                                  <img
+                                    src={m.attachment.url}
+                                    alt={m.attachment.name || 'Attachment'}
+                                    className="max-w-full max-h-48 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  href={m.attachment.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold ${
+                                    isMine
+                                      ? 'bg-primary-600/50 border-primary-500 text-white hover:bg-primary-600'
+                                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                  } transition-all`}
+                                >
+                                  <Paperclip className="w-4 h-4 shrink-0" />
+                                  <span className="truncate max-w-[150px]">{m.attachment.name || 'Download file'}</span>
+                                </a>
+                              )}
+                            </div>
+                          )}
+
                           <span className={`text-[9px] mt-1.5 block opacity-60 text-right flex items-center justify-end gap-1 ${
                             isMine ? 'text-primary-100' : 'text-slate-400'
                           }`}>
@@ -315,22 +387,61 @@ export default function GroupChat() {
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 shrink-0 flex gap-2">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Type your real-time message..."
-                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-all bg-slate-50/20"
-              />
-              <button
-                type="submit"
-                disabled={!inputText.trim()}
-                className="px-4 py-3 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary-600 disabled:opacity-50 active:scale-95 transition-all flex items-center gap-1.5"
-              >
-                Send <Send className="w-4 h-4" />
-              </button>
-            </form>
+            <div className="p-4 bg-white border-t border-slate-100 shrink-0 space-y-2">
+              {uploading && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <span>Uploading file...</span>
+                </div>
+              )}
+              {selectedFile && (
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-600 bg-slate-100/80 px-3 py-1.5 rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Paperclip className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate font-semibold">{selectedFile.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="text-red-500 hover:text-red-700 font-bold shrink-0 ml-2 cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed,text/plain"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="p-3 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-500 transition-all cursor-pointer shrink-0"
+                  title="Upload image or file"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder={selectedFile ? "Add a message or press Send..." : "Type your real-time message..."}
+                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-all bg-slate-50/20"
+                />
+                <button
+                  type="submit"
+                  disabled={uploading || (!inputText.trim() && !selectedFile)}
+                  className="px-4 py-3 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary-600 disabled:opacity-50 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  Send <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-300">

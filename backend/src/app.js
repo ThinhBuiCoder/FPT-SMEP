@@ -20,7 +20,12 @@ const chatRoutes       = require('./routes/chat.routes');
 
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
+const path = require('path');
+
 const app = express();
+
+// Serve static uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─── MIDDLEWARE ───────────────────────────────────────────
 app.use(cors({

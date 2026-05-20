@@ -118,4 +118,113 @@ const createChatGroupForTeam = async (teamId, options = {}) => {
   return chatGroup[0];
 };
 
-module.exports = { createChatGroupForTeam };
+/**
+ * Create or update the class-wide chat group.
+ * It will include the lecturer, and all students currently in the class.
+ *
+ * @param {ObjectId} classId 
+ * @param {object} options - options.session, options.createdBy
+ */
+const createOrUpdateChatGroupForClass = async (classId, options = {}) => {
+  const session = options.session;
+  const createdBy = options.createdBy;
+
+  const cls = await Class.findById(classId).session(session);
+  if (!cls) throw new Error('Class not found');
+
+  // Find all students in this class
+  const students = await Student.find({ classId: cls._id }).session(session);
+
+  // Build member list
+  const members = [];
+  const addedUserIds = new Set();
+  const addedStudentIds = new Set();
+  const addedEmails = new Set();
+
+  const addMemberSafely = (userId, studentId, role, email) => {
+    if (userId) {
+      if (addedUserIds.has(userId.toString())) return;
+      addedUserIds.add(userId.toString());
+    }
+    if (studentId) {
+      if (addedStudentIds.has(studentId.toString())) return;
+      addedStudentIds.add(studentId.toString());
+    }
+    if (email) {
+      const e = email.toLowerCase().trim();
+      if (addedEmails.has(e)) return;
+      addedEmails.add(e);
+    }
+    members.push({ userId, studentId, role });
+  };
+
+  // 1. Add Lecturer
+  if (cls.lectureId) {
+    addMemberSafely(cls.lectureId, null, 'lecture');
+  }
+
+  // 2. Add Creator / Admin if provided
+  if (createdBy) {
+    addMemberSafely(createdBy, null, 'admin');
+  }
+
+  // 3. Add Mentors
+  if (cls.mentorIds && cls.mentorIds.length > 0) {
+    for (const mId of cls.mentorIds) {
+      addMemberSafely(mId, null, 'mentor');
+    }
+  }
+
+  // 4. Add all students of this class
+  for (const student of students) {
+    let targetUserId = student.userId;
+
+    if (!targetUserId && student.email) {
+      const userObj = await User.findOne({ email: student.email.toLowerCase() }).session(session);
+      if (userObj) {
+        targetUserId = userObj._id;
+        student.userId = userObj._id;
+        await student.save({ session });
+      }
+    }
+
+    addMemberSafely(targetUserId || null, student._id, 'student', student.email);
+  }
+
+  let chatGroup;
+  if (cls.chatGroupId) {
+    chatGroup = await ChatGroup.findById(cls.chatGroupId).session(session);
+  }
+
+  if (!chatGroup) {
+    chatGroup = await ChatGroup.findOne({ teamId: null, classId: cls._id }).session(session);
+  }
+
+  if (chatGroup) {
+    chatGroup.members = members;
+    chatGroup.groupName = `${cls.classCode} General Chat`;
+    if (cls.lectureId && !chatGroup.createdBy) {
+      chatGroup.createdBy = cls.lectureId;
+    }
+    await chatGroup.save({ session });
+  } else {
+    const createdList = await ChatGroup.create(
+      [{
+        teamId: null,
+        classId: cls._id,
+        groupName: `${cls.classCode} General Chat`,
+        createdBy: createdBy || cls.lectureId || cls._id,
+        members,
+      }],
+      { session }
+    );
+    chatGroup = createdList[0];
+  }
+
+  cls.chatGroupId = chatGroup._id;
+  await cls.save({ session });
+
+  return chatGroup;
+};
+
+module.exports = { createChatGroupForTeam, createOrUpdateChatGroupForClass };

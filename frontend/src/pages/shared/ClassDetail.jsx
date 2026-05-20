@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, UserPlus, CheckCircle2, AlertTriangle, Loader2
+  Upload, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -13,7 +13,7 @@ import StudentTable from '../../components/class/StudentTable';
 import TeamList from '../../components/class/TeamList';
 import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 import TeamGeneratePanel from '../../components/class/TeamGeneratePanel';
-import AssignLectureModal from '../../components/class/AssignLectureModal';
+import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
 
 export default function ClassDetail() {
@@ -32,7 +32,7 @@ export default function ClassDetail() {
 
   // Modals & Actions
   const [showImport, setShowImport] = useState(false);
-  const [showAssignLecturer, setShowAssignLecturer] = useState(false);
+  const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [showAssignMentors, setShowAssignMentors] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
 
@@ -144,12 +144,30 @@ export default function ClassDetail() {
           </div>
           {user?.role === 'ADMIN' && (
             <button
-              onClick={() => setShowAssignLecturer(true)}
+              onClick={() => setShowEditSchedule(true)}
               className="text-xs font-semibold text-primary hover:text-primary-700 px-2.5 py-1.5 bg-primary-50 rounded-lg transition-all shrink-0 cursor-pointer"
             >
-              Assign
+              Edit
             </button>
           )}
+        </div>
+
+        {/* Schedule Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 flex items-center gap-3 relative group">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+            <Calendar className="w-5 h-5 text-indigo-500" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Schedule</p>
+            {cls.schedule && cls.schedule.dayOfWeek ? (
+              <>
+                <p className="font-semibold text-slate-800 text-sm truncate">{cls.schedule.dayOfWeek}, Slot {cls.schedule.slot}</p>
+                <p className="text-[11px] text-slate-400 truncate">Room {cls.schedule.room}</p>
+              </>
+            ) : (
+              <p className="font-semibold text-slate-800 text-sm truncate">TBD</p>
+            )}
+          </div>
         </div>
 
         {/* Mentors Card */}
@@ -258,14 +276,15 @@ export default function ClassDetail() {
         />
       )}
 
-      {/* ── Assign Lecturer Modal ── */}
-      {showAssignLecturer && (
-        <AssignLectureModal
+      {/* ── Edit Schedule & Lecturer Modal ── */}
+      {showEditSchedule && (
+        <EditScheduleModal
           classId={id}
           currentLecture={cls.lectureId}
-          onClose={() => setShowAssignLecturer(false)}
+          currentSchedule={cls.schedule}
+          onClose={() => setShowEditSchedule(false)}
           onAssigned={async () => {
-            setShowAssignLecturer(false);
+            setShowEditSchedule(false);
             await fetchData();
           }}
         />

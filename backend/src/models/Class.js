@@ -20,6 +20,14 @@ const classSchema = new mongoose.Schema(
         ref: 'User'
       }
     ],
+    schedule: {
+      dayOfWeek: { type: String, enum: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] },
+      slot:      { type: Number, min: 1, max: 4 },
+      startTime: { type: String },
+      endTime:   { type: String },
+      room:      { type: String, default: 'TBD' }
+    },
+    chatGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatGroup', default: null },
     status:      { type: String, enum: ['active', 'disabled'], default: 'active' },
   },
   { timestamps: true }
