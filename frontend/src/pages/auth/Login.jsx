@@ -222,23 +222,6 @@ const Login = () => {
               Sign In
             </Button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="mt-5 pt-4 border-t border-slate-100">
-            <p className="text-caption text-slate-400 text-center mb-2">Quick demo login:</p>
-            <div className="flex gap-2 justify-center flex-wrap">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.label}
-                  onClick={(e) => fillDemo(e, acc.email)}
-                  className="text-xs text-slate-500 hover:text-primary font-medium px-2 py-1 rounded-lg hover:bg-primary-50 transition-colors"
-                >
-                  {acc.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="mt-5 text-center text-body text-slate-500 pt-4 border-t border-slate-100">
             Don&apos;t have an account?{' '}
             <Link to="/register" className="text-primary font-semibold hover:text-primary-dark transition-colors">Create one</Link>
