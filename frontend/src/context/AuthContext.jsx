@@ -35,10 +35,29 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const res = await axiosClient.post('/auth/register', userData);
-    const { token, user: newUser } = res.data || res;
+    // Sau khi đăng ký, KHÔNG set user/token — cần OTP trước
+    return res.data || res;
+  };
+
+  const verifyOtp = async (email, otp) => {
+    const res = await axiosClient.post('/auth/verify-otp', { email, otp });
+    const { token, user: userData } = res.data || res;
     localStorage.setItem('token', token);
-    setUser(newUser);
-    return newUser;
+    setUser(userData);
+    return userData;
+  };
+
+  const resendOtp = async (email) => {
+    const res = await axiosClient.post('/auth/resend-otp', { email });
+    return res.data || res;
+  };
+
+  const loginWithGoogle = async (googleToken) => {
+    const res = await axiosClient.post('/auth/google', { googleToken });
+    const { token, user: userData } = res.data || res;
+    localStorage.setItem('token', token);
+    setUser(userData);
+    return userData;
   };
 
   const logout = () => {
@@ -59,7 +78,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = (updated) => setUser(prev => ({ ...prev, ...updated }));
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, verifyOtp, resendOtp, loginWithGoogle, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
