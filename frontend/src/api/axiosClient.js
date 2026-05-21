@@ -36,7 +36,11 @@ axiosClient.interceptors.response.use(
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('session_expired'));
       } else if (error.response.status === 403) {
-        window.location.href = '/403';
+        // Nếu là 403 từ auth (needVerify), KHÔNG redirect — để component tự xử lý
+        const isAuthRoute = error.config?.url?.includes('/auth/');
+        if (!isAuthRoute) {
+          window.location.href = '/403';
+        }
       }
     }
     const errObj = error.response?.data || { success: false, message: error.message || 'Lỗi kết nối server' };

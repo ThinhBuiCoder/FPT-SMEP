@@ -5,7 +5,10 @@ const express = require('express');
 const { body } = require('express-validator');
 const {
   register,
+  verifyOtp,
+  resendOtp,
   login,
+  googleAuth,
   getMe,
   updateProfile,
   changePassword,
@@ -16,7 +19,7 @@ const { protect } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
-// Validation rules
+// ── Validation rules ─────────────────────────────────────────
 const registerValidation = [
   body('name').trim().notEmpty().withMessage('Tên không được để trống.'),
   body('email').isEmail().withMessage('Email không hợp lệ.').normalizeEmail(),
@@ -30,15 +33,18 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Mật khẩu không được để trống.'),
 ];
 
-// Public routes
-router.post('/register', registerValidation, register);
-router.post('/login', loginValidation, login);
-router.post('/forgot-password', forgotPassword);
+// ── Public routes ─────────────────────────────────────────────
+router.post('/register',           registerValidation, register);
+router.post('/verify-otp',         verifyOtp);
+router.post('/resend-otp',         resendOtp);
+router.post('/login',              loginValidation,    login);
+router.post('/google',             googleAuth);
+router.post('/forgot-password',    forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
-// Protected routes
-router.get('/me', protect, getMe);
-router.put('/update-profile', protect, updateProfile);
-router.put('/change-password', protect, changePassword);
+// ── Protected routes ─────────────────────────────────────────
+router.get('/me',                  protect, getMe);
+router.put('/update-profile',      protect, updateProfile);
+router.put('/change-password',     protect, changePassword);
 
 module.exports = router;
