@@ -145,9 +145,10 @@ const Register = () => {
       toast.success(`Verification successful! Welcome, ${user.name} 🎉`);
       if (user.role === 'ADMIN')         navigate('/admin');
       else if (user.role === 'LECTURER') navigate('/lecturer');
+      else if (user.role === 'MENTOR')   navigate('/lecturer'); // Mentor shares lecturer dashboard
       else                               navigate('/student');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Incorrect or expired OTP code.');
+      toast.error(err.message || 'Incorrect or expired OTP code.');
       // Clear OTP on failure
       setOtpValues(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
@@ -279,15 +280,19 @@ const Register = () => {
                   {/* Role */}
                   <div>
                     <label className="block text-caption font-medium text-slate-600 mb-1.5">Role</label>
-                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                      {['STUDENT', 'LECTURER'].map(r => (
-                        <label key={r} className="cursor-pointer">
+                    <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                      {[
+                        { value: 'STUDENT',  label: 'Student' },
+                        { value: 'LECTURER', label: 'Lecturer' },
+                        { value: 'MENTOR',   label: 'Mentor' },
+                      ].map(({ value, label }) => (
+                        <label key={value} className="cursor-pointer">
                           <input
-                            checked={role === r} onChange={() => setRole(r)}
-                            className="peer sr-only" name="role" type="radio" value={r}
+                            checked={role === value} onChange={() => setRole(value)}
+                            className="peer sr-only" name="role" type="radio" value={value}
                           />
                           <div className="text-center py-2.5 rounded-lg text-body text-slate-500 peer-checked:bg-white peer-checked:text-primary peer-checked:shadow-sm peer-checked:border peer-checked:border-primary-100 transition-all font-medium">
-                            {r === 'STUDENT' ? 'Student' : 'Lecturer'}
+                            {label}
                           </div>
                         </label>
                       ))}

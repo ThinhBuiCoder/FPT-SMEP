@@ -39,9 +39,10 @@ const Login = () => {
 
   // ── Redirect after login ───────────────────────────────────
   const redirectByRole = (user) => {
-    if (user.role === 'ADMIN')    navigate('/admin');
-    else if (user.role === 'LECTURER') navigate('/lecturer');
-    else navigate('/student');
+    if (user.role === 'ADMIN')                          navigate('/admin');
+    else if (user.role === 'LECTURER')                  navigate('/lecturer');
+    else if (user.role === 'MENTOR')                    navigate('/lecturer'); // Mentor shares lecturer dashboard
+    else                                                navigate('/student');
   };
 
   // ── Email / password login ────────────────────────────────────
