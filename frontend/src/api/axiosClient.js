@@ -31,6 +31,10 @@ axiosClient.interceptors.response.use(
   (error) => {
     // Handle global errors here
     if (error.response) {
+      // Log URL and status for easier debugging of 401/403
+      try {
+        console.error('[API ERROR]', error.config?.method?.toUpperCase(), error.config?.url, '->', error.response.status, error.response.data);
+      } catch (_) {}
       if (error.response.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');

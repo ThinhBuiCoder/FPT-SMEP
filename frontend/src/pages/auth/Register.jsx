@@ -87,6 +87,10 @@ const Register = () => {
         startCountdown();
         setResendCooldown(RESEND_COOLDOWN);
         setTimeout(() => otpRefs.current[0]?.focus(), 300);
+      } else if (err.response?.status === 409) {
+        // Email đã tồn tại: hướng người dùng tới trang đăng nhập (prefill email)
+        toast.error(msg);
+        navigate('/login', { state: { email } });
       } else {
         toast.error(msg);
       }

@@ -233,6 +233,8 @@ const Home = () => {
           </p>
         </div>
       </footer>
+
+      {/* Video Modal */}
       {videoOpen && ( <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-4">
         <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
           <button
@@ -245,7 +247,7 @@ const Home = () => {
 
           <div className="aspect-video w-full bg-slate-950">
             <iframe
-              src="https://app.heygen.com/embeds/718d4f5c2a3b4fea941888184e7458a8"
+              src="https://app.heygen.com/embeds/147944771a39426c85ac6d58e54646b0"
               title="SMEP Introduction Video"
               className="h-full w-full"
               allow="autoplay; fullscreen; clipboard-write; encrypted-media"
