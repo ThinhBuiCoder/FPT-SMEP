@@ -91,7 +91,7 @@ const getAdminDashboard = async () => {
 
 // ─── LECTURER ─────────────────────────────────────────────
 const getLecturerDashboard = async (lecturerId) => {
-  const myClasses = await Class.find({ lectureId })
+  const myClasses = await Class.find({ lectureId: lecturerId })
     .populate({ path: 'lectureId', select: 'name email avatar' });
 
   const classIds = myClasses.map(c => c._id);

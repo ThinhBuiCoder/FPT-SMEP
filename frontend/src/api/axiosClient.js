@@ -31,7 +31,9 @@ axiosClient.interceptors.response.use(
   (error) => {
     // Handle global errors here
     if (error.response) {
-      if (error.response.status === 401) {
+      const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
+      
+      if (error.response.status === 401 && !isAuthRoute) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('session_expired'));

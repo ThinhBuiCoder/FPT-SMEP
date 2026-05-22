@@ -23,9 +23,10 @@ const Login = () => {
       toast.success(`Chào mừng trở lại, ${user.name}!`);
       if (user.role === 'ADMIN') navigate('/admin');
       else if (user.role === 'LECTURER') navigate('/lecturer');
+      else if (user.role === 'MENTOR') navigate('/mentor');
       else navigate('/student');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Đăng nhập thất bại');
+      toast.error(err.message || err.response?.data?.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }

@@ -27,7 +27,7 @@ const Register = () => {
       toast.success('Account created successfully! Please login.');
       navigate('/login');
     } catch (err) {
-      toast.error(err.message || 'Registration failed');
+      toast.error(err.message || err.response?.data?.message || 'Đăng ký thất bại');
     } finally {
       setLoading(false);
     }

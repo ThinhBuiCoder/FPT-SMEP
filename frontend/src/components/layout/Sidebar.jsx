@@ -55,7 +55,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
     ],
     MENTOR: [
-      { path: '/lecturer', icon: 'dashboard', label: 'Dashboard' },
+      { path: '/mentor', icon: 'dashboard', label: 'Dashboard' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
       { path: '/sessions', icon: 'event', label: 'Sessions' },
@@ -118,7 +118,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/admin' || item.path === '/lecturer' || item.path === '/student'}
+              end={item.path === '/admin' || item.path === '/lecturer' || item.path === '/mentor' || item.path === '/student'}
               onClick={handleNavClick}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 rounded-xl transition-all duration-200 group relative px-3 py-2.5',
