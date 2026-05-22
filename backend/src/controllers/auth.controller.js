@@ -1,10 +1,11 @@
 // src/controllers/auth.controller.js
 const jwt    = require('jsonwebtoken');
+const crypto = require('crypto');
 const https  = require('https');
 const { validationResult } = require('express-validator');
 const User   = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
-const { sendOtpEmail } = require('../services/emailService');
+const { sendOtpEmail, sendResetPasswordEmail } = require('../services/emailService');
 
 // ── Helpers ────────────────────────────────────────────────────
 const generateToken = (id) =>
@@ -284,7 +285,7 @@ const changePassword = async (req, res) => {
   }
 };
 
-// ── POST /api/auth/forgot-password ─────────────────────────────
+// ── POST /api/auth/forgot-password ─────────────────────────
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return errorResponse(res, 'Email is required', 400);
@@ -292,14 +293,23 @@ const forgotPassword = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (user) {
-      user.resetPasswordToken   = 'mock-reset-token-' + user._id;
+      // Generate a secure random token (64 hex chars)
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken   = resetToken;
       user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
       await user.save({ validateBeforeSave: false });
-      console.log(`[MVP] Reset link for ${email}: http://localhost:5173/reset-password/${user.resetPasswordToken}`);
+
+      // Build reset URL pointing to the frontend
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+      // Send real email
+      await sendResetPasswordEmail(email, resetUrl, user.name);
     }
     // Always return success to prevent email enumeration
     return successResponse(res, null, 'If this email exists, a reset link has been sent.');
   } catch (err) {
+    console.error('Forgot password error:', err);
     return errorResponse(res, 'Server error', 500);
   }
 };
