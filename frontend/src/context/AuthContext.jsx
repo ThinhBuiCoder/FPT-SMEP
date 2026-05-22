@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           const res = await axiosClient.get('/auth/me');
-          setUser(res.data?.user || res.user);
+          setUser(res.user);
         } catch {
           localStorage.removeItem('token');
         }
@@ -27,7 +27,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const res = await axiosClient.post('/auth/login', { email, password });
-    const { token, user: userData } = res.data || res;
+    // res is already response.data (interceptor unwraps it)
+    const { token, user: userData } = res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
@@ -35,13 +36,13 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const res = await axiosClient.post('/auth/register', userData);
-    // Sau khi đăng ký, KHÔNG set user/token — cần OTP trước
-    return res.data || res;
+    // After register, do NOT set user/token — OTP verification is required first
+    return res;
   };
 
   const verifyOtp = async (email, otp) => {
     const res = await axiosClient.post('/auth/verify-otp', { email, otp });
-    const { token, user: userData } = res.data || res;
+    const { token, user: userData } = res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
@@ -49,12 +50,12 @@ export const AuthProvider = ({ children }) => {
 
   const resendOtp = async (email) => {
     const res = await axiosClient.post('/auth/resend-otp', { email });
-    return res.data || res;
+    return res;
   };
 
   const loginWithGoogle = async (googleToken) => {
     const res = await axiosClient.post('/auth/google', { googleToken });
-    const { token, user: userData } = res.data || res;
+    const { token, user: userData } = res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;

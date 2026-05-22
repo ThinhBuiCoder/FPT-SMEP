@@ -23,20 +23,26 @@ const register = async (req, res) => {
   try {
     const exists = await User.findOne({ email });
     if (exists) {
-      // Nếu tài khoản tồn tại nhưng chưa verify → cho phép gửi lại OTP
+      // Account exists but not yet verified — resend a fresh OTP
       if (!exists.isVerified) {
         const otp = generateOtp();
         exists.otp        = otp;
-        exists.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+        exists.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
         await exists.save({ validateBeforeSave: false });
         await sendOtpEmail(email, otp, exists.name);
         return successResponse(res,
           { email, needVerify: true },
-          'Tài khoản đã tồn tại nhưng chưa xác thực. Đã gửi lại OTP mới.',
+          'This email is already registered but not yet verified. A new OTP has been sent — please check your inbox.',
           200
         );
       }
-      return errorResponse(res, 'Email đã được sử dụng.', 409);
+      // Account exists and is fully verified
+      return errorResponse(
+        res,
+        'This email address is already in use. Please sign in or use a different email.',
+        409,
+        { emailTaken: true, email }
+      );
     }
 
     // Chỉ cho tạo STUDENT hoặc LECTURER từ public endpoint

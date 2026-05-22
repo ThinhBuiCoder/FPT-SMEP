@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { User, Mail, Lock, ArrowRight, Sparkles, ShieldCheck, RefreshCw, Clock } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Sparkles, ShieldCheck, RefreshCw, Clock, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 
-const OTP_EXPIRE_SECONDS = 5 * 60; // 5 phút
-const RESEND_COOLDOWN    = 60;      // 60 giây cooldown trước khi resend
+const OTP_EXPIRE_SECONDS = 5 * 60; // 5 minutes
+const RESEND_COOLDOWN    = 60;      // 60-second cooldown before allowing resend
 
 const Register = () => {
   // ── State: Step 1 ─────────────────────────────────────────
@@ -16,6 +16,7 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [role,     setRole]     = useState('STUDENT');
   const [loading,  setLoading]  = useState(false);
+  const [emailTakenError, setEmailTakenError] = useState(false); // email already registered
 
   // ── State: Step 2 (OTP) ───────────────────────────────────
   const [step,           setStep]           = useState(1); // 1 = form, 2 = OTP
@@ -30,7 +31,7 @@ const Register = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  // ── Nhận state từ Login (resend OTP) ─────────────────────
+  // ── Receive state from Login (resend OTP flow) ──────────────────
   useEffect(() => {
     if (location.state?.step === 'otp' && location.state?.email) {
       setEmail(location.state.email);
@@ -39,7 +40,7 @@ const Register = () => {
     }
   }, []);
 
-  // ── Countdown OTP hết hạn ─────────────────────────────────
+  // ── OTP expiry countdown ─────────────────────────────────────────
   const startCountdown = () => setCountdown(OTP_EXPIRE_SECONDS);
 
   useEffect(() => {
@@ -49,7 +50,7 @@ const Register = () => {
     return () => clearInterval(timer);
   }, [step, countdown]);
 
-  // ── Countdown resend cooldown ─────────────────────────────
+  // ── Resend cooldown countdown ───────────────────────────────────
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setInterval(() => setResendCooldown(c => c - 1), 1000);
@@ -62,26 +63,36 @@ const Register = () => {
     return `${m}:${s}`;
   };
 
-  // ── Step 1: Đăng ký ──────────────────────────────────────
+  // ── Step 1: Register ──────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!name.trim())                              return toast.error('Vui lòng nhập họ tên');
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) return toast.error('Email không hợp lệ');
-    if (password.length < 6)                       return toast.error('Mật khẩu phải ít nhất 6 ký tự');
+    if (!name.trim())                               return toast.error('Please enter your full name.');
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) return toast.error('Please enter a valid email.');
+    if (password.length < 6)                        return toast.error('Password must be at least 6 characters.');
 
     setLoading(true);
+    setEmailTakenError(false);
     try {
       await register({ name, email, password, role });
-      toast.success('Đăng ký thành công! Kiểm tra email để lấy mã OTP.');
+      toast.success('Account created! Check your email for the OTP code.');
       setStep(2);
       startCountdown();
       setResendCooldown(RESEND_COOLDOWN);
-      // Focus ô OTP đầu tiên
+      // Focus the first OTP input box
       setTimeout(() => otpRefs.current[0]?.focus(), 300);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Đăng ký thất bại';
-      // Nếu email chưa verify, backend vẫn gửi OTP mới
-      if (err.response?.data?.data?.needVerify) {
+      // axiosClient interceptor already unwraps response.data, so:
+      //   err.message  = backend error message
+      //   err.data     = extra payload from errorResponse()
+      const msg = err.message || 'Registration failed.';
+
+      // Email already registered and verified
+      if (err.data?.emailTaken) {
+        setEmailTakenError(true);
+        return; // banner handles the UI, no toast needed
+      }
+      // Email registered but not yet verified — backend sent a new OTP
+      if (err.data?.needVerify) {
         toast(msg, { icon: '📧' });
         setStep(2);
         startCountdown();
@@ -97,11 +108,11 @@ const Register = () => {
 
   // ── OTP input handlers ────────────────────────────────────
   const handleOtpChange = (index, value) => {
-    if (!/^\d?$/.test(value)) return; // chỉ nhập số
+    if (!/^\d?$/.test(value)) return; // digits only
     const newOtp = [...otpValues];
     newOtp[index] = value;
     setOtpValues(newOtp);
-    // Tự động focus ô tiếp theo
+    // Auto-focus next input
     if (value && index < 5) otpRefs.current[index + 1]?.focus();
   };
 
@@ -121,23 +132,23 @@ const Register = () => {
     otpRefs.current[Math.min(pasted.length, 5)]?.focus();
   };
 
-  // ── Step 2: Xác thực OTP ─────────────────────────────────
+  // ── Step 2: Verify OTP ──────────────────────────────────────────────
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const otp = otpValues.join('');
-    if (otp.length !== 6) return toast.error('Vui lòng nhập đủ 6 chữ số OTP');
-    if (countdown <= 0)   return toast.error('OTP đã hết hạn. Vui lòng yêu cầu gửi lại.');
+    if (otp.length !== 6) return toast.error('Please enter all 6 OTP digits.');
+    if (countdown <= 0)   return toast.error('OTP has expired. Please request a new one.');
 
     setOtpLoading(true);
     try {
       const user = await verifyOtp(email, otp);
-      toast.success(`Xác thực thành công! Chào mừng ${user.name} 🎉`);
+      toast.success(`Verification successful! Welcome, ${user.name} 🎉`);
       if (user.role === 'ADMIN')         navigate('/admin');
       else if (user.role === 'LECTURER') navigate('/lecturer');
       else                               navigate('/student');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Mã OTP không đúng hoặc đã hết hạn');
-      // Xoá OTP khi sai
+      toast.error(err.response?.data?.message || 'Incorrect or expired OTP code.');
+      // Clear OTP on failure
       setOtpValues(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
     } finally {
@@ -151,13 +162,13 @@ const Register = () => {
     setResendLoading(true);
     try {
       await resendOtp(email);
-      toast.success('OTP mới đã được gửi đến email của bạn!');
+      toast.success('A new OTP has been sent to your email!');
       setOtpValues(['', '', '', '', '', '']);
       startCountdown();
       setResendCooldown(RESEND_COOLDOWN);
       otpRefs.current[0]?.focus();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Không thể gửi lại OTP');
+      toast.error(err.response?.data?.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setResendLoading(false);
     }
@@ -172,7 +183,7 @@ const Register = () => {
       <div className="w-full max-w-[440px] relative z-10">
         <AnimatePresence mode="wait">
 
-          {/* ── STEP 1: Form đăng ký ── */}
+          {/* ── STEP 1: Registration form ── */}
           {step === 1 && (
             <motion.div
               key="step1"
@@ -182,13 +193,48 @@ const Register = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-float p-8 sm:p-10">
-                <div className="text-center mb-8">
+                <div className="text-center mb-6">
                   <div className="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow-primary">
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
                   <h1 className="text-heading font-bold text-slate-900">Create your account</h1>
                   <p className="text-body text-slate-500 mt-1">Join FPT-SMEP mentoring portal</p>
                 </div>
+
+                {/* Banner: email already taken */}
+                <AnimatePresence>
+                  {emailTakenError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-start"
+                    >
+                      <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-800 mb-1">Email already registered</p>
+                        <p className="text-xs text-red-700 mb-3">
+                          <strong>{email}</strong> is already associated with an account.
+                        </p>
+                        <div className="flex gap-3">
+                          <Link
+                            to="/login"
+                            state={{ prefillEmail: email }}
+                            className="text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900"
+                          >
+                            Sign in →
+                          </Link>
+                          <Link
+                            to="/forgot-password"
+                            className="text-xs font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                          >
+                            Forgot password?
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <form className="space-y-4" onSubmit={handleRegister}>
                   {/* Name */}
@@ -199,7 +245,7 @@ const Register = () => {
                       <input
                         value={name} onChange={e => setName(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        placeholder="Nguyễn Văn A" type="text" required
+                        placeholder="John Doe" type="text" required
                       />
                     </div>
                   </div>
@@ -225,7 +271,7 @@ const Register = () => {
                       <input
                         value={password} onChange={e => setPassword(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        placeholder="Tối thiểu 6 ký tự" type="password" required
+                        placeholder="Minimum 6 characters" type="password" required
                       />
                     </div>
                   </div>
@@ -261,7 +307,7 @@ const Register = () => {
             </motion.div>
           )}
 
-          {/* ── STEP 2: Nhập OTP ── */}
+          {/* ── STEP 2: Enter OTP ── */}
           {step === 2 && (
             <motion.div
               key="step2"
@@ -276,9 +322,9 @@ const Register = () => {
                   <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <ShieldCheck className="w-6 h-6 text-white" />
                   </div>
-                  <h1 className="text-heading font-bold text-slate-900">Xác thực Email</h1>
+                  <h1 className="text-heading font-bold text-slate-900">Verify your email</h1>
                   <p className="text-body text-slate-500 mt-1">
-                    Mã OTP đã gửi tới
+                    OTP code sent to
                   </p>
                   <p className="text-sm font-semibold text-primary mt-0.5 truncate">{email}</p>
                 </div>
@@ -291,8 +337,8 @@ const Register = () => {
                 }`}>
                   <Clock className="w-4 h-4" />
                   {countdown > 0
-                    ? `OTP hết hạn sau: ${formatTime(countdown)}`
-                    : 'OTP đã hết hạn — vui lòng gửi lại'}
+                    ? `Code expires in: ${formatTime(countdown)}`
+                    : 'OTP has expired — please request a new one'}
                 </div>
 
                 {/* OTP Input */}
@@ -325,13 +371,13 @@ const Register = () => {
                     isLoading={otpLoading}
                     disabled={countdown <= 0}
                   >
-                    Xác nhận OTP
+                    Verify OTP
                   </Button>
                 </form>
 
                 {/* Resend */}
                 <div className="mt-5 text-center">
-                  <p className="text-sm text-slate-500 mb-2">Không nhận được email?</p>
+                  <p className="text-sm text-slate-500 mb-2">Didn&apos;t receive the email?</p>
                   <button
                     onClick={handleResend}
                     disabled={resendCooldown > 0 || resendLoading}
@@ -339,8 +385,8 @@ const Register = () => {
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${resendLoading ? 'animate-spin' : ''}`} />
                     {resendCooldown > 0
-                      ? `Gửi lại sau ${resendCooldown}s`
-                      : resendLoading ? 'Đang gửi...' : 'Gửi lại OTP'}
+                      ? `Resend in ${resendCooldown}s`
+                      : resendLoading ? 'Sending...' : 'Resend OTP'}
                   </button>
                 </div>
 
@@ -349,7 +395,7 @@ const Register = () => {
                   onClick={() => { setStep(1); setOtpValues(['','','','','','']); }}
                   className="mt-4 w-full text-center text-sm text-slate-400 hover:text-slate-600 transition-colors"
                 >
-                  ← Quay lại chỉnh sửa thông tin
+                  ← Back to edit your details
                 </button>
               </div>
             </motion.div>
