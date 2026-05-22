@@ -1,12 +1,12 @@
 // src/services/emailService.js — Nodemailer + Gmail SMTP
 const nodemailer = require('nodemailer');
 
-// ── Tạo transporter ────────────────────────────────────────────
+// ── Create transporter ─────────────────────────────────────────
 const createTransporter = () => {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
 
-  if (!user || !pass) return null; // fallback mode
+  if (!user || !pass) return null; // fallback to console mode
 
   return nodemailer.createTransport({
     service: 'gmail',
@@ -14,7 +14,7 @@ const createTransporter = () => {
   });
 };
 
-// ── HTML template OTP ──────────────────────────────────────────
+// ── OTP HTML template ──────────────────────────────────────────
 const buildOtpHtml = (userName, otp, expiresMinutes = 5) => `
 <!DOCTYPE html>
 <html>
@@ -44,28 +44,30 @@ const buildOtpHtml = (userName, otp, expiresMinutes = 5) => `
           <!-- Body -->
           <tr>
             <td style="padding:40px 40px 32px;">
-              <p style="margin:0 0 8px;font-size:15px;color:#64748b;">Xin chào,</p>
+              <p style="margin:0 0 8px;font-size:15px;color:#64748b;">Hello,</p>
               <p style="margin:0 0 24px;font-size:20px;font-weight:700;color:#0f172a;">${userName}</p>
 
               <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
-                Bạn vừa đăng ký tài khoản tại <strong>FPT-SMEP</strong>. Vui lòng nhập mã OTP bên dưới để kích hoạt tài khoản của bạn:
+                You recently signed up for <strong>FPT-SMEP</strong>. Please enter the OTP code below
+                to verify your email address and activate your account:
               </p>
 
               <!-- OTP Box -->
               <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;margin-bottom:24px;">
                 <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">
-                  Mã xác thực OTP
+                  Your Verification Code
                 </p>
                 <p style="margin:0;font-size:44px;font-weight:800;color:#034EA2;letter-spacing:12px;font-family:'Courier New',monospace;">
                   ${otp}
                 </p>
                 <p style="margin:12px 0 0;font-size:13px;color:#94a3b8;">
-                  Mã có hiệu lực trong <strong style="color:#ef4444;">${expiresMinutes} phút</strong>
+                  This code expires in <strong style="color:#ef4444;">${expiresMinutes} minutes</strong>
                 </p>
               </div>
 
               <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
-                Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email này. Mã OTP sẽ tự động hết hạn và không ảnh hưởng đến tài khoản của bạn.
+                If you did not request this, you can safely ignore this email.
+                The OTP will expire automatically and your account will not be affected.
               </p>
             </td>
           </tr>
@@ -74,7 +76,7 @@ const buildOtpHtml = (userName, otp, expiresMinutes = 5) => `
           <tr>
             <td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © ${new Date().getFullYear()} FPT University · Startup Mentoring &amp; Evaluation Platform
+                © ${new Date().getFullYear()} FPT University &nbsp;·&nbsp; Startup Mentoring &amp; Evaluation Platform
               </p>
             </td>
           </tr>
@@ -89,31 +91,36 @@ const buildOtpHtml = (userName, otp, expiresMinutes = 5) => `
 
 // ── sendOtpEmail ───────────────────────────────────────────────
 /**
- * Gửi OTP qua Gmail SMTP. Nếu chưa cấu hình GMAIL_USER / GMAIL_APP_PASSWORD,
- * tự động in OTP ra console (chế độ demo).
+ * Send an OTP email via Gmail SMTP (Nodemailer).
+ * If GMAIL_USER / GMAIL_APP_PASSWORD are not set, falls back to console log.
  *
- * @param {string} toEmail  - Email người nhận
- * @param {string} otp      - Mã OTP 6 số
- * @param {string} userName - Tên người dùng để cá nhân hoá email
+ * Required env vars:
+ *   GMAIL_USER         — your Gmail address (e.g. you@gmail.com)
+ *   GMAIL_APP_PASSWORD — Gmail App Password (not your account password)
+ *                        Enable at: Google Account → Security → 2-Step Verification → App passwords
+ *
+ * @param {string} toEmail  - Recipient email address
+ * @param {string} otp      - 6-digit OTP code
+ * @param {string} userName - User's display name for personalisation
  */
-const sendOtpEmail = async (toEmail, otp, userName = 'Bạn') => {
+const sendOtpEmail = async (toEmail, otp, userName = 'there') => {
   const transporter = createTransporter();
 
   if (!transporter) {
-    // ── FALLBACK: log ra console ──────────────────────────────
-    console.log('\n────────────────────────────────────');
+    // ── FALLBACK: log to console ───────────────────────────────
+    console.log('\n────────────────────────────────────────');
     console.log(`[EmailService - DEMO MODE] OTP for ${toEmail}`);
     console.log(`  Name : ${userName}`);
     console.log(`  OTP  : ${otp}`);
     console.log('  (Set GMAIL_USER + GMAIL_APP_PASSWORD in .env to send real emails)');
-    console.log('────────────────────────────────────\n');
+    console.log('────────────────────────────────────────\n');
     return;
   }
 
   const mailOptions = {
-    from: `"FPT-SMEP" <${process.env.GMAIL_USER}>`,
+    from: `"FPT-SMEP · No Reply" <${process.env.GMAIL_USER}>`,
     to: toEmail,
-    subject: `[FPT-SMEP] Mã OTP xác thực tài khoản: ${otp}`,
+    subject: `[FPT-SMEP] Your account verification code: ${otp}`,
     html: buildOtpHtml(userName, otp),
   };
 
@@ -121,9 +128,9 @@ const sendOtpEmail = async (toEmail, otp, userName = 'Bạn') => {
     await transporter.sendMail(mailOptions);
     console.log(`[EmailService] OTP sent to ${toEmail}`);
   } catch (err) {
-    // Không throw — để flow vẫn tiếp tục, chỉ log lỗi
+    // Do not throw — let the flow continue; only log the error
     console.error(`[EmailService] Failed to send email to ${toEmail}:`, err.message);
-    // Fallback: in OTP ra console để dev vẫn test được
+    // Fallback: print OTP to console so devs can still test the flow
     console.log(`[EmailService - FALLBACK] OTP for ${toEmail}: ${otp}`);
   }
 };
