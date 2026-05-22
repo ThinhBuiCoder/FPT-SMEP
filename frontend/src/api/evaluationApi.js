@@ -18,6 +18,10 @@ export const evaluationApi = {
     const res = await axios.get(`${API_URL}/evaluations/startup/${startupIdeaId}`, getAuthHeaders());
     return res.data;
   },
+  create: async (evaluationData) => {
+    const response = await axios.post(`${API_URL}/evaluations`, evaluationData, getAuthHeaders());
+    return response.data;
+  },
 
   // Module 4 Methods
   getTeamEvaluations: async (teamId) => {
@@ -38,4 +42,4 @@ export const evaluationApi = {
   }
 };
 
-export const { getTeamEvaluations, createTeamEvaluation, updateTeamEvaluation, submitTeamEvaluation } = evaluationApi;
+export const { getByStartup, create, getTeamEvaluations, createTeamEvaluation, updateTeamEvaluation, submitTeamEvaluation } = evaluationApi;

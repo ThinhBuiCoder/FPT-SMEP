@@ -40,7 +40,7 @@ const MilestoneTracking = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      if (user?.role === 'STUDENT' || user?.role === 'LECTURER') {
+      if (user?.role === 'STUDENT') {
         const res = await dashboardApi.getStudent();
         const d = res.data || res;
         if (d.team?._id) {
@@ -55,6 +55,9 @@ const MilestoneTracking = () => {
           });
           setMilestones(Array.isArray(processed) ? processed : []);
         }
+      } else {
+        // Lecturer or Mentor does not have a global milestone view. They should view it inside TeamWorkspace.
+        setMilestones([]);
       }
     } catch {
       toast.error('Failed to load milestones');
@@ -141,7 +144,11 @@ const MilestoneTracking = () => {
       </div>
 
       {milestones.length === 0 && !teamId ? (
-        <EmptyState icon={CheckSquare} title="No team found" description="Join a team to track milestones" />
+        <EmptyState 
+          icon={CheckSquare} 
+          title={user?.role === 'STUDENT' ? "No team found" : "Team Workspace Required"} 
+          description={user?.role === 'STUDENT' ? "Join a team to track milestones" : "Please navigate to a specific Team Workspace to view and manage its milestones."} 
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {COLUMNS.map(col => (

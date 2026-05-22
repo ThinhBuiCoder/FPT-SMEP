@@ -31,11 +31,9 @@ axiosClient.interceptors.response.use(
   (error) => {
     // Handle global errors here
     if (error.response) {
-      // Log URL and status for easier debugging of 401/403
-      try {
-        console.error('[API ERROR]', error.config?.method?.toUpperCase(), error.config?.url, '->', error.response.status, error.response.data);
-      } catch (_) {}
-      if (error.response.status === 401) {
+      const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
+      
+      if (error.response.status === 401 && !isAuthRoute) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('session_expired'));
@@ -47,7 +45,11 @@ axiosClient.interceptors.response.use(
         }
       }
     }
-    const errObj = error.response?.data || { success: false, message: error.message || 'Lỗi kết nối server' };
+    const errData = error.response?.data || {};
+    const errMessage = errData.message || error.message || 'Lỗi kết nối server';
+    const errObj = new Error(errMessage);
+    errObj.data = errData.data || null;
+    errObj.status = error.response?.status;
     return Promise.reject(errObj);
   }
 );

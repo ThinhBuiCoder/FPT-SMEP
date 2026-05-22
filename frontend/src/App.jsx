@@ -22,6 +22,9 @@ import ClassManagement from './pages/admin/ClassManagement';
 import LecturerDashboard from './pages/lecturer/LecturerDashboard';
 import LecturerClasses from './pages/lecturer/LecturerClasses';
 
+// Mentor Pages
+import MentorDashboard from './pages/mentor/MentorDashboard';
+
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
 import IdeaForm from './pages/student/IdeaForm';
@@ -81,9 +84,12 @@ function App() {
               <Route path="/admin/users"    element={<ProtectedRoute allowedRoles={['ADMIN']}><UserManagement /></ProtectedRoute>} />
               <Route path="/admin/classes"  element={<ProtectedRoute allowedRoles={['ADMIN']}><ClassManagement /></ProtectedRoute>} />
 
-              {/* Lecturer */}
-              <Route path="/lecturer"         element={<ProtectedRoute allowedRoles={['LECTURER']}><LecturerDashboard /></ProtectedRoute>} />
-              <Route path="/lecturer/classes" element={<ProtectedRoute allowedRoles={['LECTURER']}><LecturerClasses /></ProtectedRoute>} />
+              {/* Lecturer & Mentor Dashboard */}
+              <Route path="/lecturer"         element={<ProtectedRoute allowedRoles={['LECTURER', 'MENTOR']}><LecturerDashboard /></ProtectedRoute>} />
+              <Route path="/lecturer/classes" element={<ProtectedRoute allowedRoles={['LECTURER', 'MENTOR']}><LecturerClasses /></ProtectedRoute>} />
+
+              {/* Mentor Dashboard */}
+              <Route path="/mentor"           element={<ProtectedRoute allowedRoles={['MENTOR']}><MentorDashboard /></ProtectedRoute>} />
 
               {/* Class Detail — shared by Admin + Lecturer */}
               <Route path="/classes/:id"    element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER']}><ClassDetail /></ProtectedRoute>} />

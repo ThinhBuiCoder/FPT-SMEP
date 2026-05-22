@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { Mail, Lock, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
@@ -21,84 +21,95 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  // Banner khi tài khoản chưa verify
+  // Banner shown when account is not yet verified
   const [unverifiedEmail, setUnverifiedEmail] = useState(null);
   const [resendLoading, setResendLoading]     = useState(false);
 
   const { login, loginWithGoogle, resendOtp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // ── Redirect sau khi đăng nhập ──────────────────────────────
+  // Pre-fill email when redirected from Register "Sign in →" link
+  useEffect(() => {
+    if (location.state?.prefillEmail) {
+      setEmail(location.state.prefillEmail);
+    }
+  }, []);
+
+
+  // ── Redirect after login ───────────────────────────────────
   const redirectByRole = (user) => {
-    if (user.role === 'ADMIN')    navigate('/admin');
-    else if (user.role === 'LECTURER') navigate('/lecturer');
-    else navigate('/student');
+    if (user.role === 'ADMIN')                          navigate('/admin');
+    else if (user.role === 'LECTURER')                  navigate('/lecturer');
+    else if (user.role === 'MENTOR')                    navigate('/mentor');
+    else                                                navigate('/student');
   };
 
-  // ── Đăng nhập email/password ─────────────────────────────────
+  // ── Email / password login ────────────────────────────────────
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
-    if (!email || !password) return toast.error('Vui lòng nhập đầy đủ thông tin');
+    if (!email || !password) return toast.error('Please fill in all fields.');
 
     setLoading(true);
     setUnverifiedEmail(null);
     try {
       const user = await login(email, password);
-      toast.success(`Chào mừng trở lại, ${user.name}!`);
+      toast.success(`Welcome back, ${user.name}!`);
       redirectByRole(user);
     } catch (err) {
-      const data = err.response?.data;
-      // Tài khoản chưa verify
-      if (err.response?.status === 403 && data?.data?.needVerify) {
-        setUnverifiedEmail(data?.data?.email || email);
+      // axiosClient interceptor already unwraps response.data, so:
+      //   err.message = backend error message
+      //   err.data    = extra payload from errorResponse()
+      // Account not yet verified
+      if (err.data?.needVerify) {
+        setUnverifiedEmail(err.data?.email || email);
       } else {
-        toast.error(data?.message || 'Đăng nhập thất bại');
+        toast.error(err.message || err.response?.data?.message || 'Login failed. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Gửi lại OTP ──────────────────────────────────────────────
+  // ── Resend OTP ─────────────────────────────────────────────────
   const handleResendOtp = async () => {
     if (!unverifiedEmail) return;
     setResendLoading(true);
     try {
       await resendOtp(unverifiedEmail);
-      toast.success('OTP đã được gửi lại! Hãy kiểm tra email.');
-      // Chuyển sang trang register với email đã điền và bật bước OTP
+      toast.success('A new OTP has been sent! Please check your inbox.');
+      // Navigate to register page with email pre-filled and OTP step active
       navigate('/register', { state: { email: unverifiedEmail, step: 'otp' } });
     } catch {
-      toast.error('Không thể gửi lại OTP. Vui lòng thử lại.');
+      toast.error('Failed to resend OTP. Please try again.');
     } finally {
       setResendLoading(false);
     }
   };
 
-  // ── Đăng nhập bằng Google ─────────────────────────────────────
+  // ── Google login ───────────────────────────────────────────────
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       try {
-        // useGoogleLogin trả về access_token, cần đổi sang id_token
-        // Lấy user info từ Google userinfo endpoint
+        // useGoogleLogin returns an access_token; fetch user info from Google userinfo endpoint
         const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const googleUser = await userInfoRes.json();
 
-        // Gọi backend với id_token (dùng sub + email để tạo JWT)
+        // Send access_token to backend — it will call Google userinfo to build a JWT
         const user = await loginWithGoogle(tokenResponse.access_token);
-        toast.success(`Chào mừng, ${user.name}! 🎉`);
+        toast.success(`Welcome, ${user.name}! 🎉`);
         redirectByRole(user);
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Đăng nhập Google thất bại');
+        toast.error(err.response?.data?.message || 'Google sign-in failed.');
       } finally {
         setGoogleLoading(false);
       }
     },
     onError: () => {
-      toast.error('Đăng nhập Google bị huỷ hoặc thất bại');
+      toast.error('Google sign-in was cancelled or failed.');
       setGoogleLoading(false);
     },
     flow: 'implicit',
@@ -134,21 +145,21 @@ const Login = () => {
             <p className="text-body text-slate-500 mt-1">Sign in to FPT-SMEP Mentoring Portal</p>
           </div>
 
-          {/* Banner: chưa verify email */}
+          {/* Banner: account not verified */}
           {unverifiedEmail && (
             <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
               <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-800 mb-1">Tài khoản chưa được kích hoạt</p>
+                <p className="text-sm font-semibold text-amber-800 mb-1">Account not activated</p>
                 <p className="text-xs text-amber-700 mb-3">
-                  Email <strong>{unverifiedEmail}</strong> chưa xác thực OTP. Vui lòng kiểm tra hộp thư và nhập mã OTP.
+                  <strong>{unverifiedEmail}</strong> has not been verified yet. Please check your inbox and enter the OTP code.
                 </p>
                 <button
                   onClick={handleResendOtp}
                   disabled={resendLoading}
                   className="text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900 disabled:opacity-50"
                 >
-                  {resendLoading ? 'Đang gửi...' : 'Gửi lại OTP mới →'}
+                  {resendLoading ? 'Sending...' : 'Resend OTP →'}
                 </button>
               </div>
             </div>
@@ -166,13 +177,13 @@ const Login = () => {
             ) : (
               <GoogleIcon />
             )}
-            {googleLoading ? 'Đang kết nối Google...' : 'Tiếp tục với Google'}
+            {googleLoading ? 'Connecting to Google...' : 'Continue with Google'}
           </button>
 
           {/* Divider */}
           <div className="flex items-center gap-3 mb-5">
             <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400 font-medium">hoặc đăng nhập bằng email</span>
+            <span className="text-xs text-slate-400 font-medium">or sign in with email</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 

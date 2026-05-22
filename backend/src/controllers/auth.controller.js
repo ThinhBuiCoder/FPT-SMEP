@@ -1,10 +1,11 @@
 // src/controllers/auth.controller.js
 const jwt    = require('jsonwebtoken');
+const crypto = require('crypto');
 const https  = require('https');
 const { validationResult } = require('express-validator');
 const User   = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
-const { sendOtpEmail } = require('../services/emailService');
+const { sendOtpEmail, sendResetPasswordEmail } = require('../services/emailService');
 
 // ── Helpers ────────────────────────────────────────────────────
 const generateToken = (id) =>
@@ -23,25 +24,31 @@ const register = async (req, res) => {
   try {
     const exists = await User.findOne({ email });
     if (exists) {
-      // Nếu tài khoản tồn tại nhưng chưa verify → cho phép gửi lại OTP
+      // Account exists but not yet verified — resend a fresh OTP
       if (!exists.isVerified) {
         const otp = generateOtp();
         exists.otp        = otp;
-        exists.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+        exists.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
         await exists.save({ validateBeforeSave: false });
         await sendOtpEmail(email, otp, exists.name);
         return successResponse(res,
           { email, needVerify: true },
-          'Tài khoản đã tồn tại nhưng chưa xác thực. Đã gửi lại OTP mới.',
+          'This email is already registered but not yet verified. A new OTP has been sent — please check your inbox.',
           200
         );
       }
-      return errorResponse(res, 'Email đã được sử dụng.', 409);
+      // Account exists and is fully verified
+      return errorResponse(
+        res,
+        'This email address is already in use. Please sign in or use a different email.',
+        409,
+        { emailTaken: true, email }
+      );
     }
 
-    // Chỉ cho tạo STUDENT hoặc LECTURER từ public endpoint
-    const allowedRoles = ['STUDENT', 'LECTURER'];
-    const userRole = allowedRoles.includes(role) ? role : 'STUDENT';
+    // Only STUDENT, LECTURER, MENTOR can self-register. ADMIN must be set directly in DB.
+    const allowedRoles = ['STUDENT', 'LECTURER', 'MENTOR'];
+    const userRole = allowedRoles.includes(role?.toUpperCase()) ? role.toUpperCase() : 'STUDENT';
 
     // Tạo OTP
     const otp        = generateOtp();
@@ -278,7 +285,7 @@ const changePassword = async (req, res) => {
   }
 };
 
-// ── POST /api/auth/forgot-password ─────────────────────────────
+// ── POST /api/auth/forgot-password ─────────────────────────
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return errorResponse(res, 'Email is required', 400);
@@ -286,14 +293,23 @@ const forgotPassword = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (user) {
-      user.resetPasswordToken   = 'mock-reset-token-' + user._id;
+      // Generate a secure random token (64 hex chars)
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken   = resetToken;
       user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
       await user.save({ validateBeforeSave: false });
-      console.log(`[MVP] Reset link for ${email}: http://localhost:5173/reset-password/${user.resetPasswordToken}`);
+
+      // Build reset URL pointing to the frontend
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+      // Send real email
+      await sendResetPasswordEmail(email, resetUrl, user.name);
     }
     // Always return success to prevent email enumeration
     return successResponse(res, null, 'If this email exists, a reset link has been sent.');
   } catch (err) {
+    console.error('Forgot password error:', err);
     return errorResponse(res, 'Server error', 500);
   }
 };

@@ -40,11 +40,11 @@ const MentoringSessions = () => {
         const d = res.data || res;
         if (d.team?._id) {
           setTeamId(d.team._id);
-          const mRes = await mentoringApi.getByTeam(d.team._id);
+          const mRes = await mentoringApi.getSessionsByTeam(d.team._id);
           list = mRes.data?.sessions || mRes.sessions || mRes.data || [];
         }
       } else {
-        const res = await mentoringApi.getAll();
+        const res = await mentoringApi.getAllSessions();
         list = res.data?.sessions || res.sessions || res.data || [];
         
         try {
@@ -107,7 +107,7 @@ const MentoringSessions = () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      await mentoringApi.delete(deleteTarget.id);
+      await mentoringApi.deleteSession(deleteTarget.id);
       setSessions(sessions.filter(s => s._id !== deleteTarget.id));
       toast.success('Session deleted!');
       setDeleteTarget(null);
@@ -129,10 +129,10 @@ const MentoringSessions = () => {
         actionItems: form.actionItems.filter(a => a.trim()).map(a => ({ item: a, done: false })),
       };
       if (editingSession) {
-        await mentoringApi.update(editingSession._id, payload);
+        await mentoringApi.updateSession(editingSession._id, payload);
         toast.success('Session updated!');
       } else {
-        await mentoringApi.create(payload);
+        await mentoringApi.createSession(payload);
         toast.success('Session scheduled!');
       }
       setIsModalOpen(false);
