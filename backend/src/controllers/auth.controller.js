@@ -45,9 +45,9 @@ const register = async (req, res) => {
       );
     }
 
-    // Chỉ cho tạo STUDENT hoặc LECTURER từ public endpoint
-    const allowedRoles = ['STUDENT', 'LECTURER'];
-    const userRole = allowedRoles.includes(role) ? role : 'STUDENT';
+    // Only STUDENT, LECTURER, MENTOR can self-register. ADMIN must be set directly in DB.
+    const allowedRoles = ['STUDENT', 'LECTURER', 'MENTOR'];
+    const userRole = allowedRoles.includes(role?.toUpperCase()) ? role.toUpperCase() : 'STUDENT';
 
     // Tạo OTP
     const otp        = generateOtp();
