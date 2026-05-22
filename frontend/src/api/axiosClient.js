@@ -45,7 +45,11 @@ axiosClient.interceptors.response.use(
         }
       }
     }
-    const errObj = error.response?.data || { success: false, message: error.message || 'Lỗi kết nối server' };
+    const errData = error.response?.data || {};
+    const errMessage = errData.message || error.message || 'Lỗi kết nối server';
+    const errObj = new Error(errMessage);
+    errObj.data = errData.data || null;
+    errObj.status = error.response?.status;
     return Promise.reject(errObj);
   }
 );

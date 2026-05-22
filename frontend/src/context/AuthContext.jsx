@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const res = await axiosClient.get('/auth/me');
           // Interceptor returns response.data = { success, message, data: { user } }
-          setUser(res.data?.user);
+          setUser(res.data?.user || res.user);
         } catch {
           localStorage.removeItem('token');
         }
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await axiosClient.post('/auth/login', { email, password });
     // Interceptor returns { success, message, data: { token, user } }
-    const { token, user: userData } = res.data;
+    const { token, user: userData } = res.data || res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
   const verifyOtp = async (email, otp) => {
     const res = await axiosClient.post('/auth/verify-otp', { email, otp });
-    const { token, user: userData } = res.data;
+    const { token, user: userData } = res.data || res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
 
   const loginWithGoogle = async (googleToken) => {
     const res = await axiosClient.post('/auth/google', { googleToken });
-    const { token, user: userData } = res.data;
+    const { token, user: userData } = res.data || res;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
