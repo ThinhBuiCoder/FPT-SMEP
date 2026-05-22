@@ -14,6 +14,12 @@ const userSchema = new mongoose.Schema(
     bio:       { type: String, default: null },
     resetPasswordToken:   { type: String },
     resetPasswordExpires: { type: Date },
+    // OTP Email Verification
+    isVerified:  { type: Boolean, default: false },
+    otp:         { type: String, default: null },
+    otpExpires:  { type: Date,   default: null },
+    // Google OAuth
+    googleId:    { type: String, default: null },
   },
   { timestamps: true }
 );

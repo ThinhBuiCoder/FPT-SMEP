@@ -13,6 +13,8 @@ const fadeUp = {
 const Home = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const [videoOpen, setVideoOpen] = useState(false);
+
   const features = [
     { icon: GraduationCap, title: 'Smart Classroom', desc: 'Organize startup incubation classes with multi-level role management and real-time team coordination.', color: 'primary', span: 'md:col-span-7' },
     { icon: Users, title: 'Mentoring Hub', desc: 'Connect mentors and startups for 1-on-1 sessions with scheduling, notes, and feedback tracking.', color: 'secondary', span: 'md:col-span-5' },
@@ -87,7 +89,7 @@ const Home = () => {
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-50 border border-primary-100 mb-6 sm:mb-8"
               >
                 <Zap className="w-3.5 h-3.5 text-primary" />
-                <span className="text-caption font-semibold text-primary">AI-powered evaluation now available</span>
+                <span className="text-caption font-semibold text-primary">Academic Startup Incubator Platform</span>
               </motion.div>
 
               <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={1}
@@ -100,7 +102,7 @@ const Home = () => {
               <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={2}
                 className="text-base sm:text-lg text-slate-500 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed"
               >
-                The comprehensive platform for managing startup incubation classes, AI-driven idea evaluation, and mentor-student collaboration at FPT University.
+                A centralized platform for managing startup classes, mentoring workflows, proposal reviews, and student startup development across academic semesters.
               </motion.p>
 
               <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={3}
@@ -109,7 +111,7 @@ const Home = () => {
                 <Link to="/login">
                   <Button variant="gradient" size="lg" iconRight={ArrowRight} className="w-full sm:w-auto">Start Now</Button>
                 </Link>
-                <Button variant="outline" size="lg" icon={Play} className="w-full sm:w-auto">Watch Demo</Button>
+                <Button variant="outline" size="lg" icon={Play} className="w-full sm:w-auto" onClick={() => setVideoOpen(true)} > Watch Introduction </Button>
               </motion.div>
 
               {/* Stats */}
@@ -231,6 +233,28 @@ const Home = () => {
           </p>
         </div>
       </footer>
+      {videoOpen && ( <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-4">
+        <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <button
+            onClick={() => setVideoOpen(false)}
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+            aria-label="Close video"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="aspect-video w-full bg-slate-950">
+            <iframe
+              src="https://app.heygen.com/embeds/718d4f5c2a3b4fea941888184e7458a8"
+              title="SMEP Introduction Video"
+              className="h-full w-full"
+              allow="autoplay; fullscreen; clipboard-write; encrypted-media"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 };

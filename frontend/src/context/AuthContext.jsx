@@ -15,7 +15,8 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           const res = await axiosClient.get('/auth/me');
-          setUser(res.data?.user || res.user);
+          // Interceptor returns response.data = { success, message, data: { user } }
+          setUser(res.data?.user);
         } catch {
           localStorage.removeItem('token');
         }
@@ -27,7 +28,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const res = await axiosClient.post('/auth/login', { email, password });
-    const { token, user: userData } = res.data || res;
+    // Interceptor returns { success, message, data: { token, user } }
+    const { token, user: userData } = res.data;
     localStorage.setItem('token', token);
     setUser(userData);
     return userData;
@@ -35,10 +37,29 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const res = await axiosClient.post('/auth/register', userData);
-    const { token, user: newUser } = res.data || res;
+    // After register, do NOT set user/token — OTP verification is required first
+    return res;
+  };
+
+  const verifyOtp = async (email, otp) => {
+    const res = await axiosClient.post('/auth/verify-otp', { email, otp });
+    const { token, user: userData } = res.data;
     localStorage.setItem('token', token);
-    setUser(newUser);
-    return newUser;
+    setUser(userData);
+    return userData;
+  };
+
+  const resendOtp = async (email) => {
+    const res = await axiosClient.post('/auth/resend-otp', { email });
+    return res;
+  };
+
+  const loginWithGoogle = async (googleToken) => {
+    const res = await axiosClient.post('/auth/google', { googleToken });
+    const { token, user: userData } = res.data;
+    localStorage.setItem('token', token);
+    setUser(userData);
+    return userData;
   };
 
   const logout = () => {
@@ -59,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = (updated) => setUser(prev => ({ ...prev, ...updated }));
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, verifyOtp, resendOtp, loginWithGoogle, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
