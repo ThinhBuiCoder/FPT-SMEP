@@ -458,22 +458,48 @@ exports.getStudents = async (req, res) => {
 // ─── GET /api/classes/my-classes ──────────────────────────────────────────────
 exports.getMyClasses = async (req, res) => {
   try {
-    const student = await Student.findOne({
+    if (req.user.role === 'ADMIN') {
+      const classes = await Class.find()
+        .populate('lectureId', 'name email avatar role bio')
+        .populate('mentorIds', 'name email avatar role bio')
+        .sort({ year: -1, semester: 1, classIndex: 1 });
+      return successResponse(res, { classes });
+    }
+
+    if (req.user.role === 'LECTURER' || req.user.role === 'LECTURE') {
+      const classes = await Class.find({ lectureId: req.user._id })
+        .populate('lectureId', 'name email avatar role bio')
+        .populate('mentorIds', 'name email avatar role bio')
+        .sort({ year: -1, semester: 1, classIndex: 1 });
+      return successResponse(res, { classes });
+    }
+
+    if (req.user.role === 'MENTOR') {
+      const classes = await Class.find({ mentorIds: req.user._id })
+        .populate('lectureId', 'name email avatar role bio')
+        .populate('mentorIds', 'name email avatar role bio')
+        .sort({ year: -1, semester: 1, classIndex: 1 });
+      return successResponse(res, { classes });
+    }
+
+    const students = await Student.find({
       $or: [
         { userId: req.user._id },
         { email: req.user.email.toLowerCase() }
       ]
     });
 
-    if (!student) {
+    if (!students || students.length === 0) {
       return successResponse(res, { classes: [] }, 'Student not enrolled in any class');
     }
 
-    const cls = await Class.findById(student.classId)
-      .populate('lectureId', 'name email avatar role bio')
-      .populate('mentorIds', 'name email avatar role bio');
+    const classIds = students.map(s => s.classId);
 
-    const classes = cls ? [cls] : [];
+    const classes = await Class.find({ _id: { $in: classIds }, status: { $ne: 'disabled' } })
+      .populate('lectureId', 'name email avatar role bio')
+      .populate('mentorIds', 'name email avatar role bio')
+      .sort({ year: -1, semester: 1, classIndex: 1 });
+
     return successResponse(res, { classes });
   } catch (err) {
     console.error('getMyClasses error:', err);
@@ -484,25 +510,34 @@ exports.getMyClasses = async (req, res) => {
 // ─── GET /api/classes/my-team ─────────────────────────────────────────────────
 exports.getMyTeam = async (req, res) => {
   try {
-    let student = await Student.findOne({
+    const students = await Student.find({
       $or: [
         { userId: req.user._id },
         { email: req.user.email.toLowerCase() }
-      ],
-      teamId: { $ne: null }
+      ]
     });
 
-    if (!student) {
-      student = await Student.findOne({
-        $or: [
-          { userId: req.user._id },
-          { email: req.user.email.toLowerCase() }
-        ]
-      });
+    if (!students || students.length === 0) {
+      return successResponse(res, null, 'Student record not found');
+    }
+
+    let student = null;
+    for (const s of students) {
+      const cls = await Class.findOne({ _id: s.classId, status: { $ne: 'disabled' } });
+      if (cls) {
+        // Prefer student record with teamId
+        if (s.teamId) {
+          student = s;
+          break;
+        }
+        if (!student) {
+          student = s; // fallback to active student without team
+        }
+      }
     }
 
     if (!student) {
-      return successResponse(res, null, 'Student record not found');
+      return successResponse(res, null, 'Student record not found or class is disabled');
     }
 
     if (!student.teamId) {

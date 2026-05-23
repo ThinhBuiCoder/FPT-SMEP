@@ -1,4 +1,6 @@
 // src/server.js — Real-Time Socket.io Group Chat Enabled
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');
