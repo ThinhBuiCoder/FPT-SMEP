@@ -6,12 +6,12 @@ const StartupIdea = require('../models/StartupIdea');
 const Evaluation = require('../models/Evaluation');
 const AiAnalysis = require('../models/AiAnalysis');
 const MentoringSession = require('../models/MentoringSession');
-const Milestone        = require('../models/Milestone');
-const Student          = require('../models/Student');
-const Proposal         = require('../models/Proposal');
-const PitchDeck        = require('../models/PitchDeck');
-const SprintTask       = require('../models/SprintTask');
-const Notification     = require('../models/Notification');
+const Milestone = require('../models/Milestone');
+const Student = require('../models/Student');
+const Proposal = require('../models/Proposal');
+const PitchDeck = require('../models/PitchDeck');
+const SprintTask = require('../models/SprintTask');
+const Notification = require('../models/Notification');
 
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
@@ -41,11 +41,11 @@ const getAdminDashboard = async () => {
   const { getGlobalRankings } = require('./ranking.service');
   const allRanked = await getGlobalRankings();
   const topTeams = allRanked.slice(0, 10).map(r => ({
-    startupName: r.startupName || r.team.name || '—',
+    startupName: r?.startupName || r?.team?.name || '—',
     team: {
-      _id: r.team._id,
-      name: r.team.name,
-      classId: r.team.class,
+      _id: r?.team?._id || null,
+      name: r?.team?.name || null,
+      classId: r?.team?.class || null,
     },
     avgScore: r.finalScore || 0,
     evaluationCount: r.evalCount || 0,
@@ -132,7 +132,7 @@ const getLecturerDashboard = async (lecturerId) => {
 const getMentorDashboard = async (mentorId) => {
   const myClasses = await Class.find({ mentorIds: mentorId });
   const classIds = myClasses.map(c => c._id);
-  const myTeams = await Team.find({ $or: [ { mentorId }, { classId: { $in: classIds } } ] });
+  const myTeams = await Team.find({ $or: [{ mentorId }, { classId: { $in: classIds } }] });
   const teamIds = myTeams.map(t => t._id);
 
   const [upcomingSessions, recentEvals, recentSessions, totalTasks, completedTasks] = await Promise.all([
@@ -190,8 +190,8 @@ const getStudentDashboard = async (userId) => {
 
   const myTeam = student.teamId
     ? await Team.findById(student.teamId)
-        .populate('classId', 'classCode subjectCode semester year')
-        .populate('members.studentId', 'fullName email rollNumber major')
+      .populate('classId', 'classCode subjectCode semester year')
+      .populate('members.studentId', 'fullName email rollNumber major')
     : null;
 
   const semesterLabel = (sem) => {
@@ -215,7 +215,7 @@ const getStudentDashboard = async (userId) => {
 
   const teamMember = myTeam.members.find(
     m => m.studentId?._id?.toString() === student._id.toString() ||
-         m.studentId?.toString() === student._id.toString()
+      m.studentId?.toString() === student._id.toString()
   );
 
   const [startupIdea, milestones, sessions, tasksCount, unreadNotifications] = await Promise.all([
