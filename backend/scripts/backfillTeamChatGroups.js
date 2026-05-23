@@ -2,9 +2,27 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const Team = require('../src/models/Team');
+const Class = require('../src/models/Class');
 const ChatGroup = require('../src/models/ChatGroup');
 const connectDB = require('../src/config/db');
 const { createChatGroupForTeam } = require('../src/services/chatGroup.service');
+
+/**
+ * Build the new group name in format EXE201g_<classIndex>G<teamIndex>
+ * e.g. subjectCode=EXE201, classIndex=5, teamCode=EXE201_5_TEAM_3 → exe201g_5G3
+ */
+const buildGroupName = (cls, team) => {
+  try {
+    const subject = (cls.subjectCode || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // e.g. "EXE201"
+    const classIdx = cls.classIndex || 1;
+    const teamCodeStr = (team.teamCode || '').toUpperCase();
+    const teamMatch = teamCodeStr.match(/_TEAM_(\d+)$/);
+    const teamIdx = teamMatch ? parseInt(teamMatch[1], 10) : 1;
+    return `${subject}g_${classIdx}G${teamIdx}`;
+  } catch {
+    return null;
+  }
+};
 
 const run = async () => {
   try {
@@ -13,12 +31,13 @@ const run = async () => {
 
     console.log('Starting backfill for Team Chat Groups...');
 
-    // 2. Fetch all teams
+    // 2. Fetch all teams (populate classId)
     const teams = await Team.find({});
     console.log(`Found ${teams.length} teams in database.`);
 
     let totalTeamsChecked = 0;
     let createdCount = 0;
+    let renamedCount = 0;
     let attachedExistingCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
@@ -27,11 +46,24 @@ const run = async () => {
     for (const team of teams) {
       totalTeamsChecked++;
       try {
+        // Load class info for name building
+        const cls = await Class.findById(team.classId);
+
         // If team already has chatGroupId linked
         if (team.chatGroupId) {
           const chatGroupObj = await ChatGroup.findById(team.chatGroupId);
           if (chatGroupObj) {
-            skippedCount++;
+            // Rename if using old format (ends with " Chat" or not matching new format)
+            const expectedName = cls ? buildGroupName(cls, team) : null;
+            if (expectedName && chatGroupObj.groupName !== expectedName) {
+              const oldName = chatGroupObj.groupName;
+              chatGroupObj.groupName = expectedName;
+              await chatGroupObj.save();
+              renamedCount++;
+              console.log(`Renamed ChatGroup: "${oldName}" → "${expectedName}" (Team: ${team.teamCode})`);
+            } else {
+              skippedCount++;
+            }
             continue;
           }
         }
@@ -41,12 +73,23 @@ const run = async () => {
         if (existing) {
           team.chatGroupId = existing._id;
           await team.save();
-          attachedExistingCount++;
-          console.log(`Attached existing ChatGroup for Team: ${team.teamName} (${team.teamCode})`);
+
+          // Rename if needed
+          const expectedName = cls ? buildGroupName(cls, team) : null;
+          if (expectedName && existing.groupName !== expectedName) {
+            const oldName = existing.groupName;
+            existing.groupName = expectedName;
+            await existing.save();
+            renamedCount++;
+            console.log(`Renamed & attached ChatGroup: "${oldName}" → "${expectedName}" (Team: ${team.teamCode})`);
+          } else {
+            attachedExistingCount++;
+            console.log(`Attached existing ChatGroup for Team: ${team.teamName} (${team.teamCode})`);
+          }
           continue;
         }
 
-        // Otherwise create new chat group
+        // Otherwise create new chat group (service will use new naming logic)
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
@@ -56,7 +99,7 @@ const run = async () => {
           await session.commitTransaction();
           session.endSession();
           createdCount++;
-          console.log(`Created new ChatGroup for Team: ${team.teamName} (${team.teamCode})`);
+          console.log(`Created new ChatGroup "${chatGroup.groupName}" for Team: ${team.teamName} (${team.teamCode})`);
         } catch (innerErr) {
           await session.abortTransaction();
           session.endSession();
@@ -74,6 +117,7 @@ const run = async () => {
     console.log('======================================');
     console.log(`Total Teams Checked:     ${totalTeamsChecked}`);
     console.log(`Created Count:           ${createdCount}`);
+    console.log(`Renamed Count:           ${renamedCount}`);
     console.log(`Attached Existing Count: ${attachedExistingCount}`);
     console.log(`Skipped Count:           ${skippedCount}`);
     console.log(`Failed Count:            ${failedCount}`);
