@@ -84,8 +84,8 @@ const AdminDashboard = () => {
               <BarChart data={scoreBarData} barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => [v.toFixed(2), 'Score']} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => [typeof v === 'number' ? v.toFixed(2) : v, 'Score']} />
                 <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#034EA2" />
               </BarChart>
             </ResponsiveContainer>
@@ -163,10 +163,10 @@ const AdminDashboard = () => {
                     </span>
                   </td>
                   <td className="px-6 py-3.5 font-semibold text-slate-900">{t.team?.name || '—'}</td>
-                  <td className="px-6 py-3.5 text-slate-500 text-sm">{t.team?.classId?.name || '—'}</td>
+                  <td className="px-6 py-3.5 text-slate-500 text-sm">{t.team?.classId?.code || t.team?.classId?.classCode || t.team?.classId?.name || '—'}</td>
                   <td className="px-6 py-3.5 text-slate-700 text-sm">{t.startupName || '—'}</td>
                   <td className="px-6 py-3.5 text-right">
-                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-sm font-bold ${t.avgScore >= 80 ? 'bg-green-100 text-green-700' : t.avgScore >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-sm font-bold ${t.avgScore >= 8 ? 'bg-green-100 text-green-700' : t.avgScore >= 6 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                       {t.avgScore?.toFixed(2) || '—'}
                     </span>
                   </td>

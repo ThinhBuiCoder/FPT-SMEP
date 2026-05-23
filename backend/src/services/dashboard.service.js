@@ -38,32 +38,18 @@ const getAdminDashboard = async () => {
       .populate({ path: 'teamId', select: 'teamName classId', populate: { path: 'classId', select: 'classCode' } }),
   ]);
 
-  // Top teams ranking by average evaluation score
-  const topTeamsRaw = await Evaluation.aggregate([
-    { $match: { status: { $ne: 'DRAFT' } } },
-    { $group: { _id: '$teamId', avgScore: { $avg: '$totalScore' }, count: { $sum: 1 } } },
-    { $sort: { avgScore: -1 } },
-    { $limit: 10 },
-  ]);
-
-  const topTeams = await Promise.all(
-    topTeamsRaw.map(async (t) => {
-      if (!t._id) return null;
-      const team = await Team.findById(t._id)
-        .populate({ path: 'classId', select: 'classCode' });
-      const idea = await StartupIdea.findOne({ teamId: t._id });
-      return {
-        startupName: idea?.startupName || team?.teamName || '—',
-        team: {
-          _id: team?._id,
-          name: team?.teamName,
-          classId: team?.classId,
-        },
-        avgScore: parseFloat(t.avgScore.toFixed(2)),
-        evaluationCount: t.count,
-      };
-    })
-  );
+  const { getGlobalRankings } = require('./ranking.service');
+  const allRanked = await getGlobalRankings();
+  const topTeams = allRanked.slice(0, 10).map(r => ({
+    startupName: r.startupName || r.team.name || '—',
+    team: {
+      _id: r.team._id,
+      name: r.team.name,
+      classId: r.team.class,
+    },
+    avgScore: r.finalScore || 0,
+    evaluationCount: r.evalCount || 0,
+  }));
 
   const overallTaskProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
