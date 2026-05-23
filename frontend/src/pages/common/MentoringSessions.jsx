@@ -17,6 +17,25 @@ const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 const MentoringSessions = () => {
   const { user } = useAuth();
+  const toId = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      if (value._id) return toId(value._id);
+      if (value.id) return toId(value.id);
+      if (typeof value.toString === 'function') return value.toString();
+    }
+    return String(value);
+  };
+  const getTodayDateInput = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const minMeetingDate = getTodayDateInput();
+
   const [sessions, setSessions] = useState([]);
   const [teamId, setTeamId] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -35,6 +54,8 @@ const MentoringSessions = () => {
     try {
       setLoading(true);
       let list = [];
+      let filteredTeams = [];
+      
       if (user?.role === 'STUDENT') {
         const res = await dashboardApi.getStudent();
         const d = res.data || res;
@@ -50,9 +71,72 @@ const MentoringSessions = () => {
         try {
           const teamsRes = await teamApi.getAll();
           const teamsData = teamsRes.data?.teams || teamsRes.teams || teamsRes.data || [];
-          setTeams(teamsData);
+          
+          // Filter teams based on user role
+          if (user?.role === 'LECTURER' || user?.role === 'LECTURE') {
+            // Lecturer: show teams from their classes
+            try {
+              const classesRes = await classApi.getAll();
+              const lecturerClasses = (classesRes.data?.classes || classesRes.classes || classesRes.data || [])
+                .filter(c => toId(c.lectureId) === toId(user?._id));
+              const lecturerClassIds = new Set(lecturerClasses.map(c => toId(c._id)));
+              filteredTeams = teamsData.filter(t => lecturerClassIds.has(toId(t.classId)));
+            } catch {
+              // If class fetch fails, show teams directly assigned
+              filteredTeams = teamsData.filter(t => toId(t.lectureId) === toId(user?._id));
+            }
+          } else if (user?.role === 'MENTOR') {
+            // Mentor: show teams they mentor
+            try {
+              const classesRes = await classApi.getAll();
+              const mentorClasses = (classesRes.data?.classes || classesRes.classes || classesRes.data || [])
+                .filter(c => c.mentorIds && c.mentorIds.some(m => toId(m) === toId(user?._id)));
+              const mentorClassIds = new Set(mentorClasses.map(c => toId(c._id)));
+              
+              // Show teams from their mentored classes OR teams directly assigned
+              filteredTeams = teamsData.filter(t => 
+                mentorClassIds.has(toId(t.classId)) ||
+                toId(t.mentorId) === toId(user?._id)
+              );
+
+              if (filteredTeams.length === 0 && mentorClassIds.size > 0) {
+                const classTeamResults = await Promise.allSettled(
+                  [...mentorClassIds].map(classId => classApi.getTeams(classId))
+                );
+
+                const fallbackTeams = classTeamResults
+                  .filter(result => result.status === 'fulfilled')
+                  .flatMap(result => {
+                    const payload = result.value;
+                    return payload.data?.teams || payload.teams || payload.data || [];
+                  });
+
+                const seen = new Set();
+                filteredTeams = fallbackTeams.filter(team => {
+                  const id = toId(team._id);
+                  if (!id || seen.has(id)) return false;
+                  seen.add(id);
+                  return true;
+                });
+              }
+            } catch {
+              // If class fetch fails, show teams directly assigned
+              filteredTeams = teamsData.filter(t => toId(t.mentorId) === toId(user?._id));
+            }
+          } else {
+            // Admin: show all teams
+            filteredTeams = teamsData;
+          }
+          
+          setTeams(filteredTeams);
+          if (user?.role === 'MENTOR' && filteredTeams.length === 0) {
+            toast('You are assigned to class(es), but no teams are available yet. Please generate/assign teams first.', {
+              icon: 'ℹ️'
+            });
+          }
         } catch (teamsErr) {
           console.error('Failed to load teams:', teamsErr);
+          toast.error('Failed to load teams. Please refresh and try again.');
         }
       }
       setSessions(Array.isArray(list) ? list : []);
@@ -82,7 +166,17 @@ const MentoringSessions = () => {
 
   const openAdd = () => {
     setEditingSession(null);
-    setForm({ title: '', meetingDate: '', notes: '', actionItems: [''], teamId: teamId || '' });
+    setForm({ 
+      title: '', 
+      meetingDate: '', 
+      startTime: '',
+      endTime: '',
+      location: '',
+      meetingLink: '',
+      notes: '', 
+      actionItems: [''], 
+      teamId: teamId || '' 
+    });
     setIsModalOpen(true);
   };
 
@@ -91,43 +185,97 @@ const MentoringSessions = () => {
     setForm({
       title: s.title,
       meetingDate: s.meetingDate ? new Date(s.meetingDate).toISOString().slice(0, 16) : '',
+      startTime: s.startTime || '',
+      endTime: s.endTime || '',
+      location: s.location || '',
+      meetingLink: s.meetingLink || '',
       notes: s.notes || '',
-      actionItems: s.actionItems?.map(a => a.item || a) || [''],
+      actionItems: s.actionItems?.map(a => a.content || a.item || a) || [''],
       teamId: s.teamId?._id || s.teamId || '',
     });
     setIsModalOpen(true);
   };
 
   
-  const handleDelete = (id) => {
-    setDeleteTarget({ id });
+  const handleDelete = (session) => {
+    const isAdmin = user?.role === 'ADMIN';
+    setDeleteTarget({
+      id: session._id,
+      title: session.title,
+      action: isAdmin ? 'delete' : 'cancel'
+    });
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      await mentoringApi.deleteSession(deleteTarget.id);
-      setSessions(sessions.filter(s => s._id !== deleteTarget.id));
-      toast.success('Session deleted!');
+      if (deleteTarget.action === 'delete') {
+        await mentoringApi.deleteSession(deleteTarget.id);
+        setSessions(sessions.filter(s => s._id !== deleteTarget.id));
+        toast.success('Session deleted!');
+      } else {
+        await mentoringApi.cancelSession(deleteTarget.id);
+        setSessions(sessions.map(s => s._id === deleteTarget.id ? { ...s, status: 'CANCELLED' } : s));
+        toast.success('Session cancelled!');
+      }
       setDeleteTarget(null);
-    } catch {
-      toast.error('Failed to delete session');
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to update session');
     } finally {
       setIsDeleting(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!form.title || !form.meetingDate) { toast.error('Title and date required'); return; }
-    if (user?.role !== 'STUDENT' && !form.teamId) { toast.error('Please select a team'); return; }
+    if (!form.title || form.title.trim() === '') { 
+      toast.error('Session title is required'); 
+      return; 
+    }
+    if (!form.meetingDate) { 
+      toast.error('Meeting date is required'); 
+      return; 
+    }
+
+    const selectedDate = form.meetingDate.split('T')[0];
+    if (selectedDate < minMeetingDate) {
+      toast.error('Past dates are not allowed');
+      return;
+    }
+    
+    // Validate time range if both start and end time provided
+    if (form.startTime && form.endTime && form.startTime >= form.endTime) {
+      toast.error('Start time must be before end time');
+      return;
+    }
+    
+    if (user?.role !== 'STUDENT' && !form.teamId) { 
+      toast.error('Please select a team'); 
+      return; 
+    }
+    
+    // Check if user has teams
+    if (user?.role !== 'STUDENT' && teams.length === 0) {
+      toast.error('You do not have permission to create sessions for any team');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const payload = {
-        ...form,
+        title: form.title.trim(),
+        meetingDate: form.meetingDate,
+        startTime: form.startTime ? form.startTime.trim() : '',
+        endTime: form.endTime ? form.endTime.trim() : '',
+        location: form.location ? form.location.trim() : '',
+        meetingLink: form.meetingLink ? form.meetingLink.trim() : '',
+        notes: form.notes ? form.notes.trim() : '',
+        actionItems: form.actionItems
+          .filter(a => a.trim())
+          .map(a => ({ content: a.trim(), completed: false })),
         teamId: user?.role === 'STUDENT' ? teamId : form.teamId,
-        actionItems: form.actionItems.filter(a => a.trim()).map(a => ({ item: a, done: false })),
       };
+      
       if (editingSession) {
         await mentoringApi.updateSession(editingSession._id, payload);
         toast.success('Session updated!');
@@ -138,7 +286,9 @@ const MentoringSessions = () => {
       setIsModalOpen(false);
       await fetchData();
     } catch (err) {
-      toast.error(err.message || 'Failed to save');
+      console.error('Submit error:', err);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to save session';
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -243,7 +393,16 @@ const MentoringSessions = () => {
           <p className="text-slate-500 mt-1">Manage your weekly learning classes and mentoring sessions</p>
         </div>
         {activeView === 'mentoring' && (
-          <Button variant="gradient" size="sm" icon={Plus} onClick={openAdd}>Schedule Session</Button>
+          <Button 
+            variant="gradient" 
+            size="sm" 
+            icon={Plus} 
+            onClick={openAdd}
+            disabled={user?.role !== 'STUDENT' && (!teams || teams.length === 0)}
+            title={user?.role !== 'STUDENT' && (!teams || teams.length === 0) ? 'No teams available. You don\'t have permission to create sessions.' : 'Schedule a new mentoring session'}
+          >
+            Schedule Session
+          </Button>
         )}
       </div>
 
@@ -333,22 +492,37 @@ const MentoringSessions = () => {
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-xl" />
                     <div className="flex justify-between items-start pl-2">
                       <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-slate-900 truncate">{s.title}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-slate-900 truncate">{s.title}</h4>
+                          {s.status === 'CANCELLED' && (
+                            <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-medium">Cancelled</span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {new Date(s.meetingDate).toLocaleDateString()} {new Date(s.meetingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0 ml-2">
-                        <button onClick={() => openEdit(s)} className="p-1 rounded text-slate-400 hover:text-primary hover:bg-white transition-all"><Edit className="w-3 h-3" /></button>
-                        <button onClick={() => handleDelete(s._id)} className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-white transition-all"><Trash2 className="w-3 h-3" /></button>
+                      <div className="flex gap-2 shrink-0 ml-2 items-start">
+                        <button onClick={() => openEdit(s)} className="p-1 rounded text-slate-400 hover:text-primary hover:bg-white transition-all" title="Edit session" aria-label="Edit session"><Edit className="w-3 h-3" /></button>
+                        <button
+                          onClick={() => handleDelete(s)}
+                          title={user?.role === 'ADMIN' ? 'Delete session' : 'Cancel session'}
+                          aria-label={user?.role === 'ADMIN' ? 'Delete session' : 'Cancel session'}
+                          className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-white transition-all"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                     <button
-                      className="mt-2 ml-2 w-full bg-primary text-white text-xs py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-primary-dark transition-colors"
-                      onClick={() => { toast.success('Opening Google Meet...', { icon: '🎥' }); setTimeout(() => window.open('https://meet.google.com/new', '_blank'), 800); }}
+                      className={`mt-2 ml-2 w-full text-xs py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors ${s.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 pointer-events-none' : 'bg-primary text-white hover:bg-primary-dark'}`}
+                      onClick={() => {
+                        if (s.status === 'CANCELLED') return;
+                        toast.success('Opening Google Meet...', { icon: '🎥' }); setTimeout(() => window.open('https://meet.google.com/new', '_blank'), 800);
+                      }}
                     >
-                      <Video className="w-3 h-3" /> Join Meet
+                      <Video className="w-3 h-3" /> {s.status === 'CANCELLED' ? 'Cancelled' : 'Join Meet'}
                     </button>
                   </div>
                 ))}
@@ -371,8 +545,8 @@ const MentoringSessions = () => {
                       <p className="text-xs text-slate-400">{new Date(s.meetingDate).toLocaleDateString()}</p>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                      <button onClick={() => openEdit(s)} className="p-1 rounded text-slate-400 hover:text-primary"><Edit className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete(s._id)} className="p-1 rounded text-slate-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openEdit(s)} className="p-1 rounded text-slate-400 hover:text-primary" title="Edit session" aria-label="Edit session"><Edit className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete(s)} title={user?.role === 'ADMIN' ? 'Delete session' : 'Cancel session'} aria-label={user?.role === 'ADMIN' ? 'Delete session' : 'Cancel session'} className="p-1 rounded text-slate-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -393,47 +567,140 @@ const MentoringSessions = () => {
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       >
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
           {user?.role !== 'STUDENT' && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Select Team *</label>
-              <select
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
-                value={form.teamId}
-                onChange={(e) => setForm({ ...form, teamId: e.target.value })}
-              >
-                <option value="">-- Choose Team --</option>
-                {teams.map(t => (
-                  <option key={t._id} value={t._id}>
-                    {t.teamName} ({t.teamCode})
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Select Team * {teams.length === 0 && <span className="text-red-500 text-xs">(No teams available)</span>}</label>
+              {teams.length === 0 ? (
+                <div className="w-full p-3 border border-red-300 bg-red-50 rounded-lg text-sm text-red-700">
+                  No teams available. You don't have permission to create sessions for any team. Contact your admin.
+                </div>
+              ) : (
+                <select
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
+                  value={form.teamId}
+                  onChange={(e) => setForm({ ...form, teamId: e.target.value })}
+                  required
+                >
+                  <option value="">-- Choose Team --</option>
+                  {teams.map(t => (
+                    <option key={t._id} value={t._id}>
+                      {t.teamName} ({t.teamCode})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Session Title *</label>
-            <input type="text" className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Business Model Review" />
+            <input 
+              type="text" 
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+              value={form.title} 
+              onChange={(e) => setForm({ ...form, title: e.target.value })} 
+              placeholder="e.g. Business Model Review" 
+              required
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date & Time *</label>
-            <input type="datetime-local" className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" value={form.meetingDate} onChange={(e) => setForm({ ...form, meetingDate: e.target.value })} />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
+            <input 
+              type="date" 
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+              min={minMeetingDate}
+              value={form.meetingDate ? form.meetingDate.split('T')[0] : ''} 
+              onChange={(e) => {
+                const date = e.target.value;
+                const time = form.meetingDate ? form.meetingDate.split('T')[1] : '';
+                setForm({ ...form, meetingDate: time ? `${date}T${time}` : date });
+              }} 
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
+              <input 
+                type="time" 
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+                value={form.startTime} 
+                onChange={(e) => setForm({ ...form, startTime: e.target.value })} 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">End Time</label>
+              <input 
+                type="time" 
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+                value={form.endTime} 
+                onChange={(e) => setForm({ ...form, endTime: e.target.value })} 
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+            <input 
+              type="text" 
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+              value={form.location} 
+              onChange={(e) => setForm({ ...form, location: e.target.value })} 
+              placeholder="e.g. Room 302 or Online" 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Meeting Link</label>
+            <input 
+              type="url" 
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+              value={form.meetingLink} 
+              onChange={(e) => setForm({ ...form, meetingLink: e.target.value })} 
+              placeholder="https://meet.google.com/..." 
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Session agenda, topics to discuss..." />
+            <textarea 
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none" 
+              rows={3} 
+              value={form.notes} 
+              onChange={(e) => setForm({ ...form, notes: e.target.value })} 
+              placeholder="Session agenda, topics to discuss..." 
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Action Items</label>
             {form.actionItems.map((item, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input type="text" className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" value={item} onChange={(e) => {
-                  const arr = [...form.actionItems]; arr[i] = e.target.value; setForm({ ...form, actionItems: arr });
-                }} placeholder={`Action item ${i + 1}`} />
-                {i > 0 && <button type="button" onClick={() => setForm({ ...form, actionItems: form.actionItems.filter((_, j) => j !== i) })} className="text-red-400 hover:text-red-600 px-1">✕</button>}
+                <input 
+                  type="text" 
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" 
+                  value={item} 
+                  onChange={(e) => {
+                    const arr = [...form.actionItems]; 
+                    arr[i] = e.target.value; 
+                    setForm({ ...form, actionItems: arr });
+                  }} 
+                  placeholder={`Action item ${i + 1}`} 
+                />
+                {i > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setForm({ ...form, actionItems: form.actionItems.filter((_, j) => j !== i) })} 
+                    className="text-red-400 hover:text-red-600 px-1"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
-            <button type="button" onClick={() => setForm({ ...form, actionItems: [...form.actionItems, ''] })} className="text-sm text-primary hover:underline">+ Add action item</button>
+            <button 
+              type="button" 
+              onClick={() => setForm({ ...form, actionItems: [...form.actionItems, ''] })} 
+              className="text-sm text-primary hover:underline"
+            >
+              + Add action item
+            </button>
           </div>
         </div>
       </Modal>
@@ -442,8 +709,12 @@ const MentoringSessions = () => {
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
-        title={`Delete Session`}
-        description={`Are you sure you want to delete ${deleteTarget?.name || deleteTarget?.title || 'this item'}? This action cannot be undone.`}
+        title={deleteTarget?.action === 'delete' ? 'Delete Session' : 'Cancel Session'}
+        description={deleteTarget?.action === 'delete'
+          ? `Are you sure you want to delete ${deleteTarget?.title || 'this item'}? This action cannot be undone.`
+          : `Are you sure you want to cancel ${deleteTarget?.title || 'this session'}?`
+        }
+        confirmText={deleteTarget?.action === 'delete' ? 'Delete' : 'Cancel'}
         isSubmitting={isDeleting}
       />
     </div>
