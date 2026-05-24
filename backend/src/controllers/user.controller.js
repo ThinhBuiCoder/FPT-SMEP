@@ -1,6 +1,8 @@
 // src/controllers/user.controller.js
 const User = require('../models/User');
+const Student = require('../models/Student');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
+const { isValidProgramMajor } = require('../constants/majors');
 
 // GET /api/users
 const getUsers = async (req, res) => {
@@ -42,11 +44,18 @@ const getUserById = async (req, res) => {
 
 // POST /api/users (Admin tạo user)
 const createUser = async (req, res) => {
-  const { name, email, password, role, studentId, phone, bio } = req.body;
+  const { name, email, password, role, studentId, phone, bio, programGroup, major } = req.body;
   if (!name || !email || !password) return errorResponse(res, 'Thiếu: name, email, password.', 400);
+  
+  if (role === 'STUDENT' && (programGroup || major)) {
+    if (!isValidProgramMajor(programGroup, major)) {
+      return errorResponse(res, 'Invalid major for selected program group.', 400);
+    }
+  }
+
   try {
     if (await User.findOne({ email })) return errorResponse(res, 'Email đã tồn tại.', 409);
-    const user = await User.create({ name, email, password, role, studentId, phone, bio });
+    const user = await User.create({ name, email, password, role, studentId, phone, bio, programGroup, major });
     return successResponse(res, { user }, 'Tạo user thành công!', 201);
   } catch (err) {
     return errorResponse(res, 'Lỗi server.', 500);
@@ -55,18 +64,39 @@ const createUser = async (req, res) => {
 
 // PUT /api/users/:id
 const updateUser = async (req, res) => {
-  const { name, email, role, bio, phone, studentId } = req.body;
+  const { name, email, role, bio, phone, studentId, programGroup, major } = req.body;
   try {
     if (email) {
       const dup = await User.findOne({ email, _id: { $ne: req.params.id } });
       if (dup) return errorResponse(res, 'Email đã sử dụng.', 409);
     }
+
+    if (role === 'STUDENT' && (programGroup || major)) {
+      if (!isValidProgramMajor(programGroup, major)) {
+        return errorResponse(res, 'Invalid major for selected program group.', 400);
+      }
+    }
+
+    const updateData = { name, email, role, bio, phone, studentId };
+    if (role === 'STUDENT' && programGroup && major) {
+      updateData.programGroup = programGroup;
+      updateData.major = major;
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { name, email, role, bio, phone, studentId },
+      updateData,
       { new: true, runValidators: true }
     );
     if (!user) return errorResponse(res, 'Không tìm thấy user.', 404);
+
+    if (role === 'STUDENT' && programGroup && major && email) {
+      await Student.updateMany(
+        { email: user.email },
+        { $set: { programGroup, major, userId: user._id } }
+      );
+    }
+
     return successResponse(res, { user }, 'Cập nhật user thành công!');
   } catch (err) {
     return errorResponse(res, 'Lỗi server.', 500);

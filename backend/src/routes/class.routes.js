@@ -18,6 +18,9 @@ router.get('/my-classes', ctrl.getMyClasses);
 router.get('/my-team', ctrl.getMyTeam);
 router.get('/my-class-detail/:classId', ctrl.getMyClassDetail);
 
+// Export Class to Excel
+router.get('/:classId/export-excel', authorize('ADMIN', 'LECTURER', 'MENTOR'), ctrl.exportClassExcel);
+
 // Get single class with students & teams
 router.get('/:id',           ctrl.getClassById);
 // Update class metadata

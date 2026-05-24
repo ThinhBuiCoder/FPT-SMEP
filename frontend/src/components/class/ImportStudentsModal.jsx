@@ -3,9 +3,8 @@ import toast from 'react-hot-toast';
 import { X, Upload, FileSpreadsheet, Download, CheckCircle2, AlertCircle, Loader2, Info } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 
-// Template — NO Major column. Major is auto-detected from RollNumber.
-const TEMPLATE_HEADERS = 'RollNumber,MemberCode,LastName,MiddleName,FirstName,UrlPreImg,Fullname,Email\n';
-const TEMPLATE_ROW     = 'SE170001,MC001,Nguyen,Van,An,,Nguyen Van An,an.nguyen@fpt.edu.vn\n';
+const TEMPLATE_HEADERS = 'RollNumber,Fullname,Chuyên ngành,SubjectCode,Email\n';
+const TEMPLATE_ROW     = 'SE170001,Nguyen Van An,BIT_SE,EXE101,an.nguyen@fpt.edu.vn\n';
 
 const downloadTemplate = () => {
   const blob = new Blob([TEMPLATE_HEADERS + TEMPLATE_ROW], { type: 'text/csv;charset=utf-8;' });
@@ -76,7 +75,7 @@ export default function ImportStudentsModal({ classId, onClose, onImported }) {
               <FileSpreadsheet className="w-5 h-5 text-secondary" />
               <div>
                 <p className="text-sm font-medium text-secondary">Download Template</p>
-                <p className="text-xs text-slate-400">Columns: RollNumber, MemberCode, LastName, MiddleName, FirstName, UrlPreImg, Fullname, Email</p>
+                <p className="text-xs text-slate-400">Columns: RollNumber, Fullname, Chuyên ngành, SubjectCode, Email</p>
               </div>
             </div>
             <button
@@ -87,14 +86,11 @@ export default function ImportStudentsModal({ classId, onClose, onImported }) {
             </button>
           </div>
 
-          {/* Major auto-detect notice */}
+          {/* Major notice */}
           <div className="flex items-start gap-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
             <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
             <p className="text-xs text-blue-700">
-              <strong>Major will be detected automatically</strong> from the first 2 letters of RollNumber.
-              <br />
-              Example: <span className="font-mono">SE170001</span> → SE (Software Engineering),{' '}
-              <span className="font-mono">DE170600</span> → DE
+              <strong>Major will be imported from the 'Chuyên ngành' column.</strong>
             </p>
           </div>
 

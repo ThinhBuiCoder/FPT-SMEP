@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     avatar:    { type: String, default: null },
     phone:     { type: String, default: null },
     studentId: { type: String, default: null }, // Mã sinh viên
+    programGroup: { type: String, enum: ['BIT', 'BBA', 'BLA', null], default: null },
+    major:     { type: String, default: null },
     bio:       { type: String, default: null },
     resetPasswordToken:   { type: String },
     resetPasswordExpires: { type: Date },

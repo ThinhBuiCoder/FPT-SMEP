@@ -14,8 +14,9 @@ const studentSchema = new mongoose.Schema(
     email:      { type: String, required: true, lowercase: true, trim: true },
     // avatar is taken from linked User profile if available
     avatarUrl:  { type: String, default: null },
-    // Auto-parsed from first 2 letters of RollNumber (e.g. SE, DE, AI)
+    programGroup: { type: String, enum: ['BIT', 'BBA', 'BLA', null], default: null },
     major:      { type: String, default: null, trim: true, uppercase: true },
+    subjectCode: { type: String, default: null, trim: true, uppercase: true },
     // Which class this student belongs to
     classId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
     // Optional link to a registered User account
