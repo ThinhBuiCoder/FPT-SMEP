@@ -270,7 +270,7 @@ const getMe = async (req, res) => {
 
 // ── PUT /api/auth/update-profile ─────────────────────────────
 const updateProfile = async (req, res) => {
-  const { name, bio, phone, studentId, programGroup, major } = req.body;
+  const { name, bio, phone, studentId, programGroup, major, avatar } = req.body;
   
   if (req.user.role === 'STUDENT' && (programGroup || major)) {
     if (!isValidProgramMajor(programGroup, major)) {
@@ -280,6 +280,7 @@ const updateProfile = async (req, res) => {
 
   try {
     const updateData = { name, bio, phone, studentId };
+    if (avatar !== undefined) updateData.avatar = avatar;
     if (req.user.role === 'STUDENT' && programGroup && major) {
       updateData.programGroup = programGroup;
       updateData.major = major;
