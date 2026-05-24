@@ -42,6 +42,15 @@ const createMilestone = async (req, res) => {
 
   if (!title || !dueDate) return errorResponse(res, 'Missing required fields: title, dueDate.', 400);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
+  if (due < today) {
+    return errorResponse(res, 'Due date cannot be in the past.', 400);
+  }
+
   if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
     return errorResponse(res, 'Start date must be before due date.', 400);
   }

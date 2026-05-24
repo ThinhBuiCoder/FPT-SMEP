@@ -1,9 +1,9 @@
 // frontend/src/pages/workspace/TeamWorkspace.jsx
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Users, Calendar, Mail, Loader2, FileText, UploadCloud, History, 
-  ChevronRight, Award, Plus, User, ArrowLeft, Download, Trash2, Shield
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import {
+  Users, Calendar, Mail, Loader2, FileText, UploadCloud, History,
+  ChevronRight, Award, Plus, User, ArrowLeft, Download, Trash2, Shield, MapPin
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
@@ -15,6 +15,8 @@ import VersionHistory from './VersionHistory';
 import EvaluationPanel from '../../components/workspace/EvaluationPanel';
 import MentoringPanel from '../../components/workspace/MentoringPanel';
 import SprintPanel from '../../components/workspace/SprintPanel';
+import WeeklyRoadmapPlanner from '../../components/workspace/WeeklyRoadmapPlanner';
+import QuickShortcuts from '../../components/workspace/shortcuts/QuickShortcuts';
 
 const statusColors = {
   DRAFT: 'bg-slate-100 text-slate-600 border border-slate-200',
@@ -27,11 +29,24 @@ const statusColors = {
 export default function TeamWorkspace() {
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
+
+  // Initialise active tab from URL query param (?tab=roadmap)
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'overview';
+  });
+
+  // Sync tab when query param changes externally
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [location.search]);
 
   const fetchWorkspaceData = async () => {
     try {
@@ -43,7 +58,7 @@ export default function TeamWorkspace() {
       } else {
         res = await workspaceApi.getMyWorkspace();
       }
-      
+
       if (res.data === null) {
         // Not assigned to team yet
         setData(null);
@@ -79,7 +94,7 @@ export default function TeamWorkspace() {
         </div>
         <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
         <p className="text-slate-500 mt-2">{errorMsg}</p>
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
         >
@@ -104,7 +119,9 @@ export default function TeamWorkspace() {
   }
 
   const { team, class: cls, members, lecturer, mentor, proposal, latestDeck, pitchDecks, versions } = data;
-  const isEditable = user?.role === 'ADMIN' || (members && members.some(m => m.userId?._id === user?._id));
+  const privilegedRoles = ['ADMIN', 'LECTURER', 'MENTOR'];
+  const isTeamMember = members && members.some(m => m.userId?._id === user?._id);
+  const isEditable = privilegedRoles.includes(user?.role) || isTeamMember;
 
   // Build target proposal link
   const getProposalLink = () => {
@@ -147,40 +164,35 @@ export default function TeamWorkspace() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-        >
-          Workspace Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('evaluation')}
-          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'evaluation' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-        >
-          Evaluation
-        </button>
-        <button
-          onClick={() => setActiveTab('mentoring')}
-          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mentoring' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-        >
-          Mentoring Sessions
-        </button>
-        <button
-          onClick={() => setActiveTab('sprint')}
-          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'sprint' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-        >
-          Sprint & Milestones
-        </button>
+      <div className="flex border-b border-slate-200 overflow-x-auto">
+        {[
+          { key: 'overview', label: 'Workspace Overview' },
+          { key: 'roadmap', label: 'Weekly Roadmap' },
+          { key: 'evaluation', label: 'Evaluation' },
+          { key: 'mentoring', label: 'Mentoring Sessions' },
+          { key: 'shortcut', label: 'Quick Shortcuts' },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex items-center gap-1.5 py-3 px-6 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+          >
+            {Icon && <Icon className="w-3.5 h-3.5" />}
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
+
           {/* Left Side - Proposal & PitchDecks */}
           <div className="lg:col-span-8 space-y-6">
-            
+
             {/* Proposal Card */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
@@ -235,17 +247,17 @@ export default function TeamWorkspace() {
                       Last updated {new Date(proposal.updatedAt).toLocaleDateString()}
                     </span>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => navigate(getProposalLink() + '?preview=true')}
                       >
                         View Full Proposal
                       </Button>
                       {isEditable && (
-                        <Button 
-                          variant="primary" 
-                          size="sm" 
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={() => navigate(getProposalLink())}
                         >
                           Edit Proposal
@@ -258,10 +270,10 @@ export default function TeamWorkspace() {
             </div>
 
             {/* Pitch Decks */}
-            <PitchDeckUpload 
-              teamId={team._id} 
-              latestDeck={latestDeck} 
-              pitchDecks={pitchDecks} 
+            <PitchDeckUpload
+              teamId={team._id}
+              latestDeck={latestDeck}
+              pitchDecks={pitchDecks}
               isEditable={isEditable}
               onRefresh={fetchWorkspaceData}
             />
@@ -269,13 +281,13 @@ export default function TeamWorkspace() {
 
           {/* Right Side - Team & Versions */}
           <div className="lg:col-span-4 space-y-6">
-            
+
             {/* Stakeholders Info */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4">
               <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" /> Members & Mentors
               </h3>
-              
+
               {/* Lecturer */}
               {lecturer && (
                 <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
@@ -336,9 +348,9 @@ export default function TeamWorkspace() {
 
             {/* Proposal Version History */}
             {proposal && (
-              <VersionHistory 
-                proposalId={proposal._id} 
-                versions={versions} 
+              <VersionHistory
+                proposalId={proposal._id}
+                versions={versions}
                 isEditable={isEditable}
                 onRefresh={fetchWorkspaceData}
               />
@@ -348,11 +360,32 @@ export default function TeamWorkspace() {
         </div>
       )}
 
+      {activeTab === 'roadmap' && (() => {
+        // Map TeamWorkspace variables to WeeklyRoadmapPlanner props
+        const courseCode = cls?.subjectCode || '';
+        const classId = cls?._id || '';
+        const teamIdProp = team?._id || '';
+        // Find the current user's roleInTeam from members array
+        const myMember = members?.find(m => m.userId?._id === user?._id || m.userId === user?._id);
+        const roleInTeam = myMember?.roleInTeam || '';
+
+        return (
+          <WeeklyRoadmapPlanner
+            courseCode={courseCode}
+            classId={String(classId)}
+            teamId={String(teamIdProp)}
+            currentUser={user}
+            roleInTeam={roleInTeam}
+            teamMembers={members || []}
+          />
+        );
+      })()}
+
       {activeTab === 'evaluation' && (
-        <EvaluationPanel 
-          teamId={team._id} 
-          proposalId={proposal?._id} 
-          pitchDeckId={latestDeck?._id} 
+        <EvaluationPanel
+          teamId={team._id}
+          proposalId={proposal?._id}
+          pitchDeckId={latestDeck?._id}
         />
       )}
 
@@ -362,6 +395,10 @@ export default function TeamWorkspace() {
 
       {activeTab === 'sprint' && (
         <SprintPanel teamId={team._id} members={members} isEditable={isEditable} />
+      )}
+
+      {activeTab === 'shortcut' && (
+        <QuickShortcuts teamId={team._id} isEditable={isEditable} />
       )}
     </div>
   );

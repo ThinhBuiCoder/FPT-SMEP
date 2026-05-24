@@ -12,6 +12,8 @@ const Proposal         = require('../models/Proposal');
 const PitchDeck        = require('../models/PitchDeck');
 const SprintTask       = require('../models/SprintTask');
 const Notification     = require('../models/Notification');
+const WeeklyTask       = require('../models/WeeklyTask');
+
 
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
@@ -182,7 +184,7 @@ const getMentorDashboard = async (mentorId) => {
 };
 
 // ─── STUDENT ──────────────────────────────────────────────
-const getStudentDashboard = async (userId) => {
+const getStudentDashboard = async (userId, weekNumber = 1) => {
   const userObj = await User.findById(userId);
   if (!userObj) {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
@@ -293,8 +295,41 @@ const getStudentDashboard = async (userId) => {
     if (status === 'TODO') tasksSummary.todo = count;
     else if (status === 'IN_PROGRESS') tasksSummary.inProgress = count;
     else if (status === 'REVIEW') tasksSummary.review = count;
-    else if (status === 'DONE') tasksSummary.done = count;
+    else if (status === 'DONE' || status === 'COMPLETED') {
+    tasksSummary.done += count;
+    }
   }
+
+  // Fetch weekly task stats for the student's selected roadmap week
+  let selectedWeek = Number(weekNumber) || 1;
+  if (selectedWeek < 1 || selectedWeek > 10) selectedWeek = 1;
+  const courseCode = myClass?.subjectCode || 'EXE101';
+
+  const [dbCourseTasks, dbClassTasks, dbTeamTasks] = await Promise.all([
+    WeeklyTask.find({ taskType: 'COURSE_TEMPLATE', courseCode, weekNumber: selectedWeek }),
+    myClass ? WeeklyTask.find({ taskType: 'CLASS_TASK', classId: myClass._id, weekNumber: selectedWeek }) : [],
+    myTeam ? WeeklyTask.find({ taskType: 'TEAM_TASK', teamId: myTeam._id, weekNumber: selectedWeek }) : []
+  ]);
+
+  const allWeeklyTasks = [...dbCourseTasks, ...dbClassTasks, ...dbTeamTasks];
+  const overdueWeekly = allWeeklyTasks.filter( t => t.taskType === 'TEAM_TASK' && ( t.status === 'OVERDUE' || ( t.status !== 'COMPLETED' && t.dueDate && new Date(t.dueDate) < now ) ) ).length;
+  const pendingWeekly = allWeeklyTasks.filter(t => ['TODO', 'IN_PROGRESS', 'REVIEW'].includes(t.status) && !(t.dueDate && new Date(t.dueDate) < now)).length;
+  const completedWeekly = allWeeklyTasks.filter(t => t.status === 'COMPLETED').length;
+  
+  const pendingWithDue = allWeeklyTasks.filter(t => ['TODO', 'IN_PROGRESS', 'REVIEW'].includes(t.status) && t.dueDate);
+  let nextWeeklyDeadline = null;
+  if (pendingWithDue.length > 0) {
+    const sorted = pendingWithDue.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    nextWeeklyDeadline = sorted[0].dueDate;
+  }
+
+  const weeklyTasksSummary = {
+    selectedWeek,
+    overdue: overdueWeekly,
+    pending: pendingWeekly,
+    completed: completedWeekly,
+    nextDeadline: nextWeeklyDeadline
+  };
 
   return {
     hasTeam: true,
@@ -313,8 +348,9 @@ const getStudentDashboard = async (userId) => {
       total: milestones.length,
       percentage: milestones.length > 0 ? Math.round((done / milestones.length) * 100) : 0,
     },
+    weeklyTasksSummary,
   };
-};
+}
 
 module.exports = {
   getAdminDashboard,
