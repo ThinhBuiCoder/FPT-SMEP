@@ -20,7 +20,10 @@ const teamSchema = new mongoose.Schema(
     members:    [teamMemberSchema],
     // Auto-created chat group reference
     chatGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatGroup', default: null },
-    description: { type: String, default: '' },
+    groupName:   { type: String, default: "" },
+    groupExe201: { type: String, default: "" },
+    projectName: { type: String, default: "" },
+    description: { type: String, default: "" },
   },
   { timestamps: true }
 );

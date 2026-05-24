@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSessionsByTeam, createSession, updateSession, deleteSession } from '../../api/mentoringApi';
+import { getSessionsByTeam, createSession, updateSession, deleteSession, cancelSession } from '../../api/mentoringApi';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 
@@ -81,13 +81,23 @@ export default function MentoringPanel({ teamId }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this session?')) return;
+    const isAdmin = user?.role === 'ADMIN';
+    const confirmMessage = isAdmin
+      ? 'Are you sure you want to delete this session?'
+      : 'Are you sure you want to cancel this session?';
+
+    if (!window.confirm(confirmMessage)) return;
     try {
-      await deleteSession(id);
-      toast.success('Session deleted');
+      if (isAdmin) {
+        await deleteSession(id);
+        toast.success('Session deleted');
+      } else {
+        await cancelSession(id);
+        toast.success('Session cancelled');
+      }
       fetchSessions();
     } catch (err) {
-      toast.error('Failed to delete session');
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to update session');
     }
   };
 
@@ -163,7 +173,7 @@ export default function MentoringPanel({ teamId }) {
               {!isStudent && (
                 <div className="mt-4 md:mt-0 flex space-x-2">
                   <button onClick={() => openModal(s)} className="text-blue-600 hover:text-blue-900 text-sm font-medium">Edit</button>
-                  <button onClick={() => handleDelete(s._id)} className="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+                  <button onClick={() => handleDelete(s._id)} className="text-red-600 hover:text-red-900 text-sm font-medium">{user?.role === 'ADMIN' ? 'Delete' : 'Cancel'}</button>
                 </div>
               )}
             </div>

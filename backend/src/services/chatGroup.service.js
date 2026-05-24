@@ -104,11 +104,26 @@ const createChatGroupForTeam = async (teamId, options = {}) => {
     addMemberSafely(targetUserId || null, student._id, 'student', student.email);
   }
 
+  // Build group name: EXE201g_<classIndex>G<teamIndex>
+  // e.g. classCode=EXE201_5, teamCode=EXE201_5_TEAM_3 → EXE201g_5G3
+  let teamGroupName = `${team.teamCode} Chat`; // fallback
+  try {
+    const subject = (cls.subjectCode || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // e.g. "EXE201"
+    const classIdx = cls.classIndex || 1;
+    // Parse team index from teamCode: "EXE201_5_TEAM_3" → 3
+    const teamCodeStr = (team.teamCode || '').toUpperCase();
+    const teamMatch = teamCodeStr.match(/_TEAM_(\d+)$/);
+    const teamIdx = teamMatch ? parseInt(teamMatch[1], 10) : 1;
+    teamGroupName = `${subject}g_${classIdx}G${teamIdx}`;
+  } catch (_) {
+    // keep fallback
+  }
+
   const chatGroup = await ChatGroup.create(
     [{
       teamId,
       classId: team.classId,
-      groupName: `${team.teamCode} Chat`,
+      groupName: teamGroupName,
       createdBy: createdBy || lectId || team.createdBy,
       members,
     }],

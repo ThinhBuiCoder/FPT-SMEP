@@ -8,6 +8,8 @@ const chatGroupMemberSchema = new mongoose.Schema(
     // studentId populated from Student model (no User account yet)
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
     role: { type: String, enum: ['lecture', 'student', 'admin', 'mentor', 'LECTURE', 'LECTURER', 'STUDENT', 'MENTOR', 'ADMIN'], default: 'student' },
+    // Optional nickname set by the member themselves within this chat group
+    nickname: { type: String, trim: true, default: null, maxlength: 50 },
   },
   { _id: false }
 );

@@ -3,6 +3,7 @@ const ChatGroup = require('../models/ChatGroup');
 const Message = require('../models/Message');
 const Student = require('../models/Student');
 const Team = require('../models/Team');
+const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
 // ─── Get Messages History for a Group ───────────────────────────────────────
@@ -79,6 +80,94 @@ const getMyChatGroups = async (req, res) => {
   }
 };
 
+// ─── Get Members of a Chat Group ─────────────────────────────────────────────
+const getGroupMembers = async (req, res) => {
+  try {
+    const { chatGroupId } = req.params;
+
+    const group = await ChatGroup.findById(chatGroupId);
+    if (!group) return errorResponse(res, 'Chat group not found.', 404);
+
+    const isMember = req.user.role === 'ADMIN' || group.members.some(
+      m => m.userId && m.userId.toString() === req.user.id.toString()
+    );
+    if (!isMember) return errorResponse(res, 'You are not a member of this chat group.', 403);
+
+    // Enrich each member with User info (name, avatar) or Student info (fullName)
+    const enriched = await Promise.all(
+      group.members.map(async (m) => {
+        let displayName = null;
+        let avatar = null;
+        let email = null;
+
+        if (m.userId) {
+          const userDoc = await User.findById(m.userId).select('name email avatar');
+          if (userDoc) {
+            displayName = userDoc.name;
+            avatar = userDoc.avatar || null;
+            email = userDoc.email;
+          }
+        }
+
+        if (!displayName && m.studentId) {
+          const stuDoc = await Student.findById(m.studentId).select('fullName email avatarUrl');
+          if (stuDoc) {
+            displayName = stuDoc.fullName;
+            avatar = stuDoc.avatarUrl || null;
+            email = stuDoc.email;
+          }
+        }
+
+        return {
+          userId: m.userId || null,
+          studentId: m.studentId || null,
+          role: m.role,
+          nickname: m.nickname || null,
+          displayName,
+          avatar,
+          email,
+        };
+      })
+    );
+
+    return successResponse(res, { groupName: group.groupName, members: enriched });
+  } catch (error) {
+    console.error('getGroupMembers error:', error);
+    return errorResponse(res, 'Failed to fetch group members.', 500);
+  }
+};
+
+// ─── Update Member Nickname in a Chat Group ───────────────────────────────────
+const updateMemberNickname = async (req, res) => {
+  try {
+    const { chatGroupId } = req.params;
+    const { nickname } = req.body;
+
+    if (nickname !== undefined && nickname !== null && typeof nickname === 'string' && nickname.length > 50) {
+      return errorResponse(res, 'Nickname cannot exceed 50 characters.', 400);
+    }
+
+    const group = await ChatGroup.findById(chatGroupId);
+    if (!group) return errorResponse(res, 'Chat group not found.', 404);
+
+    // Only the user themselves can update their own nickname
+    const memberIdx = group.members.findIndex(
+      m => m.userId && m.userId.toString() === req.user.id.toString()
+    );
+    if (memberIdx === -1) return errorResponse(res, 'You are not a member of this chat group.', 403);
+
+    group.members[memberIdx].nickname = nickname ? nickname.trim() || null : null;
+    await group.save();
+
+    return successResponse(res, {
+      nickname: group.members[memberIdx].nickname,
+    }, 'Nickname updated successfully.');
+  } catch (error) {
+    console.error('updateMemberNickname error:', error);
+    return errorResponse(res, 'Failed to update nickname.', 500);
+  }
+};
+
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -137,4 +226,6 @@ module.exports = {
   getGroupMessages,
   getMyChatGroups,
   uploadChatFile,
+  getGroupMembers,
+  updateMemberNickname,
 };

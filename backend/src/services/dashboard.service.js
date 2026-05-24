@@ -190,19 +190,33 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
   }
 
-  const student = await Student.findOne({
+  const students = await Student.find({
     $or: [
       { userId: userObj._id },
       { email: userObj.email.toLowerCase() }
     ]
   });
 
-  if (!student) {
+  if (!students || students.length === 0) {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
   }
 
-  const myClass = await Class.findById(student.classId)
-    .populate('lectureId', 'name email avatar');
+  let student = null;
+  let myClass = null;
+
+  for (const s of students) {
+    const cls = await Class.findOne({ _id: s.classId, status: { $ne: 'disabled' } })
+      .populate('lectureId', 'name email avatar');
+    if (cls) {
+      student = s;
+      myClass = cls;
+      break;
+    }
+  }
+
+  if (!student || !myClass) {
+    return { hasTeam: false, myClass: null, team: null, startupIdea: null };
+  }
 
   const myTeam = student.teamId
     ? await Team.findById(student.teamId)
