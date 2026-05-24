@@ -38,7 +38,8 @@ const mentorDashboard = async (req, res) => {
 // GET /api/dashboard/student
 const studentDashboard = async (req, res) => {
   try {
-    const data = await getStudentDashboard(req.user.id);
+    const weekNumber = req.query.weekNumber;
+    const data = await getStudentDashboard(req.user._id, weekNumber);
     return successResponse(res, data);
   } catch (error) {
     console.error('StudentDashboard error:', error);

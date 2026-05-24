@@ -13,8 +13,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
   Rocket, Users, Brain, Star, CheckSquare, Calendar, Plus,
-  Clock, Zap
+  Clock, Zap, MapPin, BookOpen, TrendingUp, AlertTriangle,
 } from 'lucide-react';
+
 
 const statusColor = { DRAFT: 'Draft', SUBMITTED: 'Submitted', REVIEWED: 'Reviewed', APPROVED: 'Approved' };
 const milestoneStatus = { TODO: 'bg-slate-100 text-slate-500', IN_PROGRESS: 'bg-blue-100 text-blue-600', DONE: 'bg-green-100 text-green-600', OVERDUE: 'bg-red-100 text-red-600' };
@@ -26,11 +27,45 @@ const StudentDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // ── Weekly Tasks Widget state ──────────────────────────────────
+  const [selectedRoadmapWeek, setSelectedRoadmapWeek] = useState(() => {
+    const stored = localStorage.getItem('selectedRoadmapWeek');
+    const n = Number(stored);
+    return n >= 1 && n <= 10 ? n : 1;
+  });
+  const [weeklyStats, setWeeklyStats] = useState(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+
+  const fetchWeeklyStats = async (week) => {
+    setWeeklyLoading(true);
+    try {
+      const res = await dashboardApi.getStudent(week);
+      const d = res?.data || res;
+      setWeeklyStats(d?.weeklyTasksSummary || null);
+    } catch {
+      // silently fail — widget is supplemental
+    } finally {
+      setWeeklyLoading(false);
+    }
+  };
+
+  const handleRoadmapWeekChange = (w) => {
+    const n = Number(w);
+    setSelectedRoadmapWeek(n);
+    localStorage.setItem('selectedRoadmapWeek', String(n));
+    fetchWeeklyStats(n);
+  };
+
   useEffect(() => {
-    dashboardApi.getStudent()
-      .then(res => setData(res.data || res))
+    dashboardApi.getStudent(selectedRoadmapWeek)
+      .then(res => {
+        const d = res?.data || res;
+        setData(d);
+        setWeeklyStats(d?.weeklyTasksSummary || null);
+      })
       .catch(() => toast.error('Failed to load dashboard'))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAnalyzeAI = async () => {
@@ -192,6 +227,84 @@ const StudentDashboard = () => {
                   <Button variant="ghost-primary" size="xs" className="mt-2 w-full" onClick={() => navigate('/student/feedback')}>View Full Feedback →</Button>
                 </motion.div>
               )}
+
+              {/* Weekly Tasks Widget */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56 }}
+                className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-blue-500" />
+                    Weekly Roadmap
+                  </h3>
+                  {/* Week picker */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                    <BookOpen className="w-3 h-3 text-slate-400" />
+                    <select
+                      value={selectedRoadmapWeek}
+                      onChange={e => handleRoadmapWeekChange(e.target.value)}
+                      className="text-xs font-semibold text-slate-600 bg-transparent focus:outline-none cursor-pointer"
+                    >
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map(w => (
+                        <option key={w} value={w}>Week {w}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {weeklyLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-8 bg-slate-100 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                ) : weeklyStats ? (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-blue-50 rounded-xl p-2.5 text-center">
+                        <p className="text-lg font-black text-blue-600">{weeklyStats.pending ?? 0}</p>
+                        <p className="text-[10px] text-blue-400 font-semibold">Pending</p>
+                      </div>
+                      <div className="bg-emerald-50 rounded-xl p-2.5 text-center">
+                        <p className="text-lg font-black text-emerald-600">{weeklyStats.completed ?? 0}</p>
+                        <p className="text-[10px] text-emerald-400 font-semibold">Done</p>
+                      </div>
+                      <div className={`rounded-xl p-2.5 text-center ${weeklyStats.overdue > 0 ? 'bg-red-50' : 'bg-slate-50'}`}>
+                        <p className={`text-lg font-black ${weeklyStats.overdue > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                          {weeklyStats.overdue ?? 0}
+                        </p>
+                        <p className={`text-[10px] font-semibold ${weeklyStats.overdue > 0 ? 'text-red-400' : 'text-slate-400'}`}>Overdue</p>
+                      </div>
+                    </div>
+
+                    {weeklyStats.nextDeadline && (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Next deadline: <span className="font-semibold text-amber-700">
+                          {new Date(weeklyStats.nextDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        </span></span>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="ghost-primary"
+                      size="xs"
+                      className="w-full flex items-center gap-1.5 justify-center mt-1"
+                      onClick={() => navigate('/student/workspace?tab=roadmap')}
+                    >
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      View Weekly Roadmap →
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-slate-400">No roadmap data for Week {selectedRoadmapWeek}</p>
+                    <Button variant="ghost-primary" size="xs" className="mt-2"
+                      onClick={() => navigate('/student/workspace?tab=roadmap')}>
+                      Go to Workspace →
+                    </Button>
+                  </div>
+                )}
+              </motion.div>
 
               {/* Sessions */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.49 }} className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">

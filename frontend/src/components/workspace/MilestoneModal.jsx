@@ -61,6 +61,12 @@ export default function MilestoneModal({ isOpen, onClose, onSubmit, initialData 
     }
     if (!form.dueDate) {
       newErrors.dueDate = 'Due date is required';
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      if (new Date(form.dueDate) < new Date(today)) {
+        newErrors.dueDate = 'Due date cannot be in the past';
+        toast.error('Due date cannot be in the past');
+      }
     }
     if (form.startDate && form.dueDate && form.dueDate < form.startDate) {
       newErrors.dueDate = 'Due date must be on or after start date';
@@ -172,6 +178,7 @@ export default function MilestoneModal({ isOpen, onClose, onSubmit, initialData 
               <input
                 id="ms-due"
                 type="date"
+                min={new Date().toISOString().split('T')[0]}
                 name="dueDate"
                 value={form.dueDate}
                 onChange={handleChange}

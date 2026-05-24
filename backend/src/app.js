@@ -5,24 +5,25 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 // Routes
-const authRoutes       = require('./routes/auth.routes');
-const userRoutes       = require('./routes/user.routes');
-const classRoutes      = require('./routes/class.routes');
-const classTeamRoutes  = require('./routes/classTeam.routes');  // Module 2: class-scoped team routes
-const teamRoutes       = require('./routes/team.routes');
-const startupRoutes    = require('./routes/startupIdea.routes');
+const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
+const classRoutes = require('./routes/class.routes');
+const classTeamRoutes = require('./routes/classTeam.routes');  // Module 2: class-scoped team routes
+const teamRoutes = require('./routes/team.routes');
+const startupRoutes = require('./routes/startupIdea.routes');
 const evaluationRoutes = require('./routes/evaluation.routes');
-const aiRoutes         = require('./routes/ai.routes');
-const mentoringRoutes  = require('./routes/mentoring.routes');
-const milestoneRoutes  = require('./routes/milestone.routes');
-const dashboardRoutes  = require('./routes/dashboard.routes');
-const chatRoutes       = require('./routes/chat.routes');
-const workspaceRoutes  = require('./routes/workspace.routes');
-const commentRoutes    = require('./routes/comment.routes');
+const aiRoutes = require('./routes/ai.routes');
+const mentoringRoutes = require('./routes/mentoring.routes');
+const milestoneRoutes = require('./routes/milestone.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
+const chatRoutes = require('./routes/chat.routes');
+const workspaceRoutes = require('./routes/workspace.routes');
+const commentRoutes = require('./routes/comment.routes');
 const sprintTaskRoutes = require('./routes/sprintTask.routes');
-const rankingRoutes     = require('./routes/ranking.routes');
+const rankingRoutes = require('./routes/ranking.routes');
 const notificationRoutes = require('./routes/notification.routes');
-const workshopRoutes    = require('./routes/workshop.routes');
+const workshopRoutes = require('./routes/workshop.routes');
+const weeklyTaskRoutes = require('./routes/weeklyTask.routes');
 
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
@@ -56,25 +57,26 @@ app.get('/', (_req, res) => res.json({
 }));
 
 // ─── API ROUTES ───────────────────────────────────────────
-app.use('/api/auth',               authRoutes);
-app.use('/api/users',              userRoutes);
-app.use('/api/classes',            classRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/classes', classRoutes);
 // Module 2: team generation under /api/classes/:classId/teams
 app.use('/api/classes/:classId/teams', classTeamRoutes);
-app.use('/api/teams',              teamRoutes);
-app.use('/api/startup-ideas',      startupRoutes);
-app.use('/api/evaluations',        evaluationRoutes);
-app.use('/api/ai',                 aiRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/startup-ideas', startupRoutes);
+app.use('/api/evaluations', evaluationRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/mentoring-sessions', mentoringRoutes);
-app.use('/api/milestones',         milestoneRoutes);
-app.use('/api/dashboard',          dashboardRoutes);
-app.use('/api/chat',               chatRoutes);
-app.use('/api/workspace',          workspaceRoutes);
-app.use('/api/comments',           commentRoutes);
-app.use('/api/sprint-tasks',       sprintTaskRoutes);
-app.use('/api/rankings',           rankingRoutes);
-app.use('/api/notifications',      notificationRoutes);
-app.use('/api/workshops',          workshopRoutes);
+app.use('/api/milestones', milestoneRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/workspace', workspaceRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/sprint-tasks', sprintTaskRoutes);
+app.use('/api/rankings', rankingRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/workshops', workshopRoutes);
+app.use('/api/weekly-tasks', weeklyTaskRoutes);
 
 // ─── ERROR HANDLERS ───────────────────────────────────────
 app.use(notFound);

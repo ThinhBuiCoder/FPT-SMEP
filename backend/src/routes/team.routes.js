@@ -3,6 +3,12 @@ const express = require('express');
 const ctrl    = require('../controllers/team.controller');
 const { protect }   = require('../middlewares/auth.middleware');
 const { authorize } = require('../middlewares/role.middleware');
+const shortcutCtrl = require('../controllers/shortcut.controller');
+const {
+  requireAuth,
+  canAccessTeamWorkspace,
+  canManageShortcut,
+} = require('../middlewares/shortcutPermission.middleware');
 
 const router = express.Router();
 router.use(protect);
@@ -19,6 +25,15 @@ router.delete('/:teamId',    authorize('ADMIN', 'LECTURER'), ctrl.deleteTeam);
 router.put('/:teamId/assign-mentor', authorize('ADMIN', 'LECTURER'), ctrl.assignMentor);
 // View chat group for a team
 router.get('/:teamId/chat-group', ctrl.getChatGroup);
+
+// ─── Quick Shortcuts ──────────────────────────────────────────────────────────
+router.route('/:teamId/shortcuts')
+  .get(requireAuth, canAccessTeamWorkspace, shortcutCtrl.getShortcuts)
+  .post(requireAuth, canAccessTeamWorkspace, shortcutCtrl.createShortcut);
+
+router.route('/:teamId/shortcuts/:shortcutId')
+  .put(requireAuth, canManageShortcut, shortcutCtrl.updateShortcut)
+  .delete(requireAuth, canManageShortcut, shortcutCtrl.deleteShortcut);
 
 // ─── NOTE: Team generation is under /api/classes/:classId/teams/generate ─────
 // See class.routes.js + team.routes (below for class-scoped)
