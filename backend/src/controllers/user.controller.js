@@ -64,7 +64,7 @@ const createUser = async (req, res) => {
 
 // PUT /api/users/:id
 const updateUser = async (req, res) => {
-  const { name, email, role, bio, phone, studentId, programGroup, major } = req.body;
+    const { name, email, role, status, bio, phone, studentId, programGroup, major } = req.body;
   try {
     if (email) {
       const dup = await User.findOne({ email, _id: { $ne: req.params.id } });
@@ -78,6 +78,7 @@ const updateUser = async (req, res) => {
     }
 
     const updateData = { name, email, role, bio, phone, studentId };
+    if (status) updateData.status = status;
     if (role === 'STUDENT' && programGroup && major) {
       updateData.programGroup = programGroup;
       updateData.major = major;

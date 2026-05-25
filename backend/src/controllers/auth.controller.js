@@ -69,9 +69,12 @@ const register = async (req, res) => {
     const otp        = generateOtp();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
 
+    const status = (userRole === 'LECTURER' || userRole === 'MENTOR') ? 'PENDING' : 'APPROVED';
+
     const user = await User.create({
       name, email, password,
       role: userRole,
+      status,
       studentId: userRole === 'STUDENT' ? studentId : null,
       programGroup: validProgramGroup,
       major: validMajor,
@@ -123,6 +126,18 @@ const verifyOtp = async (req, res) => {
     user.otp        = null;
     user.otpExpires = null;
     await user.save({ validateBeforeSave: false });
+
+    if (user.status === 'PENDING') {
+      return successResponse(
+        res, 
+        { user, isPending: true }, 
+        'Xác thực email thành công! Tài khoản của bạn đang chờ Admin phê duyệt.'
+      );
+    }
+
+    if (user.status === 'REJECTED') {
+      return errorResponse(res, 'Tài khoản của bạn đã bị từ chối.', 403);
+    }
 
     const token = generateToken(user._id);
     return successResponse(res, { user, token }, 'Xác thực thành công! Chào mừng bạn đến với FPT-SMEP 🎉');
@@ -182,6 +197,13 @@ const login = async (req, res) => {
       );
     }
 
+    if (user.status === 'PENDING') {
+      return errorResponse(res, 'Your account is pending admin approval.', 403, { isPending: true });
+    }
+    if (user.status === 'REJECTED') {
+      return errorResponse(res, 'Your account registration was rejected.', 403);
+    }
+
     const token = generateToken(user._id);
     // toJSON() removes password automatically
     return successResponse(res, { user, token }, 'Đăng nhập thành công!');
@@ -215,6 +237,13 @@ const googleAuth = async (req, res) => {
         if (!user.avatar && picture) user.avatar = picture;
         await user.save({ validateBeforeSave: false });
       }
+
+      if (user.status === 'PENDING') {
+        return errorResponse(res, 'Your account is pending admin approval.', 403, { isPending: true });
+      }
+      if (user.status === 'REJECTED') {
+        return errorResponse(res, 'Your account registration was rejected.', 403);
+      }
     } else {
       // Tạo tài khoản mới từ Google
       user = await User.create({
@@ -224,6 +253,7 @@ const googleAuth = async (req, res) => {
         googleId,
         avatar:     picture || null,
         role:       'STUDENT',
+        status:     'APPROVED',
         isVerified: true, // Email đã được Google xác thực
       });
     }

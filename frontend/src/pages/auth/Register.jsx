@@ -15,6 +15,7 @@ const Register = () => {
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role,     setRole]     = useState('STUDENT');
   const [programGroup, setProgramGroup] = useState('');
   const [major,        setMajor]        = useState('');
@@ -77,6 +78,7 @@ const Register = () => {
     if (!name.trim())                               return toast.error('Please enter your full name.');
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) return toast.error('Please enter a valid email.');
     if (password.length < 6)                        return toast.error('Password must be at least 6 characters.');
+    if (password !== confirmPassword)               return toast.error('Passwords do not match.');
 
     setLoading(true);
     setEmailTakenError(false);
@@ -153,7 +155,14 @@ const Register = () => {
 
     setOtpLoading(true);
     try {
-      const user = await verifyOtp(email, otp);
+      const { user, isPending } = await verifyOtp(email, otp);
+      
+      if (isPending) {
+        toast.success(`Verification successful! Your account is pending admin approval.`);
+        navigate('/login', { state: { email, isPending: true } });
+        return;
+      }
+
       toast.success(`Verification successful! Welcome, ${user.name} 🎉`);
       if (user.role === 'ADMIN')         navigate('/admin');
       else if (user.role === 'LECTURER') navigate('/lecturer');
@@ -285,6 +294,19 @@ const Register = () => {
                         value={password} onChange={e => setPassword(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                         placeholder="Minimum 6 characters" type="password" required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-caption font-medium text-slate-600 mb-1.5">Confirm Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        placeholder="Re-enter your password" type="password" required
                       />
                     </div>
                   </div>
