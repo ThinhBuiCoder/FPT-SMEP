@@ -6,15 +6,13 @@ const StartupIdea = require('../models/StartupIdea');
 const Evaluation = require('../models/Evaluation');
 const AiAnalysis = require('../models/AiAnalysis');
 const MentoringSession = require('../models/MentoringSession');
-const Milestone        = require('../models/Milestone');
-const Student          = require('../models/Student');
-const Proposal         = require('../models/Proposal');
-const PitchDeck        = require('../models/PitchDeck');
-const SprintTask       = require('../models/SprintTask');
-const Notification     = require('../models/Notification');
-const WeeklyTask       = require('../models/WeeklyTask');
-
-
+const Milestone = require('../models/Milestone');
+const Student = require('../models/Student');
+const Proposal = require('../models/Proposal');
+const PitchDeck = require('../models/PitchDeck');
+const SprintTask = require('../models/SprintTask');
+const Notification = require('../models/Notification');
+const WeeklyTask = require('../models/WeeklyTask');
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
   const [
@@ -40,32 +38,18 @@ const getAdminDashboard = async () => {
       .populate({ path: 'teamId', select: 'teamName classId', populate: { path: 'classId', select: 'classCode' } }),
   ]);
 
-  // Top teams ranking by average evaluation score
-  const topTeamsRaw = await Evaluation.aggregate([
-    { $match: { status: { $ne: 'DRAFT' } } },
-    { $group: { _id: '$teamId', avgScore: { $avg: '$totalScore' }, count: { $sum: 1 } } },
-    { $sort: { avgScore: -1 } },
-    { $limit: 10 },
-  ]);
-
-  const topTeams = await Promise.all(
-    topTeamsRaw.map(async (t) => {
-      if (!t._id) return null;
-      const team = await Team.findById(t._id)
-        .populate({ path: 'classId', select: 'classCode' });
-      const idea = await StartupIdea.findOne({ teamId: t._id });
-      return {
-        startupName: idea?.startupName || team?.teamName || '—',
-        team: {
-          _id: team?._id,
-          name: team?.teamName,
-          classId: team?.classId,
-        },
-        avgScore: parseFloat(t.avgScore.toFixed(2)),
-        evaluationCount: t.count,
-      };
-    })
-  );
+  const { getGlobalRankings } = require('./ranking.service');
+  const allRanked = await getGlobalRankings();
+  const topTeams = allRanked.slice(0, 10).map(r => ({
+    startupName: r?.startupName || r?.team?.name || '—',
+    team: {
+      _id: r?.team?._id || null,
+      name: r?.team?.name || null,
+      classId: r?.team?.class || null,
+    },
+    avgScore: r.finalScore || 0,
+    evaluationCount: r.evalCount || 0,
+  }));
 
   const overallTaskProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -148,7 +132,7 @@ const getLecturerDashboard = async (lecturerId) => {
 const getMentorDashboard = async (mentorId) => {
   const myClasses = await Class.find({ mentorIds: mentorId });
   const classIds = myClasses.map(c => c._id);
-  const myTeams = await Team.find({ $or: [ { mentorId }, { classId: { $in: classIds } } ] });
+  const myTeams = await Team.find({ $or: [{ mentorId }, { classId: { $in: classIds } }] });
   const teamIds = myTeams.map(t => t._id);
 
   const [upcomingSessions, recentEvals, recentSessions, totalTasks, completedTasks] = await Promise.all([
@@ -220,8 +204,8 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
 
   const myTeam = student.teamId
     ? await Team.findById(student.teamId)
-        .populate('classId', 'classCode subjectCode semester year')
-        .populate('members.studentId', 'fullName email rollNumber major')
+      .populate('classId', 'classCode subjectCode semester year')
+      .populate('members.studentId', 'fullName email rollNumber major')
     : null;
 
   const semesterLabel = (sem) => {
@@ -245,7 +229,7 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
 
   const teamMember = myTeam.members.find(
     m => m.studentId?._id?.toString() === student._id.toString() ||
-         m.studentId?.toString() === student._id.toString()
+      m.studentId?.toString() === student._id.toString()
   );
 
   const [startupIdea, milestones, sessions, tasksCount, unreadNotifications] = await Promise.all([
@@ -310,7 +294,7 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
     else if (status === 'IN_PROGRESS') tasksSummary.inProgress = count;
     else if (status === 'REVIEW') tasksSummary.review = count;
     else if (status === 'DONE' || status === 'COMPLETED') {
-    tasksSummary.done += count;
+      tasksSummary.done += count;
     }
   }
 
@@ -326,10 +310,10 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
   ]);
 
   const allWeeklyTasks = [...dbCourseTasks, ...dbClassTasks, ...dbTeamTasks];
-  const overdueWeekly = allWeeklyTasks.filter( t => t.taskType === 'TEAM_TASK' && ( t.status === 'OVERDUE' || ( t.status !== 'COMPLETED' && t.dueDate && new Date(t.dueDate) < now ) ) ).length;
+  const overdueWeekly = allWeeklyTasks.filter(t => t.taskType === 'TEAM_TASK' && (t.status === 'OVERDUE' || (t.status !== 'COMPLETED' && t.dueDate && new Date(t.dueDate) < now))).length;
   const pendingWeekly = allWeeklyTasks.filter(t => ['TODO', 'IN_PROGRESS', 'REVIEW'].includes(t.status) && !(t.dueDate && new Date(t.dueDate) < now)).length;
   const completedWeekly = allWeeklyTasks.filter(t => t.status === 'COMPLETED').length;
-  
+
   const pendingWithDue = allWeeklyTasks.filter(t => ['TODO', 'IN_PROGRESS', 'REVIEW'].includes(t.status) && t.dueDate);
   let nextWeeklyDeadline = null;
   if (pendingWithDue.length > 0) {
