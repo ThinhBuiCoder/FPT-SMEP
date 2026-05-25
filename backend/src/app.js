@@ -24,7 +24,7 @@ const rankingRoutes = require('./routes/ranking.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const workshopRoutes = require('./routes/workshop.routes');
 const weeklyTaskRoutes = require('./routes/weeklyTask.routes');
-//const checkpointRoutes = require('./routes/checkpoint.routes');
+const checkpointRoutes = require('./routes/checkpoint.routes');
 
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
