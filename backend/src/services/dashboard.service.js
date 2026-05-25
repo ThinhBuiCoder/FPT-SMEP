@@ -6,12 +6,13 @@ const StartupIdea = require('../models/StartupIdea');
 const Evaluation = require('../models/Evaluation');
 const AiAnalysis = require('../models/AiAnalysis');
 const MentoringSession = require('../models/MentoringSession');
-const Milestone = require('../models/Milestone');
-const Student = require('../models/Student');
-const Proposal = require('../models/Proposal');
-const PitchDeck = require('../models/PitchDeck');
-const SprintTask = require('../models/SprintTask');
-const Notification = require('../models/Notification');
+const Milestone        = require('../models/Milestone');
+const Student          = require('../models/Student');
+const Proposal         = require('../models/Proposal');
+const PitchDeck        = require('../models/PitchDeck');
+const SprintTask       = require('../models/SprintTask');
+const Notification     = require('../models/Notification');
+const WeeklyTask       = require('../models/WeeklyTask');
 
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
