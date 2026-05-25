@@ -6,6 +6,8 @@ import { workshopApi } from '../../api/workshopApi';
 import { useAuth } from '../../hooks/useAuth';
 import WorkshopList from '../../components/workspace/WorkshopList';
 import WorkshopForm from '../../components/workspace/WorkshopForm';
+import WorkshopCheckInModal from '../../components/workspace/WorkshopCheckInModal';
+import WorkshopAttendanceManager from '../../components/workspace/WorkshopAttendanceManager';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 
 const Workshops = () => {
@@ -18,6 +20,11 @@ const Workshops = () => {
   // Modal State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
+
+  // Check-in and Attendance State
+  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+  const [isAttendanceManagerOpen, setIsAttendanceManagerOpen] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
 
   const canCreate = user?.role === 'ADMIN' || user?.role === 'LECTURER';
 
@@ -59,18 +66,28 @@ const Workshops = () => {
     setIsFormOpen(true);
   };
 
+  const handleCheckIn = (workshop) => {
+    setSelectedWorkshop(workshop);
+    setIsCheckInOpen(true);
+  };
+
+  const handleManageAttendance = (workshop) => {
+    setSelectedWorkshop(workshop);
+    setIsAttendanceManagerOpen(true);
+  };
+
   // Filter and Search Logic
   const now = new Date();
   const filteredWorkshops = workshops.filter(ws => {
-    const matchesSearch = ws.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          ws.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = ws.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ws.description?.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
     if (filter === 'UPCOMING') {
-      return new Date(ws.startDate) >= now.setHours(0,0,0,0);
+      return new Date(ws.startDate) >= now.setHours(0, 0, 0, 0);
     }
     if (filter === 'PAST') {
-      return new Date(ws.startDate) < now.setHours(0,0,0,0);
+      return new Date(ws.startDate) < now.setHours(0, 0, 0, 0);
     }
     return true;
   });
@@ -118,11 +135,10 @@ const Workshops = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                filter === f
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${filter === f
                   ? 'bg-white text-primary shadow-sm border border-slate-200/50'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               {f === 'ALL' ? 'All Events' : f === 'UPCOMING' ? 'Upcoming' : 'Past'}
             </button>
@@ -143,6 +159,8 @@ const Workshops = () => {
             workshops={filteredWorkshops}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onCheckIn={handleCheckIn}
+            onManageAttendance={handleManageAttendance}
           />
         )}
       </motion.div>
@@ -153,6 +171,27 @@ const Workshops = () => {
         onClose={() => setIsFormOpen(false)}
         workshop={editingWorkshop}
         onSave={fetchWorkshops}
+      />
+
+      {/* Check-In Modal */}
+      <WorkshopCheckInModal
+        isOpen={isCheckInOpen}
+        onClose={() => {
+          setIsCheckInOpen(false);
+          setSelectedWorkshop(null);
+        }}
+        workshop={selectedWorkshop}
+        onCheckInSuccess={fetchWorkshops}
+      />
+
+      {/* Attendance Manager Modal */}
+      <WorkshopAttendanceManager
+        isOpen={isAttendanceManagerOpen}
+        onClose={() => {
+          setIsAttendanceManagerOpen(false);
+          setSelectedWorkshop(null);
+        }}
+        workshop={selectedWorkshop}
       />
     </div>
   );
