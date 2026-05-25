@@ -45,8 +45,10 @@ export default function ClassDetail() {
       setCls(data.class);
       setStudents(data.students || []);
       setTeams(data.teams || []);
+      return data;
     } catch (err) {
       toast.error(err?.message || 'Failed to load class');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -135,7 +137,7 @@ export default function ClassDetail() {
             >
               {backfilling ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin animate-pulse" /> Backfilling...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Backfilling...
                 </>
               ) : (
                 'Backfill Chats'

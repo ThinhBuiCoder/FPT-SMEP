@@ -48,13 +48,46 @@ const MentoringSessions = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [calMonth, setCalMonth] = useState(new Date());
-  const [form, setForm] = useState({ title: '', meetingDate: '', notes: '', actionItems: [''], teamId: '' });
+  const [form, setForm] = useState({ title: '', meetingDate: '', notes: '', actionItems: [''], classId: '', teamId: '' });
+  const [classTeams, setClassTeams] = useState([]);
+
+  const getClassLabel = (cls) => cls?.classCode || cls?.className || cls?.name || 'Unnamed class';
+  const selectedClassTeams = form.classId
+    ? classTeams
+    : [];
+
+  const loadTeamsForClass = async (classId) => {
+    if (!classId) {
+      setClassTeams([]);
+      return;
+    }
+
+    try {
+      const res = await classApi.getTeams(classId);
+      const teamsData = res.data?.teams || res.teams || res.data || [];
+      const visibleTeams = user?.role === 'MENTOR'
+        ? teamsData.filter(team => toId(team?.mentorId) === toId(user?._id))
+        : teamsData;
+      const seen = new Set();
+      setClassTeams((Array.isArray(visibleTeams) ? visibleTeams : []).filter(team => {
+        const id = toId(team?._id);
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      }));
+    } catch (err) {
+      console.error('Failed to load class teams:', err);
+      setClassTeams([]);
+      toast.error('Failed to load teams for the selected class');
+    }
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
       let list = [];
       let filteredTeams = [];
+      let accessibleClasses = [];
       
       if (user?.role === 'STUDENT') {
         const res = await dashboardApi.getStudent();
@@ -64,96 +97,81 @@ const MentoringSessions = () => {
           const mRes = await mentoringApi.getSessionsByTeam(d.team._id);
           list = mRes.data?.sessions || mRes.sessions || mRes.data || [];
         }
-      } else {
-        const res = await mentoringApi.getAllSessions();
-        list = res.data?.sessions || res.sessions || res.data || [];
-        
+
         try {
-          const teamsRes = await teamApi.getAll();
-          const teamsData = teamsRes.data?.teams || teamsRes.teams || teamsRes.data || [];
-          
-          // Filter teams based on user role
-          if (user?.role === 'LECTURER' || user?.role === 'LECTURE') {
-            // Lecturer: show teams from their classes
-            try {
-              const classesRes = await classApi.getAll();
-              const lecturerClasses = (classesRes.data?.classes || classesRes.classes || classesRes.data || [])
-                .filter(c => toId(c.lectureId) === toId(user?._id));
-              const lecturerClassIds = new Set(lecturerClasses.map(c => toId(c._id)));
-              filteredTeams = teamsData.filter(t => lecturerClassIds.has(toId(t.classId)));
-            } catch {
-              // If class fetch fails, show teams directly assigned
-              filteredTeams = teamsData.filter(t => toId(t.lectureId) === toId(user?._id));
-            }
-          } else if (user?.role === 'MENTOR') {
-            // Mentor: show teams they mentor
-            try {
-              const classesRes = await classApi.getAll();
-              const mentorClasses = (classesRes.data?.classes || classesRes.classes || classesRes.data || [])
-                .filter(c => c.mentorIds && c.mentorIds.some(m => toId(m) === toId(user?._id)));
-              const mentorClassIds = new Set(mentorClasses.map(c => toId(c._id)));
-              
-              // Show teams from their mentored classes OR teams directly assigned
-              filteredTeams = teamsData.filter(t => 
-                mentorClassIds.has(toId(t.classId)) ||
-                toId(t.mentorId) === toId(user?._id)
-              );
+          const classesRes = await classApi.getMyClasses();
+          accessibleClasses = classesRes.data?.classes || classesRes.classes || classesRes.data || [];
+        } catch (classesErr) {
+          console.error('Failed to load student classes:', classesErr);
+        }
+      } else {
 
-              if (filteredTeams.length === 0 && mentorClassIds.size > 0) {
-                const classTeamResults = await Promise.allSettled(
-                  [...mentorClassIds].map(classId => classApi.getTeams(classId))
-                );
+        const [sessionsRes, classesRes, teamsRes] = await Promise.allSettled([
+          mentoringApi.getAllSessions(),
+          classApi.getAll(),
+          teamApi.getAll()
+        ]);
 
-                const fallbackTeams = classTeamResults
-                  .filter(result => result.status === 'fulfilled')
-                  .flatMap(result => {
-                    const payload = result.value;
-                    return payload.data?.teams || payload.teams || payload.data || [];
-                  });
+        if (sessionsRes.status === 'fulfilled') {
+          const res = sessionsRes.value;
+          list = res.data?.sessions || res.sessions || res.data || [];
+        }
 
-                const seen = new Set();
-                filteredTeams = fallbackTeams.filter(team => {
-                  const id = toId(team._id);
-                  if (!id || seen.has(id)) return false;
-                  seen.add(id);
-                  return true;
-                });
-              }
-            } catch {
-              // If class fetch fails, show teams directly assigned
-              filteredTeams = teamsData.filter(t => toId(t.mentorId) === toId(user?._id));
-            }
-          } else {
-            // Admin: show all teams
-            filteredTeams = teamsData;
-          }
-          
-          setTeams(filteredTeams);
-          if (user?.role === 'MENTOR' && filteredTeams.length === 0) {
-            toast('You are assigned to class(es), but no teams are available yet. Please generate/assign teams first.', {
-              icon: 'ℹ️'
+        const classesData = classesRes.status === 'fulfilled'
+          ? (classesRes.value.data?.classes || classesRes.value.classes || classesRes.value.data || [])
+          : [];
+        const teamsData = teamsRes.status === 'fulfilled'
+          ? (teamsRes.value.data?.teams || teamsRes.value.teams || teamsRes.value.data || [])
+          : [];
+
+        if (user?.role === 'LECTURER' || user?.role === 'LECTURE') {
+          accessibleClasses = classesData.filter(c => toId(c.lectureId) === toId(user?._id));
+          const lecturerClassIds = new Set(accessibleClasses.map(c => toId(c._id)));
+          filteredTeams = teamsData.filter(t => lecturerClassIds.has(toId(t.classId)) || toId(t.lectureId) === toId(user?._id));
+        } else if (user?.role === 'MENTOR') {
+          accessibleClasses = classesData.filter(c => c.mentorIds && c.mentorIds.some(m => toId(m) === toId(user?._id)));
+          const mentorClassIds = new Set(accessibleClasses.map(c => toId(c._id)));
+
+          filteredTeams = teamsData.filter(t =>
+            mentorClassIds.has(toId(t.classId)) ||
+            toId(t.mentorId) === toId(user?._id)
+          );
+
+          if (filteredTeams.length === 0 && mentorClassIds.size > 0) {
+            const classTeamResults = await Promise.allSettled(
+              [...mentorClassIds].map(classId => classApi.getTeams(classId))
+            );
+
+            const fallbackTeams = classTeamResults
+              .filter(result => result.status === 'fulfilled')
+              .flatMap(result => {
+                const payload = result.value;
+                return payload.data?.teams || payload.teams || payload.data || [];
+              });
+
+            const seen = new Set();
+            filteredTeams = fallbackTeams.filter(team => {
+              const id = toId(team._id);
+              if (!id || seen.has(id)) return false;
+              seen.add(id);
+              return true;
             });
           }
-        } catch (teamsErr) {
-          console.error('Failed to load teams:', teamsErr);
-          toast.error('Failed to load teams. Please refresh and try again.');
-        }
-      }
-      setSessions(Array.isArray(list) ? list : []);
-
-      // Fetch user classes for Timetable
-      try {
-        let classesRes;
-        if (user?.role === 'STUDENT') {
-          classesRes = await classApi.getMyClasses();
         } else {
-          classesRes = await classApi.getAll();
+          accessibleClasses = classesData;
+          filteredTeams = teamsData;
         }
-        const classesList = classesRes.data?.classes || classesRes.classes || classesRes.data || [];
-        setMyClasses(classesList);
-      } catch (classesErr) {
-        console.error('Failed to load user classes:', classesErr);
+
+        setTeams(filteredTeams);
+        if (user?.role === 'MENTOR' && filteredTeams.length === 0) {
+          toast('You are assigned to class(es), but no teams are available yet. Please generate/assign teams first.', {
+            icon: 'ℹ️'
+          });
+        }
       }
+
+      setSessions(Array.isArray(list) ? list : []);
+      setMyClasses(Array.isArray(accessibleClasses) ? accessibleClasses : []);
     } catch {
       toast.error('Failed to load sessions');
     } finally {
@@ -166,6 +184,7 @@ const MentoringSessions = () => {
 
   const openAdd = () => {
     setEditingSession(null);
+    const defaultClassId = myClasses.length === 1 ? toId(myClasses[0]._id) : '';
     setForm({ 
       title: '', 
       meetingDate: '', 
@@ -175,12 +194,32 @@ const MentoringSessions = () => {
       meetingLink: '',
       notes: '', 
       actionItems: [''], 
-      teamId: teamId || '' 
+      classId: defaultClassId,
+      teamId: '' 
     });
+    void loadTeamsForClass(defaultClassId);
     setIsModalOpen(true);
   };
 
+  const handleClassChange = (classId) => {
+    void loadTeamsForClass(classId);
+    setForm(prev => ({
+      ...prev,
+      classId,
+      teamId: ''
+    }));
+  };
+
+  const handleTeamChange = (teamIdValue) => {
+    setForm(prev => ({
+      ...prev,
+      teamId: teamIdValue,
+    }));
+  };
+
   const openEdit = (s) => {
+    const sessionTeamId = s.teamId?._id || s.teamId || '';
+    const sessionClassId = s.classId?._id || s.classId || s.teamId?.classId?._id || s.teamId?.classId || '';
     setEditingSession(s);
     setForm({
       title: s.title,
@@ -191,8 +230,10 @@ const MentoringSessions = () => {
       meetingLink: s.meetingLink || '',
       notes: s.notes || '',
       actionItems: s.actionItems?.map(a => a.content || a.item || a) || [''],
-      teamId: s.teamId?._id || s.teamId || '',
+      classId: sessionClassId,
+      teamId: sessionTeamId,
     });
+    void loadTeamsForClass(sessionClassId);
     setIsModalOpen(true);
   };
 
@@ -249,6 +290,11 @@ const MentoringSessions = () => {
       return;
     }
     
+    if (user?.role !== 'STUDENT' && !form.classId) {
+      toast.error('Please select a class');
+      return;
+    }
+
     if (user?.role !== 'STUDENT' && !form.teamId) { 
       toast.error('Please select a team'); 
       return; 
@@ -569,28 +615,56 @@ const MentoringSessions = () => {
       >
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
           {user?.role !== 'STUDENT' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Select Team * {teams.length === 0 && <span className="text-red-500 text-xs">(No teams available)</span>}</label>
-              {teams.length === 0 ? (
-                <div className="w-full p-3 border border-red-300 bg-red-50 rounded-lg text-sm text-red-700">
-                  No teams available. You don't have permission to create sessions for any team. Contact your admin.
-                </div>
-              ) : (
-                <select
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
-                  value={form.teamId}
-                  onChange={(e) => setForm({ ...form, teamId: e.target.value })}
-                  required
-                >
-                  <option value="">-- Choose Team --</option>
-                  {teams.map(t => (
-                    <option key={t._id} value={t._id}>
-                      {t.teamName} ({t.teamCode})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Select Class * {myClasses.length === 0 && <span className="text-red-500 text-xs">(No classes available)</span>}</label>
+                {myClasses.length === 0 ? (
+                  <div className="w-full p-3 border border-red-300 bg-red-50 rounded-lg text-sm text-red-700">
+                    No classes available for your account.
+                  </div>
+                ) : (
+                  <select
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
+                    value={form.classId}
+                    onChange={(e) => handleClassChange(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Class --</option>
+                    {myClasses.map(cls => (
+                      <option key={cls._id} value={cls._id}>
+                        {getClassLabel(cls)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Select Team * {form.classId && selectedClassTeams.length === 0 && <span className="text-red-500 text-xs">(No teams in this class)</span>}</label>
+                {!form.classId ? (
+                  <div className="w-full p-3 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-500">
+                    Choose a class first to see its teams.
+                  </div>
+                ) : selectedClassTeams.length === 0 ? (
+                  <div className="w-full p-3 border border-red-300 bg-red-50 rounded-lg text-sm text-red-700">
+                    No teams available for the selected class. Contact your admin.
+                  </div>
+                ) : (
+                  <select
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm bg-white"
+                    value={form.teamId}
+                    onChange={(e) => handleTeamChange(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Team --</option>
+                    {selectedClassTeams.map(t => (
+                      <option key={t._id} value={t._id}>
+                        {t.teamName} ({t.teamCode})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </>
           )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Session Title *</label>

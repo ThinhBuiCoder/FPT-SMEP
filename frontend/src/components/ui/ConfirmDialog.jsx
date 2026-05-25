@@ -14,7 +14,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, description, isSubmi
         
         <div className="flex gap-3 w-full pt-4">
           <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            No
           </Button>
           <Button
             variant="primary"
@@ -22,7 +22,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, description, isSubmi
             onClick={onConfirm}
             isLoading={isSubmitting}
           >
-            {confirmText}
+            Yes
           </Button>
         </div>
       </div>
