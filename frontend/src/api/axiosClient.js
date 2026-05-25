@@ -48,7 +48,7 @@ axiosClient.interceptors.response.use(
     const errData = error.response?.data || {};
     const errMessage = errData.message || error.message || 'Lỗi kết nối server';
     const errObj = new Error(errMessage);
-    errObj.data = errData.data || null;
+    errObj.data = errData.data || errData.errors || null;
     errObj.status = error.response?.status;
     return Promise.reject(errObj);
   }

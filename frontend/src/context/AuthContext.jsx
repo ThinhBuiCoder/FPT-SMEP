@@ -43,10 +43,12 @@ export const AuthProvider = ({ children }) => {
 
   const verifyOtp = async (email, otp) => {
     const res = await axiosClient.post('/auth/verify-otp', { email, otp });
-    const { token, user: userData } = res.data || res;
-    localStorage.setItem('token', token);
-    setUser(userData);
-    return userData;
+    const { token, user: userData, isPending } = res.data || res;
+    if (token) {
+      localStorage.setItem('token', token);
+      setUser(userData);
+    }
+    return { user: userData, isPending };
   };
 
   const resendOtp = async (email) => {

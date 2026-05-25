@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
     password:  { type: String, required: true, minlength: 6 },
     role:      { type: String, enum: ['ADMIN', 'LECTURER', 'MENTOR', 'STUDENT'], default: 'STUDENT' },
+    status:    { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'APPROVED' },
     avatar:    { type: String, default: null },
     phone:     { type: String, default: null },
     studentId: { type: String, default: null }, // Mã sinh viên
