@@ -17,6 +17,7 @@ import MentoringPanel from '../../components/workspace/MentoringPanel';
 import SprintPanel from '../../components/workspace/SprintPanel';
 import WeeklyRoadmapPlanner from '../../components/workspace/WeeklyRoadmapPlanner';
 import QuickShortcuts from '../../components/workspace/shortcuts/QuickShortcuts';
+import CheckpointSection from '../../components/workspace/checkpoints/CheckpointSection';
 
 const statusColors = {
   DRAFT: 'bg-slate-100 text-slate-600 border border-slate-200',
@@ -276,6 +277,12 @@ export default function TeamWorkspace() {
               pitchDecks={pitchDecks}
               isEditable={isEditable}
               onRefresh={fetchWorkspaceData}
+            />
+
+            {/* Startup Checkpoints */}
+            <CheckpointSection 
+              teamId={team._id} 
+              isEditable={isEditable}
             />
           </div>
 
