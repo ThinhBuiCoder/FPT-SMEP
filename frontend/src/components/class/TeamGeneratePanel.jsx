@@ -2,28 +2,13 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Users, AlertTriangle, CheckCircle2, Loader2, Info, AlertCircle } from 'lucide-react';
 import { classApi } from '../../api/classApi';
-
-// Same map as StudentTable for display
-const MAJOR_MAP = {
-  SE: 'Software Engineering',
-  AI: 'Artificial Intelligence',
-  IA: 'Information Assurance',
-  IB: 'International Business',
-  GD: 'Graphic Design',
-  DM: 'Digital Marketing',
-  MC: 'Multimedia Communication',
-  HM: 'Hotel Management',
-  TM: 'Tourism Management',
-  JS: 'Japanese Studies',
-  KS: 'Korean Studies',
-  EL: 'English Language',
-  DE: 'Design / Digital-related',
-};
+import { getMajorName } from '../../constants/majors';
 
 const majorDisplay = (code) => {
   if (!code) return code;
   const upper = code.toUpperCase();
-  return MAJOR_MAP[upper] ? `${upper} (${MAJOR_MAP[upper]})` : upper;
+  const name = getMajorName(upper);
+  return name ? `${upper} (${name})` : upper;
 };
 
 export default function TeamGeneratePanel({ classId, selected: rawSelected, students: rawStudents, classMentors = [], onTeamCreated }) {
@@ -51,14 +36,16 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
       s => !s.major || typeof s.major !== 'string' || !s.major.trim()
     ).length;
 
-    const canAuto   = studentCount >= 6 && majorCount >= 2;
-    const canManual = studentCount > 0 && majorCount >= 2 && studentCount < 6;
-    const blocked   = studentCount > 0 && majorCount < 2;
+    const isValidSize = studentCount >= 4 && studentCount <= 6;
+    const isValidMajor = majorCount >= 2;
+    const canCreate = isValidSize && isValidMajor;
+    const sizeError = studentCount > 0 && !isValidSize;
+    const majorError = studentCount > 0 && !isValidMajor;
 
-    return { selectedStudents, majors: uniqueMajors, majorCount, studentCount, canAuto, canManual, blocked, missingMajorCount };
+    return { selectedStudents, majors: majorCount, uniqueMajors, studentCount, canCreate, sizeError, majorError, missingMajorCount };
   }, [selected, students]);
 
-  const { studentCount, majorCount, majors, canAuto, canManual, blocked, missingMajorCount } = validation;
+  const { studentCount, uniqueMajors, majors: majorCount, canCreate, sizeError, majorError, missingMajorCount } = validation;
 
   const generate = async (mode) => {
     setSubmitting(true);
@@ -90,34 +77,32 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
 
   return (
     <div className={`rounded-2xl border p-4 transition-all ${
-      blocked       ? 'bg-red-50 border-red-200'    :
-      canAuto       ? 'bg-green-50 border-green-200' :
-      canManual     ? 'bg-amber-50 border-amber-200' :
+      (sizeError || majorError) ? 'bg-red-50 border-red-200' :
+      canCreate ? 'bg-green-50 border-green-200' :
       'bg-slate-50 border-slate-200'
     }`}>
       <div className="flex flex-wrap items-center gap-4">
         {/* Status indicator */}
         <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-          {canAuto && <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />}
-          {canManual && <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />}
-          {blocked && <AlertTriangle className="w-6 h-6 text-red-500 shrink-0" />}
-          {!blocked && !canAuto && !canManual && <Users className="w-6 h-6 text-slate-400 shrink-0" />}
+          {canCreate && <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />}
+          {(sizeError || majorError) && <AlertTriangle className="w-6 h-6 text-red-500 shrink-0" />}
+          {!canCreate && !sizeError && !majorError && <Users className="w-6 h-6 text-slate-400 shrink-0" />}
 
           <div>
             <p className="font-semibold text-slate-800">
               {studentCount} student{studentCount !== 1 ? 's' : ''} selected
             </p>
             <p className="text-xs text-slate-500">
-              {majorCount} major{majorCount !== 1 ? 's' : ''}: {majors.map(m => majorDisplay(m)).join(', ') || 'none'}
+              {majorCount} major{majorCount !== 1 ? 's' : ''}: {uniqueMajors.map(m => majorDisplay(m)).join(', ') || 'none'}
             </p>
           </div>
         </div>
 
         {/* Requirements checklist */}
         <div className="flex gap-4 text-xs">
-          <span className={`flex items-center gap-1 font-medium ${studentCount >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${studentCount >= 6 ? 'bg-green-500' : 'bg-slate-300'}`}>✓</span>
-            6+ students ({studentCount}/6)
+          <span className={`flex items-center gap-1 font-medium ${(studentCount >= 4 && studentCount <= 6) ? 'text-green-600' : 'text-slate-400'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${(studentCount >= 4 && studentCount <= 6) ? 'bg-green-500' : 'bg-slate-300'}`}>✓</span>
+            4-6 students ({studentCount}/6)
           </span>
           <span className={`flex items-center gap-1 font-medium ${majorCount >= 2 ? 'text-green-600' : 'text-red-500'}`}>
             <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${majorCount >= 2 ? 'bg-green-500' : 'bg-red-400'}`}>
@@ -146,24 +131,18 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          {blocked && (
+          {majorError && (
             <div className="px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-medium">
               Team must include students from at least 2 different majors.
             </div>
           )}
-
-          {canManual && !canAuto && (
-            <button
-              onClick={() => generate('manual')}
-              disabled={submitting}
-              className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-all flex items-center gap-2"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Create Team Manually
-            </button>
+          {sizeError && (
+            <div className="px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-medium">
+              Team size must be between 4 and 6 students.
+            </div>
           )}
 
-          {canAuto && (
+          {canCreate && (
             <button
               onClick={() => generate('auto')}
               disabled={submitting}
@@ -182,7 +161,7 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
           <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-700">
             <strong>{missingMajorCount} student{missingMajorCount !== 1 ? 's' : ''}</strong> do not have a valid major.
-            Please check their RollNumber — major is detected from the first 2 letters.
+            Please ask them to update their profile or check their registration data.
           </p>
         </div>
       )}

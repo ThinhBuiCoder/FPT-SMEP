@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge';
 import axiosClient from '../../api/axiosClient';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import { PROGRAM_GROUPS } from '../../constants/majors';
 
 const roleBadgeVariant = { ADMIN: 'Approved', LECTURER: 'Submitted', MENTOR: 'Review', STUDENT: 'Reviewed' };
 const roleLabel = { ADMIN: 'Administrator', LECTURER: 'Lecturer', MENTOR: 'Mentor', STUDENT: 'Student' };
@@ -17,6 +18,8 @@ const ProfileSettings = () => {
   // Profile state
   const [name, setName] = useState(user?.name || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
+  const [programGroup, setProgramGroup] = useState(user?.programGroup || '');
+  const [major, setMajor] = useState(user?.major || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Password state
@@ -30,9 +33,18 @@ const ProfileSettings = () => {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!name.trim()) return toast.error('Name is required');
+    if (role === 'STUDENT') {
+      if (!programGroup || !major) return toast.error('Program Group and Major are required for students.');
+    }
+    
     setIsSavingProfile(true);
     try {
-      const res = await axiosClient.put('/auth/update-profile', { name, avatar });
+      const payload = { name, avatar };
+      if (role === 'STUDENT') {
+        payload.programGroup = programGroup;
+        payload.major = major;
+      }
+      const res = await axiosClient.put('/auth/update-profile', payload);
       updateUser(res.user);
       toast.success('Profile updated successfully');
     } catch (err) {
@@ -161,6 +173,36 @@ const ProfileSettings = () => {
                     <input id="profile-avatar" type="url" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="https://..." className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none" />
                   </div>
                 </div>
+
+                {role === 'STUDENT' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Program Group</label>
+                      <select
+                        value={programGroup} onChange={e => { setProgramGroup(e.target.value); setMajor(''); }} required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                      >
+                        <option value="">-- Select Program Group --</option>
+                        {PROGRAM_GROUPS.map(g => (
+                          <option key={g.code} value={g.code}>{g.code} - {g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Major</label>
+                      <select
+                        value={major} onChange={e => setMajor(e.target.value)} required disabled={!programGroup}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                      >
+                        <option value="">-- Select Major --</option>
+                        {programGroup && PROGRAM_GROUPS.find(g => g.code === programGroup)?.majors.map(m => (
+                          <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <div className="pt-2">
                   <Button type="submit" variant="gradient" isLoading={isSavingProfile}>Save Changes</Button>

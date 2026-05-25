@@ -22,6 +22,14 @@ function TeamCard({ team, onRefresh }) {
   const navigate = useNavigate();
   const [expanded,  setExpanded]  = useState(false);
   const [deleting,  setDeleting]  = useState(false);
+  const [editing,   setEditing]   = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [formData,  setFormData]  = useState({
+    groupName: team.groupName || '',
+    groupExe201: team.groupExe201 || '',
+    projectName: team.projectName || '',
+    description: team.description || '',
+  });
 
   const handleDelete = async () => {
     if (!confirm(`Delete ${team.teamName || 'this team'}? This will also remove the chat group.`)) return;
@@ -34,6 +42,20 @@ function TeamCard({ team, onRefresh }) {
       toast.error(e?.message || 'Failed to delete team');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await teamApi.update(team._id, formData);
+      toast.success('Team info updated');
+      setEditing(false);
+      onRefresh();
+    } catch (e) {
+      toast.error(e?.message || 'Failed to update team info');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -89,9 +111,73 @@ function TeamCard({ team, onRefresh }) {
         </div>
       </div>
 
-      {/* Members */}
+      {/* Members & Details */}
       {expanded && (
         <div className="border-t border-slate-100 p-4">
+          
+          {/* Team Info Section */}
+          <div className="mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Team Info</h4>
+              {!editing && (
+                <button onClick={() => setEditing(true)} className="text-xs font-medium text-primary hover:underline">
+                  Edit Info
+                </button>
+              )}
+            </div>
+
+            {editing ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 p-2 bg-slate-50 rounded border border-slate-100">
+                  <div>
+                    <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
+                    <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-semibold text-slate-400">Group EXE201</p>
+                    <p className="text-sm text-slate-700 font-medium">{team.groupExe201 || 'Not set'}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Project Name</label>
+                  <input type="text" value={formData.projectName} onChange={e => setFormData({ ...formData, projectName: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                  <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" rows={2} />
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-all flex items-center gap-1">
+                    {saving && <Loader2 className="w-3 h-3 animate-spin" />} Save
+                  </button>
+                  <button onClick={() => setEditing(false)} disabled={saving} className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-100 transition-all">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
+                  <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Group EXE201</p>
+                  <p className="text-sm text-slate-700 font-medium">{team.groupExe201 || 'Not set'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Project Name</p>
+                  <p className="text-sm text-slate-700">{team.projectName || 'Not set'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Description</p>
+                  <p className="text-sm text-slate-700">{team.description || 'No description'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Members</h4>
           {members.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-2">No members</p>
           ) : (

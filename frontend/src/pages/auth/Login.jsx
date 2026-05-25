@@ -21,20 +21,24 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  // Banner shown when account is not yet verified
   const [unverifiedEmail, setUnverifiedEmail] = useState(null);
+  const [pendingApproval, setPendingApproval] = useState(false);
+  const [rejectedStatus, setRejectedStatus]   = useState(false);
   const [resendLoading, setResendLoading]     = useState(false);
 
   const { login, loginWithGoogle, resendOtp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Pre-fill email when redirected from Register "Sign in →" link
+  // Pre-fill email when redirected from Register
   useEffect(() => {
-    if (location.state?.prefillEmail) {
-      setEmail(location.state.prefillEmail);
+    if (location.state?.prefillEmail || location.state?.email) {
+      setEmail(location.state.prefillEmail || location.state.email);
     }
-  }, []);
+    if (location.state?.isPending) {
+      setPendingApproval(true);
+    }
+  }, [location.state]);
 
 
   // ── Redirect after login ───────────────────────────────────
@@ -52,17 +56,19 @@ const Login = () => {
 
     setLoading(true);
     setUnverifiedEmail(null);
+    setPendingApproval(false);
+    setRejectedStatus(false);
     try {
       const user = await login(email, password);
       toast.success(`Welcome back, ${user.name}!`);
       redirectByRole(user);
     } catch (err) {
-      // axiosClient interceptor already unwraps response.data, so:
-      //   err.message = backend error message
-      //   err.data    = extra payload from errorResponse()
-      // Account not yet verified
       if (err.data?.needVerify) {
         setUnverifiedEmail(err.data?.email || email);
+      } else if (err.data?.isPending) {
+        setPendingApproval(true);
+      } else if (err.response?.status === 403 && err.message?.toLowerCase().includes('rejected')) {
+        setRejectedStatus(true);
       } else {
         toast.error(err.message || err.response?.data?.message || 'Login failed. Please try again.');
       }
@@ -103,7 +109,13 @@ const Login = () => {
         toast.success(`Welcome, ${user.name}! 🎉`);
         redirectByRole(user);
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Google sign-in failed.');
+        if (err.data?.isPending) {
+          setPendingApproval(true);
+        } else if (err.response?.status === 403 && err.message?.toLowerCase().includes('rejected')) {
+          setRejectedStatus(true);
+        } else {
+          toast.error(err.response?.data?.message || 'Google sign-in failed.');
+        }
       } finally {
         setGoogleLoading(false);
       }
@@ -146,7 +158,7 @@ const Login = () => {
           </div>
 
           {/* Banner: account not verified */}
-          {unverifiedEmail && (
+          {unverifiedEmail && !pendingApproval && !rejectedStatus && (
             <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
               <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
               <div className="flex-1">
@@ -161,6 +173,32 @@ const Login = () => {
                 >
                   {resendLoading ? 'Sending...' : 'Resend OTP →'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Banner: account pending approval */}
+          {pendingApproval && (
+            <div className="mb-5 bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 items-start">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-800 mb-1">Pending Approval</p>
+                <p className="text-xs text-blue-700">
+                  Your email is verified! However, since you registered as a Mentor or Lecturer, an Administrator must review and approve your account before you can log in.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Banner: account rejected */}
+          {rejectedStatus && (
+            <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-start">
+              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-800 mb-1">Account Rejected</p>
+                <p className="text-xs text-red-700">
+                  Your registration request has been declined by the Administrator. Please contact support if you believe this is a mistake.
+                </p>
               </div>
             </div>
           )}
@@ -195,7 +233,6 @@ const Login = () => {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  placeholder="name@fpt.edu.vn"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -213,7 +250,6 @@ const Login = () => {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-body text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  placeholder="••••••••"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

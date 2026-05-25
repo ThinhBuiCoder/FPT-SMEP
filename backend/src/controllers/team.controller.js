@@ -54,11 +54,16 @@ exports.generateTeam = async (req, res) => {
 
   try {
     // Create team
+    const groupName = cls.classCode; // e.g., EXE201_11
+    const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`; // e.g., EXE201g_11G1
+
     const [team] = await Team.create(
       [{
         classId,
         teamName,
         teamCode,
+        groupName,
+        groupExe201,
         lectureId: cls.lectureId || null,
         mentorId: assignedMentorId,
         createdBy: req.user._id,
@@ -131,13 +136,25 @@ exports.getTeamsByClass = async (req, res) => {
 
 // ─── PUT /api/teams/:teamId ───────────────────────────────────────────────────
 exports.updateTeam = async (req, res) => {
-  const { teamName, description } = req.body;
+  const { teamName, description, groupName, groupExe201, projectName } = req.body;
   try {
     const team = await Team.findById(req.params.teamId);
     if (!team) return errorResponse(res, 'Team not found', 404);
 
-    if (teamName)    team.teamName    = teamName;
+    // Validate permission for students
+    if (req.user.role === 'STUDENT') {
+      const studentRecord = await Student.findOne({ userId: req.user._id, classId: team.classId });
+      if (!studentRecord || studentRecord.teamId?.toString() !== team._id.toString()) {
+        return errorResponse(res, 'You do not have permission to update this team', 403);
+      }
+    }
+
+    if (teamName !== undefined)    team.teamName    = teamName;
     if (description !== undefined) team.description = description;
+    if (groupName !== undefined)   team.groupName   = groupName;
+    if (groupExe201 !== undefined) team.groupExe201 = groupExe201;
+    if (projectName !== undefined) team.projectName = projectName;
+    
     await team.save();
 
     return successResponse(res, { team }, 'Team updated');

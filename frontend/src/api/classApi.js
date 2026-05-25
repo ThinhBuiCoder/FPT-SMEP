@@ -22,6 +22,8 @@ export const classApi = {
     axiosClient.post(`/classes/${classId}/import-students`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  exportClassExcel: (classId) => 
+    axiosClient.get(`/classes/${classId}/export-excel`, { responseType: 'blob' }),
 
   // ─── Teams ───────────────────────────────────────────────────────────────
   getTeams:      (classId)       => axiosClient.get(`/classes/${classId}/teams`),

@@ -24,8 +24,8 @@ const validateTeamStudents = async (studentIds, classId, mode) => {
   // Deduplicate
   const uniqueIds = [...new Set(studentIds.map(String))];
 
-  // Fetch students
-  const students = await Student.find({ _id: { $in: uniqueIds }, classId });
+  // Fetch students and populate userId to fallback major if needed
+  const students = await Student.find({ _id: { $in: uniqueIds }, classId }).populate('userId', 'major');
 
   if (students.length !== uniqueIds.length)
     return { students: [], error: 'One or more students do not belong to this class' };
@@ -37,11 +37,11 @@ const validateTeamStudents = async (studentIds, classId, mode) => {
     return { students: [], error: `These students are already in a team: ${names}` };
   }
 
-  // Major validation — major is auto-parsed 2-letter code from RollNumber
-  // Only count non-null, non-empty major values
+  // Major validation
+  // Only count non-null, non-empty major values. Fallback to userId.major if student.major is missing
   const majors = [...new Set(
     students
-      .map(s => s.major)
+      .map(s => s.major || (s.userId && s.userId.major) || null)
       .filter(m => typeof m === 'string' && m.trim().length > 0)
       .map(m => m.trim().toUpperCase())
   )];
@@ -49,8 +49,9 @@ const validateTeamStudents = async (studentIds, classId, mode) => {
     return { students: [], error: 'Team must include students from at least 2 different majors.' };
 
   // Size validation
-  if (mode === 'auto' && students.length < 6)
-    return { students: [], error: 'Auto mode requires at least 6 students' };
+  if (students.length < 4 || students.length > 6) {
+    return { students: [], error: 'Team size must be between 4 and 6 students' };
+  }
 
   return { students, error: null };
 };

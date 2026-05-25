@@ -1,23 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Search, Users } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Search, Users, AlertTriangle } from 'lucide-react';
 import EmptyState from '../ui/EmptyState';
-
-// ─── Major Display Map (optional cosmetic labels) ──────────────────────────────
-const MAJOR_MAP = {
-  SE: 'Software Engineering',
-  AI: 'Artificial Intelligence',
-  IA: 'Information Assurance',
-  IB: 'International Business',
-  GD: 'Graphic Design',
-  DM: 'Digital Marketing',
-  MC: 'Multimedia Communication',
-  HM: 'Hotel Management',
-  TM: 'Tourism Management',
-  JS: 'Japanese Studies',
-  KS: 'Korean Studies',
-  EL: 'English Language',
-  DE: 'Design / Digital-related',
-};
+import { getMajorName } from '../../constants/majors';
 
 /**
  * Get display label for a major code.
@@ -26,15 +11,14 @@ const MAJOR_MAP = {
  * Returns "-" if major is null/empty.
  */
 const majorLabel = (major) => {
-  if (!major || typeof major !== 'string' || !major.trim()) return '-';
-  const code = major.trim().toUpperCase();
-  return MAJOR_MAP[code] ? `${code}` : code;
+  if (!major || typeof major !== 'string' || !major.trim()) return null;
+  return major.trim().toUpperCase();
 };
 
 const majorTooltip = (major) => {
   if (!major || typeof major !== 'string' || !major.trim()) return '';
   const code = major.trim().toUpperCase();
-  return MAJOR_MAP[code] || code;
+  return getMajorName(code) || code;
 };
 
 const teamStatusBadge = (student) => {
@@ -62,9 +46,16 @@ const majorColor = (major) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-export default function StudentTable({ students: rawStudents, selected, onSelectionChange, onRefresh }) {
+export default function StudentTable({ students: rawStudents, teams: rawTeams, cls, selected, onSelectionChange, onRefresh }) {
   const students = Array.isArray(rawStudents) ? rawStudents : [];
+  const teams = Array.isArray(rawTeams) ? rawTeams : [];
   const [search,      setSearch]      = useState('');
+
+  const teamMap = useMemo(() => {
+    const map = new Map();
+    teams.forEach(t => map.set(t._id.toString(), t));
+    return map;
+  }, [teams]);
   const [filterMajor, setFilterMajor] = useState('');
 
   const majors = useMemo(() => {
@@ -85,9 +76,14 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
   }, [students, search, filterMajor]);
 
   const toggleSelect = (id) => {
-    onSelectionChange(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    onSelectionChange(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= 6) {
+        toast.error('Chỉ được chọn tối đa 6 sinh viên cho một nhóm.');
+        return prev;
+      }
+      return [...prev, id];
+    });
   };
 
   const toggleAll = () => {
@@ -96,7 +92,19 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
     if (allSelected) {
       onSelectionChange(prev => prev.filter(id => !unassigned.includes(id)));
     } else {
-      onSelectionChange(prev => [...new Set([...prev, ...unassigned])]);
+      onSelectionChange(prev => {
+        const newIds = unassigned.filter(id => !prev.includes(id));
+        const allowedToAdd = 6 - prev.length;
+        if (allowedToAdd <= 0) {
+          toast.error('Đã đạt tối đa 6 sinh viên.');
+          return prev;
+        }
+        if (newIds.length > allowedToAdd) {
+          toast.error(`Chỉ chọn thêm ${allowedToAdd} sinh viên để đạt tối đa 6.`);
+          return [...prev, ...newIds.slice(0, allowedToAdd)];
+        }
+        return [...prev, ...newIds];
+      });
     }
   };
 
@@ -123,7 +131,7 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
         >
           <option value="">All Majors</option>
           {majors.map(m => (
-            <option key={m} value={m}>{m}{MAJOR_MAP[m] ? ` — ${MAJOR_MAP[m]}` : ''}</option>
+            <option key={m} value={m}>{m}{getMajorName(m) ? ` — ${getMajorName(m)}` : ''}</option>
           ))}
         </select>
         {selected.length > 0 && (
@@ -152,8 +160,12 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Roll No.</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Major</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">SubjectCode</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">GroupName</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden xl:table-cell">Group EXE201</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden 2xl:table-cell">Project Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden 2xl:table-cell">Description</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Team</th>
               </tr>
             </thead>
@@ -163,6 +175,8 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
                 const selectable = canSelect(s);
                 const mLabel = majorLabel(s.major);
                 const mTooltip = majorTooltip(s.major);
+                const team = s.teamId ? teamMap.get(s.teamId.toString()) : null;
+                const subjectCode = s.subjectCode || cls?.subjectCode || '—';
                 return (
                   <tr
                     key={s._id}
@@ -191,17 +205,28 @@ export default function StudentTable({ students: rawStudents, selected, onSelect
                     </td>
 
                     <td className="px-4 py-3 text-slate-500 hidden sm:table-cell font-mono text-xs">{s.rollNumber || '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 hidden md:table-cell truncate max-w-[180px]">{s.email || '—'}</td>
 
                     {/* Major badge */}
                     <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full ${majorColor(s.major)}`}
-                        title={mTooltip}
-                      >
-                        {mLabel}
-                      </span>
+                      {mLabel ? (
+                        <span
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full ${majorColor(s.major)}`}
+                          title={mTooltip}
+                        >
+                          {mLabel}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 rounded-full flex items-center w-fit gap-1" title="Missing major">
+                          <AlertTriangle className="w-3 h-3" /> Missing
+                        </span>
+                      )}
                     </td>
+
+                    <td className="px-4 py-3 text-slate-500 hidden md:table-cell font-mono text-xs">{subjectCode}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden lg:table-cell font-medium text-xs">{team?.groupName || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden xl:table-cell font-mono text-xs">{team?.groupExe201 || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden 2xl:table-cell truncate max-w-[150px] text-xs" title={team?.projectName}>{team?.projectName || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden 2xl:table-cell truncate max-w-[200px] text-xs" title={team?.description}>{team?.description || '—'}</td>
 
                     {/* Team status */}
                     <td className="px-4 py-3 text-center">{teamStatusBadge(s)}</td>

@@ -1,46 +1,22 @@
 // src/services/studentImport.service.js
 // Parses an Excel file and bulk-imports students into a class.
-// Major is auto-parsed from the first 2 letters of RollNumber.
 
 const XLSX = require('xlsx');
 const Student = require('../models/Student');
 const User    = require('../models/User');
-
-// ─── Major Helper ──────────────────────────────────────────────────────────────
-
-/**
- * Extract the 2-letter major code from a RollNumber.
- * Examples:
- *   DE170600 => "DE"
- *   SE170601 => "SE"
- *   IA180999 => "IA"
- *
- * @param {string} rollNumber
- * @returns {string} 2-letter uppercase major code
- * @throws {Error} if rollNumber is missing or doesn't start with 2 letters
- */
-function getMajorFromRollNumber(rollNumber) {
-  if (!rollNumber || typeof rollNumber !== 'string') {
-    throw new Error('RollNumber is required');
-  }
-
-  const normalized = rollNumber.trim().toUpperCase();
-  const match = normalized.match(/^[A-Z]{2}/);
-
-  if (!match) {
-    throw new Error('Invalid RollNumber format, cannot detect major');
-  }
-
-  return match[0];
-}
+const { getProgramGroupFromMajor } = require('../constants/majors');
 
 // ─── Excel Parsing ─────────────────────────────────────────────────────────────
 
 // Required columns (case-insensitive header matching)
-// Major is NOT required — it is auto-parsed from RollNumber
+// Major is NOT required
 const REQUIRED_COLS = ['rollnumber', 'fullname', 'email'];
 
-const normalizeHeader = (h) => String(h).trim().toLowerCase().replace(/\s+/g, '');
+const normalizeHeader = (h) => {
+  const normalized = String(h).trim().toLowerCase().replace(/\s+/g, '');
+  if (['chuyênngành', 'chuyennganh', 'major'].includes(normalized)) return 'major';
+  return normalized;
+};
 
 /**
  * Validate a single row object.
@@ -54,20 +30,12 @@ const validateRow = (row) => {
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRe.test(row.email)) return `Email "${row.email}" is invalid`;
 
-  // Validate RollNumber format for major extraction
-  try {
-    getMajorFromRollNumber(row.rollnumber);
-  } catch (e) {
-    return e.message;
-  }
-
   return null;
 };
 
 /**
  * Parse Excel buffer and return array of row objects with normalized keys.
  * Expected columns: RollNumber, MemberCode, LastName, MiddleName, FirstName, UrlPreImg, Fullname, Email
- * Major column is NOT expected — auto-parsed from RollNumber.
  *
  * @param {Buffer} buffer
  * @returns {{ headers: string[], rows: object[], error: string|null }}
@@ -124,7 +92,6 @@ const parseExcel = (buffer) => {
 
 /**
  * Import students from Excel buffer into a class.
- * Major is auto-parsed from the first 2 letters of RollNumber.
  * If a User with matching email already exists, links the student to that User.
  * UrlPreImg column is read but NOT used.
  *
@@ -185,27 +152,32 @@ const importStudents = async (buffer, classId) => {
     const emailLower = row.email.toLowerCase();
     const rollUpper  = row.rollnumber.trim().toUpperCase();
     
-    // Parse major from RollNumber
-    let major;
-    try {
-      major = getMajorFromRollNumber(rollUpper);
-    } catch (e) {
-      errors.push({ row: rowNum, reason: e.message });
-      continue;
+    const existingUser = userMap.get(emailLower);
+    
+    let major = null;
+    let programGroup = null;
+    
+    if (row.major && typeof row.major === 'string') {
+      major = row.major.trim().toUpperCase();
+      programGroup = getProgramGroupFromMajor(major);
+    } else if (existingUser) {
+      major = existingUser.major;
+      programGroup = existingUser.programGroup;
     }
 
     // Check duplicate rollNumber within this class
     const existsByRoll = rollMap.get(rollUpper);
     if (existsByRoll) {
-      // Update major if it changed or was missing
-      if (!existsByRoll.major || existsByRoll.major !== major) {
+      // Update major/programGroup if it changed or was missing
+      if (existsByRoll.major !== major || existsByRoll.programGroup !== programGroup) {
         updatesToExecute.push({
           updateOne: {
             filter: { _id: existsByRoll._id },
-            update: { $set: { major } }
+            update: { $set: { major, programGroup } }
           }
         });
         existsByRoll.major = major; // update local cache
+        existsByRoll.programGroup = programGroup;
       }
       errors.push({ row: rowNum, reason: `RollNumber "${rollUpper}" already exists in this class (major updated to ${major})` });
       continue;
@@ -214,15 +186,16 @@ const importStudents = async (buffer, classId) => {
     // Check duplicate email within this class
     const existsByEmail = emailMap.get(emailLower);
     if (existsByEmail) {
-      // Update major if needed
-      if (!existsByEmail.major || existsByEmail.major !== major) {
+      // Update major/programGroup if needed
+      if (existsByEmail.major !== major || existsByEmail.programGroup !== programGroup) {
         updatesToExecute.push({
           updateOne: {
             filter: { _id: existsByEmail._id },
-            update: { $set: { major } }
+            update: { $set: { major, programGroup } }
           }
         });
         existsByEmail.major = major; // update local cache
+        existsByEmail.programGroup = programGroup;
       }
       errors.push({ row: rowNum, reason: `Email "${emailLower}" already exists in this class (major updated to ${major})` });
       continue;
@@ -241,7 +214,6 @@ const importStudents = async (buffer, classId) => {
     // Link to existing User account if one exists
     let linkedUserId = null;
     let avatarUrl = null;
-    const existingUser = userMap.get(emailLower);
     if (existingUser) {
       linkedUserId = existingUser._id;
       avatarUrl = existingUser.avatar || null;
@@ -256,7 +228,9 @@ const importStudents = async (buffer, classId) => {
       firstName:  row.firstname  || '',
       fullName:   row.fullname,
       email:      emailLower,
+      programGroup,
       major,
+      subjectCode: row.subjectcode ? String(row.subjectcode).trim().toUpperCase() : null,
       classId,
       userId:    linkedUserId,
       avatarUrl,
@@ -308,4 +282,4 @@ const importStudents = async (buffer, classId) => {
   };
 };
 
-module.exports = { parseExcel, importStudents, getMajorFromRollNumber };
+module.exports = { parseExcel, importStudents };

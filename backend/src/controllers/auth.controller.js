@@ -4,8 +4,10 @@ const crypto = require('crypto');
 const https  = require('https');
 const { validationResult } = require('express-validator');
 const User   = require('../models/User');
+const Student = require('../models/Student');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { sendOtpEmail, sendResetPasswordEmail } = require('../services/emailService');
+const { isValidProgramMajor } = require('../constants/majors');
 
 // ── Helpers ────────────────────────────────────────────────────
 const generateToken = (id) =>
@@ -19,7 +21,7 @@ const register = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return errorResponse(res, 'Dữ liệu không hợp lệ', 400, errors.array());
 
-  const { name, email, password, role, studentId, phone, bio } = req.body;
+  const { name, email, password, role, studentId, phone, bio, programGroup, major } = req.body;
 
   try {
     const exists = await User.findOne({ email });
@@ -50,14 +52,32 @@ const register = async (req, res) => {
     const allowedRoles = ['STUDENT', 'LECTURER', 'MENTOR'];
     const userRole = allowedRoles.includes(role?.toUpperCase()) ? role.toUpperCase() : 'STUDENT';
 
+    let validProgramGroup = null;
+    let validMajor = null;
+    if (userRole === 'STUDENT') {
+      if (!programGroup || !major) {
+        return errorResponse(res, 'programGroup and major are required for students.', 400);
+      }
+      if (!isValidProgramMajor(programGroup, major)) {
+        return errorResponse(res, 'Invalid major for selected program group.', 400);
+      }
+      validProgramGroup = programGroup;
+      validMajor = major;
+    }
+
     // Tạo OTP
     const otp        = generateOtp();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
 
+    const status = (userRole === 'LECTURER' || userRole === 'MENTOR') ? 'PENDING' : 'APPROVED';
+
     const user = await User.create({
       name, email, password,
       role: userRole,
+      status,
       studentId: userRole === 'STUDENT' ? studentId : null,
+      programGroup: validProgramGroup,
+      major: validMajor,
       phone, bio,
       isVerified: false,
       otp,
@@ -106,6 +126,18 @@ const verifyOtp = async (req, res) => {
     user.otp        = null;
     user.otpExpires = null;
     await user.save({ validateBeforeSave: false });
+
+    if (user.status === 'PENDING') {
+      return successResponse(
+        res, 
+        { user, isPending: true }, 
+        'Xác thực email thành công! Tài khoản của bạn đang chờ Admin phê duyệt.'
+      );
+    }
+
+    if (user.status === 'REJECTED') {
+      return errorResponse(res, 'Tài khoản của bạn đã bị từ chối.', 403);
+    }
 
     const token = generateToken(user._id);
     return successResponse(res, { user, token }, 'Xác thực thành công! Chào mừng bạn đến với FPT-SMEP 🎉');
@@ -165,6 +197,13 @@ const login = async (req, res) => {
       );
     }
 
+    if (user.status === 'PENDING') {
+      return errorResponse(res, 'Your account is pending admin approval.', 403, { isPending: true });
+    }
+    if (user.status === 'REJECTED') {
+      return errorResponse(res, 'Your account registration was rejected.', 403);
+    }
+
     const token = generateToken(user._id);
     // toJSON() removes password automatically
     return successResponse(res, { user, token }, 'Đăng nhập thành công!');
@@ -198,6 +237,13 @@ const googleAuth = async (req, res) => {
         if (!user.avatar && picture) user.avatar = picture;
         await user.save({ validateBeforeSave: false });
       }
+
+      if (user.status === 'PENDING') {
+        return errorResponse(res, 'Your account is pending admin approval.', 403, { isPending: true });
+      }
+      if (user.status === 'REJECTED') {
+        return errorResponse(res, 'Your account registration was rejected.', 403);
+      }
     } else {
       // Tạo tài khoản mới từ Google
       user = await User.create({
@@ -207,6 +253,7 @@ const googleAuth = async (req, res) => {
         googleId,
         avatar:     picture || null,
         role:       'STUDENT',
+        status:     'APPROVED',
         isVerified: true, // Email đã được Google xác thực
       });
     }
@@ -253,13 +300,36 @@ const getMe = async (req, res) => {
 
 // ── PUT /api/auth/update-profile ─────────────────────────────
 const updateProfile = async (req, res) => {
-  const { name, bio, phone, studentId } = req.body;
+  const { name, bio, phone, studentId, programGroup, major, avatar } = req.body;
+  
+  if (req.user.role === 'STUDENT' && (programGroup || major)) {
+    if (!isValidProgramMajor(programGroup, major)) {
+      return errorResponse(res, 'Invalid major for selected program group.', 400);
+    }
+  }
+
   try {
+    const updateData = { name, bio, phone, studentId };
+    if (avatar !== undefined) updateData.avatar = avatar;
+    if (req.user.role === 'STUDENT' && programGroup && major) {
+      updateData.programGroup = programGroup;
+      updateData.major = major;
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { name, bio, phone, studentId },
+      updateData,
       { new: true, runValidators: true }
     );
+
+    // Sync to Student model
+    if (req.user.role === 'STUDENT' && programGroup && major) {
+      await Student.updateMany(
+        { email: user.email },
+        { $set: { programGroup, major, userId: user._id } }
+      );
+    }
+
     return successResponse(res, { user }, 'Cập nhật profile thành công!');
   } catch (err) {
     return errorResponse(res, 'Lỗi server.', 500);

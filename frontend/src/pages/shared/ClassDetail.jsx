@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar
+  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -35,6 +35,7 @@ export default function ClassDetail() {
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [showAssignMentors, setShowAssignMentors] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -80,6 +81,28 @@ export default function ClassDetail() {
     }
   };
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const response = await classApi.exportClassExcel(id);
+      const blob = new Blob([response.data || response], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${cls.classCode || 'students'}_students.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Export successful');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to export students');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) return <LoadingSkeleton />;
   if (!cls)    return <div className="text-center py-20 text-slate-400">Class not found.</div>;
 
@@ -119,12 +142,23 @@ export default function ClassDetail() {
               )}
             </button>
           )}
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
-          >
-            <Upload className="w-4 h-4" /> Import Students
-          </button>
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER' || user?.role === 'MENTOR') && (
+            <button
+              onClick={handleExportExcel}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition-all font-medium disabled:opacity-50"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
+            >
+              <Upload className="w-4 h-4" /> Import Students
+            </button>
+          )}
         </div>
       </div>
 
@@ -226,13 +260,15 @@ export default function ClassDetail() {
 
       {/* ── Team Generation Panel (always visible when students exist) ── */}
       {safeStudents.length > 0 && (
-        <TeamGeneratePanel
-          classId={id}
-          selected={selected}
-          students={safeStudents}
-          classMentors={cls.mentorIds || []}
-          onTeamCreated={handleTeamCreated}
-        />
+        <div className="sticky top-20 z-40 shadow-xl rounded-2xl bg-white/80 backdrop-blur-md">
+          <TeamGeneratePanel
+            classId={id}
+            selected={selected}
+            students={safeStudents}
+            classMentors={cls.mentorIds || []}
+            onTeamCreated={handleTeamCreated}
+          />
+        </div>
       )}
 
       {/* ── Tabs ── */}
@@ -255,6 +291,8 @@ export default function ClassDetail() {
         {tab === 'students' ? (
           <StudentTable
             students={safeStudents}
+            teams={safeTeams}
+            cls={cls}
             selected={selected}
             onSelectionChange={setSelected}
             onRefresh={fetchData}

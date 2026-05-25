@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Edit, Trash2, Users, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Users, ArrowLeft, ArrowRight, Check, X } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -12,6 +12,9 @@ import { userApi } from '../../api/userApi';
 const roleBadge = { ADMIN: 'Approved', LECTURER: 'Submitted', MENTOR: 'Review', STUDENT: 'Reviewed' };
 const roleLabel = { ADMIN: 'Admin', LECTURER: 'Lecturer', MENTOR: 'Mentor', STUDENT: 'Student' };
 
+const statusBadge = { PENDING: 'Review', APPROVED: 'Approved', REJECTED: 'Overdue' };
+const statusLabel = { PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected' };
+
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +23,7 @@ const UserManagement = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -30,7 +34,7 @@ const UserManagement = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [formData, setFormData] = useState({ name: '', email: '', role: 'STUDENT', status: 'ACTIVE' });
+  const [formData, setFormData] = useState({ name: '', email: '', role: 'STUDENT', status: 'APPROVED' });
 
   // Debounce search
   useEffect(() => {
@@ -44,6 +48,7 @@ const UserManagement = () => {
       const params = { page, limit: 10 };
       if (debouncedSearch) params.search = debouncedSearch;
       if (roleFilter !== 'ALL') params.role = roleFilter;
+      if (statusFilter !== 'ALL') params.status = statusFilter;
       
       const res = await userApi.getAll(params);
       const list = res.data?.users || res.users || res.data || [];
@@ -63,7 +68,17 @@ const UserManagement = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
-  useEffect(() => { fetchUsers(); }, [page, debouncedSearch, roleFilter]);
+  useEffect(() => { fetchUsers(); }, [page, debouncedSearch, roleFilter, statusFilter]);
+
+  const handleStatusUpdate = async (userId, newStatus) => {
+    try {
+      await userApi.update(userId, { status: newStatus });
+      toast.success(`User marked as ${newStatus}`);
+      fetchUsers();
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
 
   const openAddModal = () => {
     setEditingUser(null);
@@ -73,7 +88,7 @@ const UserManagement = () => {
 
   const openEditModal = (user) => {
     setEditingUser(user);
-    setFormData({ name: user.name, email: user.email, role: user.role });
+    setFormData({ name: user.name, email: user.email, role: user.role, status: user.status || 'APPROVED' });
     setIsModalOpen(true);
   };
 
@@ -149,6 +164,19 @@ const UserManagement = () => {
             <option value="ADMIN">Admins</option>
           </select>
         </div>
+        <div className="relative w-full sm:w-40 shrink-0">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <select
+            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none"
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          >
+            <option value="ALL">All Status</option>
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
@@ -163,6 +191,7 @@ const UserManagement = () => {
                 <tr className="border-b border-slate-100 bg-slate-50/60">
                   <th className="py-3 px-6 text-xs text-slate-400 uppercase text-left font-semibold tracking-wider">User</th>
                   <th className="py-3 px-6 text-xs text-slate-400 uppercase text-left font-semibold tracking-wider">Role</th>
+                  <th className="py-3 px-6 text-xs text-slate-400 uppercase text-left font-semibold tracking-wider">Status</th>
                   <th className="py-3 px-6 text-xs text-slate-400 uppercase text-left font-semibold tracking-wider">Student ID</th>
                   <th className="py-3 px-6 text-xs text-slate-400 uppercase text-left font-semibold tracking-wider">Joined</th>
                   <th className="py-3 px-6 text-xs text-slate-400 uppercase text-right font-semibold tracking-wider">Actions</th>
@@ -183,10 +212,17 @@ const UserManagement = () => {
                       </div>
                     </td>
                     <td className="py-3.5 px-6"><Badge variant={roleBadge[user.role]} size="sm">{roleLabel[user.role]}</Badge></td>
+                    <td className="py-3.5 px-6"><Badge variant={statusBadge[user.status || 'APPROVED']} size="sm">{statusLabel[user.status || 'APPROVED']}</Badge></td>
                     <td className="py-3.5 px-6 text-sm text-slate-500 font-mono">{user.studentId || '—'}</td>
                     <td className="py-3.5 px-6 text-sm text-slate-400">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</td>
                     <td className="py-3.5 px-6 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {user.status === 'PENDING' && (
+                          <>
+                            <button className="p-1.5 rounded-lg text-success-dark hover:bg-success-50 transition-all" onClick={() => handleStatusUpdate(user._id, 'APPROVED')} title="Approve"><Check className="w-4 h-4" /></button>
+                            <button className="p-1.5 rounded-lg text-danger hover:bg-danger-50 transition-all" onClick={() => handleStatusUpdate(user._id, 'REJECTED')} title="Reject"><X className="w-4 h-4" /></button>
+                          </>
+                        )}
                         <button className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary-50 transition-all" onClick={() => openEditModal(user)}><Edit className="w-4 h-4" /></button>
                         <button className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" onClick={() => handleDelete(user._id, user.name)}><Trash2 className="w-4 h-4" /></button>
                       </div>
@@ -227,6 +263,14 @@ const UserManagement = () => {
               <option value="LECTURER">Lecturer</option>
               <option value="MENTOR">Mentor</option>
               <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+            <select className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none bg-white text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+              <option value="APPROVED">Approved</option>
+              <option value="PENDING">Pending</option>
+              <option value="REJECTED">Rejected</option>
             </select>
           </div>
         </div>
