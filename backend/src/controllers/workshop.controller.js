@@ -413,6 +413,8 @@ const getWorkshopAttendance = async (req, res) => {
         studentName: s.fullName || s.userId?.name,
         rollNumber: s.rollNumber,
         email: s.email,
+        major: s.major,
+        programGroup: s.programGroup,
         status: rec ? rec.status : 'NOT_PARTICIPATED',
         checkInTime: rec ? rec.checkInTime : null,
         evidenceUrl: rec ? rec.evidenceUrl : null,

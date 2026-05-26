@@ -126,15 +126,18 @@ const notifyWorkshopCreated = async (workshopId) => {
         format: ws.format
       }));
     } else if (ws.targetAudience === 'CLASS') {
-      const onlineIds = (ws.onlineClassIds || []).map(c => c.toString());
-      const offlineIds = (ws.offlineClassIds || []).map(c => c.toString());
-      const allClassIds = [...ws.onlineClassIds || [], ...ws.offlineClassIds || []];
+      const onlineIds = (ws.onlineClassIds || []).map(c => c._id ? c._id.toString() : c.toString());
+      const offlineIds = (ws.offlineClassIds || []).map(c => c._id ? c._id.toString() : c.toString());
+      const allClassIds = [
+        ...(ws.onlineClassIds || []).map(c => c._id || c),
+        ...(ws.offlineClassIds || []).map(c => c._id || c)
+      ];
 
       if (allClassIds.length === 0) return;
 
       const students = await Student.find({ classId: { $in: allClassIds } });
       recipients = students.map(s => {
-        const cStr = s.classId.toString();
+        const cStr = s.classId ? s.classId.toString() : '';
         let fmt = ws.format;
         if (onlineIds.includes(cStr)) fmt = 'ONLINE';
         else if (offlineIds.includes(cStr)) fmt = 'OFFLINE';
