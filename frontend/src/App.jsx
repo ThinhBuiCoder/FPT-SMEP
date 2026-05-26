@@ -40,6 +40,7 @@ import MilestoneTracking from './pages/common/MilestoneTracking';
 import MentoringSessions from './pages/common/MentoringSessions';
 import GroupChat from './pages/common/GroupChat';
 import TeamWorkspace from './pages/workspace/TeamWorkspace';
+import StartupWorkspaceHub from './pages/workspace/StartupWorkspaceHub';
 import ProposalEditor from './pages/workspace/ProposalEditor';
 import Workshops from './pages/workshops/Workshops';
 
@@ -91,8 +92,8 @@ function App() {
               {/* Mentor Dashboard */}
               <Route path="/mentor"           element={<ProtectedRoute allowedRoles={['MENTOR']}><MentorDashboard /></ProtectedRoute>} />
 
-              {/* Class Detail — shared by Admin + Lecturer */}
-              <Route path="/classes/:id"    element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER']}><ClassDetail /></ProtectedRoute>} />
+              {/* Class Detail */}
+              <Route path="/classes/:id"    element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','MENTOR']}><ClassDetail /></ProtectedRoute>} />
 
               {/* Student */}
               <Route path="/student"                              element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentDashboard /></ProtectedRoute>} />
@@ -106,6 +107,7 @@ function App() {
               <Route path="/student/team"                         element={<ProtectedRoute allowedRoles={['STUDENT']}><MyTeam /></ProtectedRoute>} />
 
               {/* Workspace Routes */}
+              <Route path="/workspace" element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','MENTOR']}><StartupWorkspaceHub /></ProtectedRoute>} />
               <Route path="/student/workspace"          element={<ProtectedRoute allowedRoles={['STUDENT']}><TeamWorkspace /></ProtectedRoute>} />
               <Route path="/student/workspace/proposal" element={<ProtectedRoute allowedRoles={['STUDENT']}><ProposalEditor /></ProtectedRoute>} />
               <Route path="/workspace/teams/:teamId"          element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','MENTOR','STUDENT']}><TeamWorkspace /></ProtectedRoute>} />

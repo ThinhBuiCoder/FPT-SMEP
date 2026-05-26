@@ -39,6 +39,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/admin', icon: 'dashboard', label: 'Overview' },
       { path: '/admin/users', icon: 'group', label: 'Users' },
       { path: '/admin/classes', icon: 'school', label: 'Classes' },
+      { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
       { path: '/rankings', icon: 'leaderboard', label: 'Rankings' },
@@ -47,6 +48,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
     LECTURER: [
       { path: '/lecturer', icon: 'dashboard', label: 'Dashboard' },
       { path: '/lecturer/classes', icon: 'school', label: 'My Classes' },
+      { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
       { path: '/milestones', icon: 'view_kanban', label: 'Milestones' },
@@ -56,6 +58,8 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
     ],
     MENTOR: [
       { path: '/mentor', icon: 'dashboard', label: 'Dashboard' },
+      { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
+      { path: '/lecturer/classes', icon: 'school', label: 'My Classes' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
       { path: '/sessions', icon: 'event', label: 'Sessions' },

@@ -8,6 +8,7 @@ const { protect } = require("../middlewares/auth.middleware");
 router.use(protect);
 
 // Workspace Summary APIs
+router.get("/accessible-teams", ctrl.getAccessibleTeams);
 router.get("/my-team", ctrl.getMyWorkspace);
 router.get("/teams/:teamId", ctrl.getTeamWorkspace);
 

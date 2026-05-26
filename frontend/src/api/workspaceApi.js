@@ -3,6 +3,7 @@ import axiosClient from './axiosClient';
 
 export const workspaceApi = {
   getMyWorkspace: () => axiosClient.get('/workspace/my-team'),
+  getAccessibleTeams: () => axiosClient.get('/workspace/accessible-teams'),
   getTeamWorkspace: (teamId) => axiosClient.get(`/workspace/teams/${teamId}`),
   
   createProposal: (teamId, payload) => axiosClient.post(`/workspace/teams/${teamId}/proposal`, payload),

@@ -9,6 +9,7 @@ const Student = require("../models/Student");
 const Proposal = require("../models/Proposal");
 const ProposalVersion = require("../models/ProposalVersion");
 const PitchDeck = require("../models/PitchDeck");
+const CheckpointSubmission = require("../models/CheckpointSubmission");
 const workspacePerm = require("../utils/workspacePermission");
 
 // Ensure upload directory exists
@@ -59,6 +60,90 @@ const successResponse = (res, data, message = "") => {
 
 const errorResponse = (res, message, status = 500) => {
   return res.status(status).json({ success: false, error: message });
+};
+
+const teamListPopulate = [
+  { path: "classId", select: "classCode subjectCode semester year" },
+  { path: "mentorId", select: "name email avatar" },
+  { path: "lectureId", select: "name email avatar" },
+];
+
+// ─── GET /api/workspace/accessible-teams ─────────────────────────────────────
+// Teams the current user may open in Startup Workspace (Admin / Lecturer / Mentor)
+exports.getAccessibleTeams = async (req, res) => {
+  try {
+    const role = (req.user?.role || "").toUpperCase();
+    let teams = [];
+
+    if (role === "ADMIN") {
+      teams = await Team.find().populate(teamListPopulate).sort({ teamName: 1 });
+    } else if (role === "LECTURER" || role === "LECTURE") {
+      const classes = await Class.find({ lectureId: req.user._id }).select("_id");
+      const classIds = classes.map((c) => c._id);
+      teams = await Team.find({
+        $or: [{ classId: { $in: classIds } }, { lectureId: req.user._id }],
+      })
+        .populate(teamListPopulate)
+        .sort({ teamName: 1 });
+    } else if (role === "MENTOR") {
+      const classes = await Class.find({ mentorIds: req.user._id }).select("_id");
+      const classIds = classes.map((c) => c._id);
+      teams = await Team.find({
+        $or: [{ classId: { $in: classIds } }, { mentorId: req.user._id }],
+      })
+        .populate(teamListPopulate)
+        .sort({ teamName: 1 });
+    } else if (role === "STUDENT" || role === "USER") {
+      const student = await workspacePerm.getCurrentStudentByUser(req.user);
+      if (student?.teamId) {
+        teams = await Team.find({ _id: student.teamId }).populate(teamListPopulate);
+      }
+    } else {
+      return errorResponse(res, "Access Denied.", 403);
+    }
+
+    const teamIds = teams.map((t) => t._id);
+    const [proposals, submissions, memberCounts] = await Promise.all([
+      Proposal.find({ teamId: { $in: teamIds } }).select("teamId status startupName"),
+      CheckpointSubmission.find({ teamId: { $in: teamIds } }).select("teamId files"),
+      Student.aggregate([
+        { $match: { teamId: { $in: teamIds } } },
+        { $group: { _id: "$teamId", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const proposalByTeam = new Map(proposals.map((p) => [p.teamId.toString(), p]));
+    const memberByTeam = new Map(memberCounts.map((m) => [m._id.toString(), m.count]));
+    const checkpointFilesByTeam = new Map();
+    submissions.forEach((sub) => {
+      const key = sub.teamId.toString();
+      const n = sub.files?.length || 0;
+      checkpointFilesByTeam.set(key, (checkpointFilesByTeam.get(key) || 0) + n);
+    });
+
+    const list = teams.map((team) => {
+      const id = team._id.toString();
+      const proposal = proposalByTeam.get(id);
+      return {
+        _id: team._id,
+        teamName: team.teamName,
+        teamCode: team.teamCode,
+        description: team.description,
+        class: team.classId,
+        mentor: team.mentorId,
+        lecturer: team.lectureId,
+        memberCount: memberByTeam.get(id) || 0,
+        proposalStatus: proposal?.status || null,
+        startupName: proposal?.startupName || null,
+        checkpointFileCount: checkpointFilesByTeam.get(id) || 0,
+      };
+    });
+
+    return successResponse(res, { teams: list, role });
+  } catch (err) {
+    console.error("getAccessibleTeams:", err);
+    return errorResponse(res, "Server error: " + err.message);
+  }
 };
 
 // ─── GET /api/workspace/my-team ──────────────────────────────────────────────
