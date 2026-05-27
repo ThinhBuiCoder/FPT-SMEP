@@ -51,7 +51,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
-      { path: '/milestones', icon: 'view_kanban', label: 'Milestones' },
+      { path: '/executionboard', icon: 'view_kanban', label: 'Execution Board' },
       { path: '/evaluations', icon: 'analytics', label: 'AI Reports' },
       { path: '/sessions', icon: 'event', label: 'Sessions' },
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
@@ -74,7 +74,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
       { path: '/student/idea/new', icon: 'rocket_launch', label: 'My Idea' },
-      { path: '/milestones', icon: 'task_alt', label: 'Milestones' },
+      { path: '/executionboard', icon: 'task_alt', label: 'Execution Board' },
       { path: '/sessions', icon: 'video_chat', label: 'Mentoring' },
     ],
   };

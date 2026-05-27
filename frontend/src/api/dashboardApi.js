@@ -8,8 +8,10 @@ export const dashboardApi = {
    * Fetch student dashboard stats.
    * @param {number} [weekNumber] - Roadmap week (1-10). Falls back to 1 on the server.
    */
-  getStudent: (weekNumber) => {
+  getStudent: (weekNumber, options = {}) => {
     const wn = Number(weekNumber) || 1;
-    return axiosClient.get(`/dashboard/student?weekNumber=${wn}`);
+    return axiosClient.get(`/dashboard/student?weekNumber=${wn}`, {
+      signal: options.signal,
+    });
   },
 };

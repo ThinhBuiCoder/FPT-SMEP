@@ -154,7 +154,7 @@ const StudentDashboard = () => {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.21 }} className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2"><CheckSquare className="w-5 h-5 text-green-500" />Milestones</h3>
-                  <Button variant="ghost-primary" size="xs" onClick={() => navigate('/milestones')}>View Kanban</Button>
+                  <Button variant="ghost-primary" size="xs" onClick={() => navigate('/executionboard')}>View Kanban</Button>
                 </div>
                 <div className="mb-4">
                   <ProgressBar value={milestoneProgress?.percentage || 0} showLabel />
