@@ -5,9 +5,13 @@ const rubricScoreSchema = new mongoose.Schema(
   {
     criterionKey: String,
     criterionName: String,
+    description: String,
     score: { type: Number, min: 0, default: 0 },
     maxScore: { type: Number, default: 10 },
     weight: { type: Number, default: 1 },
+    selectedLevel: { type: String, default: '' },
+    weightedScore: { type: Number, default: 0 },
+    scoreMode: { type: String, enum: ['LEVEL', 'MANUAL'], default: 'MANUAL' },
     comment: String,
   },
   { _id: false }
@@ -29,6 +33,8 @@ const evaluationSchema = new mongoose.Schema(
     classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class' },
     proposalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Proposal' },
     pitchDeckId: { type: mongoose.Schema.Types.ObjectId, ref: 'PitchDeck' },
+    checkpointNumber: { type: Number, min: 1, max: 4 },
+    checkpointTitle: { type: String, default: '' },
 
     // Evaluator info (lecturerId is kept for compatibility)
     lecturerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -38,6 +44,8 @@ const evaluationSchema = new mongoose.Schema(
     rubricScores: [rubricScoreSchema],
     totalScore: { type: Number, default: 0 },
     maxTotalScore: { type: Number, default: 0 },
+    totalWeight: { type: Number, default: 0 },
+    checkpointTotal: { type: Number, default: 0 },
     weightedScore: { type: Number, default: 0 },
 
     overallFeedback: { type: String, default: '' },
@@ -45,7 +53,10 @@ const evaluationSchema = new mongoose.Schema(
     weaknesses: { type: String, default: '' },
     suggestions: { type: String, default: '' },
 
-    status: { type: String, enum: ['DRAFT', 'SUBMITTED', 'PUBLISHED'], default: 'DRAFT' }
+    status: { type: String, enum: ['DRAFT', 'SUBMITTED', 'PUBLISHED'], default: 'DRAFT' },
+    submittedAt: { type: Date, default: null },
+    lockedAt: { type: Date, default: null },
+    historyVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -53,28 +64,27 @@ const evaluationSchema = new mongoose.Schema(
 // Auto-compute totalScore before save
 evaluationSchema.pre('save', function (next) {
   if (this.rubricScores && this.rubricScores.length > 0) {
-    // New logic (Module 4)
     let total = 0;
     let maxTotal = 0;
     let weighted = 0;
     let totalWeight = 0;
 
     for (const rs of this.rubricScores) {
-      total += (rs.score || 0);
+      const score = Number(rs.score || 0);
+      const weight = Number(rs.weight || 0);
+      total += score;
       maxTotal += (rs.maxScore || 10);
-      const w = rs.weight || 1;
-      weighted += (rs.score || 0) * w;
-      totalWeight += w;
+      weighted += score * (weight / 100);
+      totalWeight += weight;
+      rs.weightedScore = Number((score * (weight / 100)).toFixed(2));
     }
 
     this.totalScore = parseFloat(total.toFixed(2));
     this.maxTotalScore = maxTotal;
-    if (totalWeight > 0) {
-      // Normalizing weighted score out of 10 if total max is considered
-      this.weightedScore = parseFloat((weighted / totalWeight).toFixed(2));
-    }
+    this.totalWeight = totalWeight;
+    this.checkpointTotal = parseFloat(weighted.toFixed(2));
+    this.weightedScore = parseFloat(weighted.toFixed(2));
   } else {
-    // Legacy logic (Module 1)
     const sum =
       this.innovationScore +
       this.feasibilityScore +
@@ -85,5 +95,8 @@ evaluationSchema.pre('save', function (next) {
   }
   next();
 });
+
+evaluationSchema.index({ teamId: 1, checkpointNumber: 1, lecturerId: 1 }, { unique: false });
+evaluationSchema.index({ proposalId: 1, checkpointNumber: 1, status: 1 });
 
 module.exports = mongoose.model('Evaluation', evaluationSchema);

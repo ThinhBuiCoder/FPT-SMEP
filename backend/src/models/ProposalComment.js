@@ -8,6 +8,7 @@ const proposalCommentSchema = new mongoose.Schema(
     proposalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Proposal', required: true },
     
     sectionKey: { type: String, required: true },
+    sectionLabel: { type: String, default: '' },
     selectedText: { type: String, default: '' },
     content: { type: String, required: true },
     
@@ -15,6 +16,7 @@ const proposalCommentSchema = new mongoose.Schema(
     createdByRole: { type: String },
     
     parentCommentId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProposalComment', default: null },
+    threadRootId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProposalComment', default: null },
     
     resolved: { type: Boolean, default: false },
     resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
