@@ -63,11 +63,11 @@ const Rankings = () => {
 
   const top3 = rankings.slice(0, 3);
   const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
-  const podiumHeight = ['h-24', 'h-32', 'h-20'];
-  const podiumRank = [2, 1, 3];
+  const podiumHeight = ['h-32', 'h-24', 'h-20'];
+  const podiumRank = [1, 2, 3];
   const podiumIcon = [
-    <Medal key="2" className="w-6 h-6 text-slate-300" />,
     <Trophy key="1" className="w-7 h-7 text-amber-400" />,
+    <Medal key="2" className="w-6 h-6 text-slate-300" />,
     <Medal key="3" className="w-6 h-6 text-amber-700" />,
   ];
 
@@ -120,7 +120,7 @@ const Rankings = () => {
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-radial-gradient from-white/10 to-transparent rounded-full blur-2xl" />
               <h3 className="text-center text-white/50 text-xs font-black uppercase tracking-widest mb-6">Top Startups Podium</h3>
-              
+
               <div className="flex items-end justify-center gap-4 sm:gap-8 pt-4">
                 {podiumOrder.map((team, idx) => {
                   const actualIndex = top3.indexOf(team);

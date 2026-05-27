@@ -15,6 +15,9 @@ router.get('/config', ctrl.getConfig);
 // GET /api/workspace/checkpoints/teams/:teamId
 router.get('/teams/:teamId', ctrl.getCheckpointData);
 
+// GET /api/workspace/checkpoints/teams/:teamId/history
+router.get('/teams/:teamId/history', ctrl.getFeedbackHistory);
+
 // ── File management ──────────────────────────────────────────────────────────
 // POST   /api/workspace/checkpoints/teams/:teamId/checkpoints/:checkpointNumber/upload
 router.post(

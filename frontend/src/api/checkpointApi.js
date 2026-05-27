@@ -10,6 +10,11 @@ export const checkpointApi = {
   getCheckpointData: (teamId) =>
     axiosClient.get(`/workspace/checkpoints/teams/${teamId}`),
 
+  getFeedbackHistory: (teamId, checkpointNumber) =>
+    axiosClient.get(`/workspace/checkpoints/teams/${teamId}/history`, {
+      params: checkpointNumber ? { checkpointNumber } : {},
+    }),
+
   // Upload a file (Student only)
   uploadFile: (teamId, checkpointNumber, formData) =>
     axiosClient.post(
