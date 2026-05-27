@@ -4,7 +4,7 @@ import axiosClient from './axiosClient';
 export const teamApi = {
   // ─── Team CRUD ───────────────────────────────────────────────────────────
   getAll:      (params) => axiosClient.get('/teams', { params }),
-  getById:     (id)     => axiosClient.get(`/teams/${id}`),
+  getById:     (id, options = {}) => axiosClient.get(`/teams/${id}`, { signal: options.signal }),
   update:      (teamId, data) => axiosClient.put(`/teams/${teamId}`, data),
   delete:      (teamId)       => axiosClient.delete(`/teams/${teamId}`),
 

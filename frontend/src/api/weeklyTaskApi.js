@@ -13,8 +13,11 @@ export const getWeeklyTasks = (params = {}) =>
  * @param {string} teamId
  * @param {Object} params - { weekNumber, assigneeStudentId, priority, status, search }
  */
-export const getTeamTaskBoard = (teamId, params = {}) =>
-  axiosClient.get(`/weekly-tasks/team/${teamId}/board`, { params });
+export const getTeamTaskBoard = (teamId, params = {}, options = {}) =>
+  axiosClient.get(`/weekly-tasks/team/${teamId}/board`, {
+    params,
+    signal: options.signal,
+  });
 
 /**
  * POST /api/weekly-tasks
