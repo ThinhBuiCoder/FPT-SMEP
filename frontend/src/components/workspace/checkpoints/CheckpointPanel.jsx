@@ -217,10 +217,27 @@ export default function CheckpointPanel({ checkpoint, teamId, isEditable, onClos
                     {checkpoint.rubrics.map((r, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-amber-50/80 border border-amber-100 text-sm text-slate-700"
+                        className="p-3 rounded-xl bg-amber-50/80 border border-amber-100 text-sm text-slate-700"
                       >
-                        <Award className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                        {r}
+                        <div className="flex items-start gap-3">
+                          <Award className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
+                              <span>{r.label}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-amber-700 border border-amber-200">{r.weight}%</span>
+                            </div>
+                            {r.description && <p className="text-xs text-slate-600 mt-1">{r.description}</p>}
+                            {Array.isArray(r.levels) && r.levels.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                                {r.levels.map((level) => (
+                                  <span key={level.key} className="px-2 py-1 rounded-full bg-white border border-slate-200">
+                                    {level.label} {level.range}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
