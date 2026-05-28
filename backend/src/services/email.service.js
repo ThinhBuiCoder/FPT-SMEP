@@ -20,15 +20,15 @@ async function sendClassCreatedNotification({ classes, createdBy, recipientEmail
     return { sent: false, error: "No classes to send" };
   }
 
-  const creatorInfo = createdBy 
-    ? `${createdBy.name || "Unknown"} - ${createdBy.email || "Unknown"}` 
+  const creatorInfo = createdBy
+    ? `${createdBy.name || "Unknown"} - ${createdBy.email || "Unknown"}`
     : "System/Unknown";
 
-  const classListHtml = classes.map((c, i) => 
+  const classListHtml = classes.map((c, i) =>
     `<li>${i + 1}. ${c.classCode} - ${c.subjectCode} - ${c.semester} ${c.year}</li>`
   ).join("");
 
-  const classListText = classes.map((c, i) => 
+  const classListText = classes.map((c, i) =>
     `${i + 1}. ${c.classCode} - ${c.subjectCode} - ${c.semester} ${c.year}`
   ).join("\n");
 
@@ -155,13 +155,17 @@ async function sendWorkshopNotificationEmail({ to, workshop, recipientName, form
 
   const dateStr = new Date(workshop.startDate).toLocaleDateString();
   const deadlineStr = workshop.checkInDeadline ? new Date(workshop.checkInDeadline).toLocaleString() : 'N/A';
-  let locationInfo = '';
+  let locationInfoHtml = '';
+  let locationInfoText = '';
   if (format === 'ONLINE') {
-    locationInfo = `Meeting Link: <a href="${workshop.meetingLink || "#"}">${workshop.meetingLink || "TBD"}</a>`;
+    locationInfoHtml = `Meeting Link: <a href="${workshop.meetingLink || "#"}">${workshop.meetingLink || "TBD"}</a>`;
+    locationInfoText = `Meeting Link: ${workshop.meetingLink || "TBD"}`;
   } else if (format === 'OFFLINE') {
-    locationInfo = `Location: ${workshop.location || "TBD"}`;
+    locationInfoHtml = `Location: ${workshop.location || "TBD"}`;
+    locationInfoText = `Location: ${workshop.location || "TBD"}`;
   } else {
-    locationInfo = `Location: ${workshop.location || "TBD"} | Meeting Link: <a href="${workshop.meetingLink || "#"}">${workshop.meetingLink || "TBD"}</a>`;
+    locationInfoHtml = `Location: ${workshop.location || "TBD"} | Meeting Link: <a href="${workshop.meetingLink || "#"}">${workshop.meetingLink || "TBD"}</a>`;
+    locationInfoText = `Location: ${workshop.location || "TBD"} | Meeting Link: ${workshop.meetingLink || "TBD"}`;
   }
 
   const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
@@ -179,7 +183,7 @@ async function sendWorkshopNotificationEmail({ to, workshop, recipientName, form
         <ul style="list-style: none; padding-left: 0; margin: 0; font-size: 14px; color: #334155;">
           <li><strong>📅 Date:</strong> ${dateStr}</li>
           <li><strong>🕒 Time:</strong> ${workshop.startTime} - ${workshop.endTime}</li>
-          <li><strong>📍 Location:</strong> ${locationInfo}</li>
+          <li><strong>📍 Location:</strong> ${locationInfoHtml}</li>
           <li><strong>⏰ Check-in Deadline:</strong> ${deadlineStr}</li>
         </ul>
       </div>
@@ -199,7 +203,7 @@ A new ${workshop.type.toLowerCase()} has been announced: "${workshop.title}"
 Description: ${workshop.description || "No description"}
 Date: ${dateStr}
 Time: ${workshop.startTime} - ${workshop.endTime}
-Location: ${locationInfo}
+Location: ${locationInfoText}
 Check-in Deadline: ${deadlineStr}
 
 Please login to the FPT-SMEP system to view details:
