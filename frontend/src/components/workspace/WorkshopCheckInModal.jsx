@@ -17,12 +17,12 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
     if (!selectedFile) return;
 
     if (!selectedFile.type.startsWith('image/')) {
-      toast.error('Vui lòng chọn một file ảnh.');
+      toast.error('Please select an image file.');
       return;
     }
 
     if (selectedFile.size > 10 * 1024 * 1024) {
-      toast.error('Dung lượng ảnh tối đa là 10MB.');
+      toast.error('Maximum image size is 10MB.');
       return;
     }
 
@@ -37,7 +37,7 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      toast.error('Vui lòng chọn/chụp ảnh minh chứng.');
+      toast.error('Please select or capture an evidence photo.');
       return;
     }
 
@@ -47,12 +47,12 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
       // 1. Upload the image file first via chatApi.uploadFile which uses /chat/upload
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const uploadRes = await chatApi.uploadFile(formData);
       const imageUrl = uploadRes.data?.url || uploadRes.url;
 
       if (!imageUrl) {
-        throw new Error('Không lấy được URL ảnh sau khi upload.');
+        throw new Error('Could not retrieve image URL after upload.');
       }
 
       // 2. Submit the attendance record
@@ -61,12 +61,12 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
         classId: workshop.classId?._id || workshop.classId,
       });
 
-      toast.success('Check-in thành công! Chờ giảng viên duyệt.');
+      toast.success('Check-in successful! Awaiting lecturer approval.');
       onCheckInSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi check-in.');
+      toast.error(err.response?.data?.message || 'An error occurred during check-in.');
     } finally {
       setUploading(false);
       setSubmitting(false);
@@ -103,10 +103,10 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-slate-700">
-              Tải lên ảnh minh chứng <span className="text-rose-500">*</span>
+              Upload Evidence Photo <span className="text-rose-500">*</span>
             </label>
             <p className="text-xs text-slate-400">
-              Hãy chụp màn hình hoặc chụp ảnh trực tiếp tại buổi hội thảo/workshop để xác minh sự tham gia của bạn.
+              Take a screenshot or photo at the workshop/event to verify your participation.
             </p>
           </div>
 
@@ -136,8 +136,8 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
                   <Image className="w-8 h-8" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-bold text-slate-700">Chọn hoặc chụp ảnh minh chứng</p>
-                  <p className="text-xs text-slate-400 mt-1">PNG, JPG hoặc JPEG lên tới 10MB</p>
+                  <p className="text-sm font-bold text-slate-700">Select or capture evidence photo</p>
+                  <p className="text-xs text-slate-400 mt-1">PNG, JPG or JPEG up to 10MB</p>
                 </div>
                 <input
                   type="file"
@@ -157,7 +157,7 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
               disabled={submitting}
               className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200/60 rounded-xl hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:opacity-50"
             >
-              Hủy
+              Cancel
             </button>
             <button
               type="submit"
@@ -167,12 +167,12 @@ export default function WorkshopCheckInModal({ isOpen, onClose, workshop, onChec
               {submitting ? (
                 <>
                   <Loader className="w-4 h-4 animate-spin" />
-                  <span>Đang xử lý...</span>
+                  <span>Processing...</span>
                 </>
               ) : (
                 <>
                   <Upload className="w-4 h-4" />
-                  <span>Xác nhận Check-in</span>
+                  <span>Confirm Check-in</span>
                 </>
               )}
             </button>

@@ -737,7 +737,7 @@ exports.exportClassExcel = async (req, res) => {
     sheet.columns = [
       { header: 'RollNumber', key: 'rollNumber', width: 18 },
       { header: 'Fullname', key: 'fullName', width: 30 },
-      { header: 'Chuyên ngành', key: 'major', width: 18 },
+      { header: 'Major', key: 'major', width: 18 },
       { header: 'SubjectCode', key: 'subjectCode', width: 16 },
       { header: 'GroupName', key: 'groupName', width: 20 },
       { header: 'Group EXE201', key: 'groupExe201', width: 20 },

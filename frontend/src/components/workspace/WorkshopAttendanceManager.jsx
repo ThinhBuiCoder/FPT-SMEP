@@ -13,10 +13,10 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [verifyingStudentId, setVerifyingStudentId] = useState(null);
   const [verifyingAll, setVerifyingAll] = useState(false);
-  
+
   // Preview State for evidence image
   const [previewImage, setPreviewImage] = useState(null);
-  
+
   // Rejection State
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -30,7 +30,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
 
   // Student list search, filter, and pagination
   const [studentSearch, setStudentSearch] = useState('');
-  const [studentMajorFilter, setStudentMajorFilter] = useState('ALL');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('ALL');
   const [studentPage, setStudentPage] = useState(1);
   const [studentsPerPage] = useState(10);
 
@@ -39,7 +39,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       setSelectedClassId('');
       setStudents([]);
       setPreviewImage(null);
-      
+
       // Reset Class States
       setClassSearch('');
       setClassModeFilter('ALL');
@@ -47,7 +47,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
 
       // Reset Student States
       setStudentSearch('');
-      setStudentMajorFilter('ALL');
+      setStudentStatusFilter('ALL');
       setStudentPage(1);
 
       fetchClasses();
@@ -57,7 +57,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
   useEffect(() => {
     if (selectedClassId) {
       setStudentSearch('');
-      setStudentMajorFilter('ALL');
+      setStudentStatusFilter('ALL');
       setStudentPage(1);
       fetchAttendance();
     } else {
@@ -89,7 +89,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       setClasses(list);
     } catch (err) {
       console.error(err);
-      toast.error('Không thể tải danh sách lớp học.');
+      toast.error('Could not load class list.');
     } finally {
       setLoadingClasses(false);
     }
@@ -104,7 +104,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       setStudents(list);
     } catch (err) {
       console.error(err);
-      toast.error('Không thể tải danh sách điểm danh.');
+      toast.error('Could not load attendance list.');
     } finally {
       setLoadingStudents(false);
     }
@@ -121,8 +121,8 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
     setVerifyingStudentId(studentId);
     try {
       await workshopApi.verifyAttendance(workshop._id, studentId, status, reason);
-      toast.success(status === 'VERIFIED' ? 'Đã duyệt minh chứng!' : 'Đã từ chối minh chứng.');
-      
+      toast.success(status === 'VERIFIED' ? 'Evidence approved!' : 'Evidence rejected.');
+
       // Update local state realtime
       setStudents(prev => prev.map(s => {
         if (s.studentId === studentId) {
@@ -137,7 +137,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       }
     } catch (err) {
       console.error(err);
-      toast.error('Không thể cập nhật trạng thái điểm danh.');
+      toast.error('Could not update attendance status.');
     } finally {
       setVerifyingStudentId(null);
     }
@@ -147,13 +147,13 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
     const checkedInCount = students.filter(s => s.status === 'CHECKED_IN').length;
     if (checkedInCount === 0) return;
 
-    if (!window.confirm(`Bạn có chắc chắn muốn duyệt tất cả ${checkedInCount} sinh viên đã check-in?`)) return;
+    if (!window.confirm(`Are you sure you want to approve all ${checkedInCount} checked-in student(s)?`)) return;
 
     setVerifyingAll(true);
     try {
       const res = await workshopApi.verifyAllAttendance(workshop._id, selectedClassId);
-      toast.success(res.data?.message || res.message || 'Đã duyệt tất cả thành công!');
-      
+      toast.success(res.data?.message || res.message || 'All attendance approved successfully!');
+
       // Update local state realtime
       setStudents(prev => prev.map(s => {
         if (s.status === 'CHECKED_IN') {
@@ -163,7 +163,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       }));
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi duyệt tất cả.');
+      toast.error(err.response?.data?.message || 'An error occurred while approving all.');
     } finally {
       setVerifyingAll(false);
     }
@@ -174,10 +174,10 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
     const cleanCode = c.classCode.toLowerCase();
     const cleanSubject = (c.subjectCode || '').toLowerCase();
     const query = classSearch.toLowerCase();
-    
+
     const matchesSearch = cleanCode.includes(query) || cleanSubject.includes(query);
     const matchesMode = classModeFilter === 'ALL' || c.mode === classModeFilter;
-    
+
     return matchesSearch && matchesMode;
   });
 
@@ -202,13 +202,11 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
     const cleanEmail = (s.email || '').toLowerCase();
     const cleanRoll = (s.rollNumber || '').toLowerCase();
     const query = studentSearch.toLowerCase();
-    
+
     const matchesSearch = cleanName.includes(query) || cleanEmail.includes(query) || cleanRoll.includes(query);
-    
-    const sMajor = s.major || s.programGroup || '';
-    const matchesMajor = studentMajorFilter === 'ALL' || sMajor === studentMajorFilter;
-    
-    return matchesSearch && matchesMajor;
+    const matchesStatus = studentStatusFilter === 'ALL' || s.status === studentStatusFilter;
+
+    return matchesSearch && matchesStatus;
   });
 
   // Paginate students
@@ -230,13 +228,13 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
   const getStatusBadge = (status) => {
     switch (status) {
       case 'NOT_PARTICIPATED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Chưa tham gia</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Not Participated</span>;
       case 'CHECKED_IN':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">Đã check-in</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">Checked In</span>;
       case 'VERIFIED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Đã xác nhận</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Verified</span>;
       case 'REJECTED':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200">Bị từ chối</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200">Rejected</span>;
       default:
         return null;
     }
@@ -257,7 +255,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
           <div>
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
               <CheckCircle2 className="w-6 h-6 text-primary" />
-              Quản lý điểm danh
+              Attendance Management
             </h2>
             <p className="text-sm text-slate-500 mt-1 max-w-2xl truncate">
               {workshop?.title}
@@ -280,17 +278,17 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                 onClick={() => setSelectedClassId('')}
                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs"
               >
-                ← Quay lại danh sách lớp
+                ← Back to Class List
               </button>
               <div className="h-6 w-px bg-slate-200" />
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-500">Lớp đang chọn:</span>
+                <span className="text-sm font-semibold text-slate-500">Selected Class:</span>
                 <span className="text-sm font-extrabold text-slate-800">
                   {classes.find(c => c._id === selectedClassId)?.classCode} ({classes.find(c => c._id === selectedClassId)?.mode === 'ONLINE' ? 'Online' : 'Offline'})
                 </span>
               </div>
             </div>
-            
+
             {students.length > 0 && (
               <div className="flex gap-2">
                 <button
@@ -300,7 +298,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]"
                 >
                   {verifyingAll ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Xác nhận tất cả ({stats.checkedIn})
+                  Approve All ({stats.checkedIn})
                 </button>
               </div>
             )}
@@ -311,19 +309,19 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
         {selectedClassId && students.length > 0 && (
           <div className="px-8 py-3 bg-slate-50/50 border-b border-slate-100 flex flex-wrap gap-4 shrink-0 animate-in fade-in duration-200">
             <div className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
-              Tổng số: <span className="text-slate-800">{stats.total}</span>
+              Total: <span className="text-slate-800">{stats.total}</span>
             </div>
             <div className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg shadow-sm">
-              Đã duyệt: <span>{stats.verified}</span>
+              Verified: <span>{stats.verified}</span>
             </div>
             <div className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg shadow-sm">
-              Đã check-in (Chờ): <span>{stats.checkedIn}</span>
+              Checked In (Pending): <span>{stats.checkedIn}</span>
             </div>
             <div className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg shadow-sm">
-              Từ chối: <span>{stats.rejected}</span>
+              Rejected: <span>{stats.rejected}</span>
             </div>
             <div className="text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
-              Chưa tham gia: <span>{stats.notParticipated}</span>
+              Not Participated: <span>{stats.notParticipated}</span>
             </div>
           </div>
         )}
@@ -333,7 +331,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
           {loadingStudents || loadingClasses ? (
             <div className="h-full flex items-center justify-center flex-col gap-3">
               <Loader className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-sm text-slate-500 font-medium">Đang tải...</p>
+              <p className="text-sm text-slate-500 font-medium">Loading...</p>
             </div>
           ) : !selectedClassId ? (
             <div className="h-full flex flex-col animate-in fade-in duration-300">
@@ -344,7 +342,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     <input
                       type="text"
-                      placeholder="Tìm kiếm lớp học, mã môn..."
+                      placeholder="Search by class code, subject..."
                       value={classSearch}
                       onChange={e => {
                         setClassSearch(e.target.value);
@@ -361,21 +359,21 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                     }}
                     className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer focus:bg-white transition-all"
                   >
-                    <option value="ALL">Tất cả hình thức</option>
+                    <option value="ALL">All Modes</option>
                     <option value="ONLINE">💻 Online</option>
                     <option value="OFFLINE">🏢 Offline</option>
                   </select>
                 </div>
                 <span className="text-xs font-bold text-slate-400 bg-slate-200/60 px-3 py-1.5 rounded-full shrink-0 self-start md:self-auto">
-                  {filteredClasses.length} / {classes.length} Lớp học
+                  {filteredClasses.length} / {classes.length} Classes
                 </span>
               </div>
 
               {filteredClasses.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-3 text-center">
                   <AlertTriangle className="w-12 h-12 text-slate-300 animate-bounce" />
-                  <h3 className="font-semibold text-slate-700 text-sm">Không tìm thấy lớp học nào</h3>
-                  <p className="text-xs text-slate-400 mt-1 max-w-xs">Không có lớp học nào khớp với điều kiện tìm kiếm và lọc của bạn.</p>
+                  <h3 className="font-semibold text-slate-700 text-sm">No classes found</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xs">No classes match your search or filter criteria.</p>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col justify-between">
@@ -383,21 +381,20 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hình thức</th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mã lớp</th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Môn học</th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mode</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Class Code</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Subject</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {currentClasses.map(c => (
                           <tr key={c._id} className="hover:bg-slate-50/40 transition-colors">
                             <td className="px-6 py-4 align-middle">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase ${
-                                c.mode === 'ONLINE' 
-                                  ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' 
-                                  : 'bg-amber-50 text-amber-600 border border-amber-100'
-                              }`}>
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase ${c.mode === 'ONLINE'
+                                ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                : 'bg-amber-50 text-amber-600 border border-amber-100'
+                                }`}>
                                 {c.mode === 'ONLINE' ? '💻 Online' : '🏢 Offline'}
                               </span>
                             </td>
@@ -413,7 +410,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                                 onClick={() => setSelectedClassId(c._id)}
                                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white text-xs font-bold rounded-xl transition-all shadow-xs active:scale-95"
                               >
-                                <span>Xem điểm danh</span>
+                                <span>View Attendance</span>
                                 <span className="font-bold">→</span>
                               </button>
                             </td>
@@ -427,7 +424,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                   {totalClassPages > 1 && (
                     <div className="flex items-center justify-between mt-6 bg-white border border-slate-200/60 px-6 py-3.5 rounded-2xl shadow-xs">
                       <span className="text-xs text-slate-500 font-semibold">
-                        Trang <span className="text-slate-800 font-bold">{classPage}</span> / <span className="text-slate-800 font-bold">{totalClassPages}</span> (Hiển thị {indexOfFirstClass + 1} - {Math.min(indexOfLastClass, filteredClasses.length)} trên {filteredClasses.length})
+                        Page <span className="text-slate-800 font-bold">{classPage}</span> / <span className="text-slate-800 font-bold">{totalClassPages}</span> (Showing {indexOfFirstClass + 1} - {Math.min(indexOfLastClass, filteredClasses.length)} of {filteredClasses.length})
                       </span>
                       <div className="flex gap-2">
                         <button
@@ -461,7 +458,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     <input
                       type="text"
-                      placeholder="Tìm tên, MSSV, email sinh viên..."
+                      placeholder="Search by name, student ID, email..."
                       value={studentSearch}
                       onChange={e => {
                         setStudentSearch(e.target.value);
@@ -471,27 +468,28 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                     />
                   </div>
                   <select
-                    value={studentMajorFilter}
+                    value={studentStatusFilter}
                     onChange={e => {
-                      setStudentMajorFilter(e.target.value);
+                      setStudentStatusFilter(e.target.value);
                       setStudentPage(1);
                     }}
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer focus:bg-white transition-all min-w-[150px]"
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer focus:bg-white transition-all min-w-[160px]"
                   >
-                    <option value="ALL">Tất cả ngành</option>
-                    {uniqueMajors.map(major => (
-                      <option key={major} value={major}>{major}</option>
-                    ))}
+                    <option value="ALL">📋 All Statuses</option>
+                    <option value="CHECKED_IN">⏳ Checked In</option>
+                    <option value="VERIFIED">✅ Verified</option>
+                    <option value="REJECTED">❌ Rejected</option>
+                    <option value="NOT_PARTICIPATED">⚪ Not Participated</option>
                   </select>
                 </div>
                 <span className="text-xs font-bold text-slate-400 bg-slate-200/60 px-3 py-1.5 rounded-full shrink-0 self-start md:self-auto">
-                  {filteredStudents.length} / {students.length} Sinh viên
+                  {filteredStudents.length} / {students.length} Students
                 </span>
               </div>
               <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-3 text-center">
                 <AlertTriangle className="w-12 h-12 text-slate-300" />
-                <h3 className="font-semibold text-slate-700 text-sm">Không tìm thấy sinh viên nào</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs">Không có sinh viên nào khớp với điều kiện tìm kiếm hoặc ngành học của bạn.</p>
+                <h3 className="font-semibold text-slate-700 text-sm">No students found</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs">No students match your search or status filter.</p>
               </div>
             </div>
           ) : (
@@ -504,7 +502,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                       <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
                         type="text"
-                        placeholder="Tìm tên, MSSV, email sinh viên..."
+                        placeholder="Search by name, student ID, email..."
                         value={studentSearch}
                         onChange={e => {
                           setStudentSearch(e.target.value);
@@ -514,21 +512,22 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                       />
                     </div>
                     <select
-                      value={studentMajorFilter}
+                      value={studentStatusFilter}
                       onChange={e => {
-                        setStudentMajorFilter(e.target.value);
+                        setStudentStatusFilter(e.target.value);
                         setStudentPage(1);
                       }}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer focus:bg-white transition-all min-w-[150px]"
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer focus:bg-white transition-all min-w-[160px]"
                     >
-                      <option value="ALL">Tất cả ngành</option>
-                      {uniqueMajors.map(major => (
-                        <option key={major} value={major}>{major}</option>
-                      ))}
+                      <option value="ALL">📋 All Statuses</option>
+                      <option value="CHECKED_IN">⏳ Checked In</option>
+                      <option value="VERIFIED">✅ Verified</option>
+                      <option value="REJECTED">❌ Rejected</option>
+                      <option value="NOT_PARTICIPATED">⚪ Not Participated</option>
                     </select>
                   </div>
                   <span className="text-xs font-bold text-slate-400 bg-slate-200/60 px-3 py-1.5 rounded-full shrink-0 self-start md:self-auto">
-                    {filteredStudents.length} / {students.length} Sinh viên
+                    {filteredStudents.length} / {students.length} Students
                   </span>
                 </div>
 
@@ -536,25 +535,25 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sinh viên</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">MSSV</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ngành học</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian check-in</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Minh chứng</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Student ID</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Major</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Check-in Time</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Evidence</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {currentStudents.map(s => {
-                        const checkInDate = s.checkInTime ? new Date(s.checkInTime).toLocaleString([], {
+                        const checkInDate = s.checkInTime ? new Date(s.checkInTime).toLocaleString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
                         }) : '—';
-                        
+
                         return (
                           <tr key={s.studentId} className="hover:bg-slate-50/40 transition-colors">
                             <td className="px-6 py-4 align-middle">
@@ -562,7 +561,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                               <div className="text-xs text-slate-400 mt-0.5">{s.email}</div>
                               <div className="mt-1">
                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.mode === 'ONLINE' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                                  Hình thức: {s.mode || 'N/A'}
+                                  Mode: {s.mode || 'N/A'}
                                 </span>
                               </div>
                             </td>
@@ -585,17 +584,17 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-xs"
                                 >
                                   <Eye size={14} />
-                                  <span>Xem</span>
+                                  <span>View</span>
                                 </button>
                               ) : (
-                                <span className="text-xs text-slate-300 italic">Không có</span>
+                                <span className="text-xs text-slate-300 italic">None</span>
                               )}
                             </td>
                             <td className="px-6 py-4 align-middle">
                               {getStatusBadge(s.status)}
                               {s.status === 'REJECTED' && s.rejectReason && (
                                 <div className="text-[10px] text-rose-500 mt-1 max-w-[150px] truncate" title={s.rejectReason}>
-                                  Lý do: {s.rejectReason}
+                                  Reason: {s.rejectReason}
                                 </div>
                               )}
                             </td>
@@ -607,7 +606,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                                     disabled={verifyingStudentId !== null}
                                     onClick={() => handleVerify(s.studentId, 'VERIFIED')}
                                     className="p-1.5 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-600 hover:text-emerald-700 rounded-xl transition-all disabled:opacity-50"
-                                    title="Duyệt"
+                                    title="Approve"
                                   >
                                     <Check size={16} />
                                   </button>
@@ -616,7 +615,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                                     disabled={verifyingStudentId !== null}
                                     onClick={() => handleVerify(s.studentId, 'REJECTED')}
                                     className="p-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 hover:text-rose-700 rounded-xl transition-all disabled:opacity-50"
-                                    title="Từ chối"
+                                    title="Reject"
                                   >
                                     <X size={16} />
                                   </button>
@@ -628,7 +627,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                                   onClick={() => handleVerify(s.studentId, s.status === 'VERIFIED' ? 'REJECTED' : 'VERIFIED')}
                                   className="text-xs font-semibold text-slate-400 hover:text-slate-600 underline transition-all disabled:opacity-50"
                                 >
-                                  {s.status === 'VERIFIED' ? 'Đổi thành từ chối' : 'Đổi thành duyệt'}
+                                  {s.status === 'VERIFIED' ? 'Change to Rejected' : 'Change to Approved'}
                                 </button>
                               ) : (
                                 <span className="text-xs text-slate-300 font-semibold">—</span>
@@ -646,7 +645,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
               {totalStudentPages > 1 && (
                 <div className="flex items-center justify-between mt-6 bg-white border border-slate-200/60 px-6 py-3.5 rounded-2xl shadow-xs">
                   <span className="text-xs text-slate-500 font-semibold">
-                    Trang <span className="text-slate-800 font-bold">{studentPage}</span> / <span className="text-slate-800 font-bold">{totalStudentPages}</span> (Hiển thị {indexOfFirstStudent + 1} - {Math.min(indexOfLastStudent, filteredStudents.length)} trên {filteredStudents.length})
+                    Page <span className="text-slate-800 font-bold">{studentPage}</span> / <span className="text-slate-800 font-bold">{totalStudentPages}</span> (Showing {indexOfFirstStudent + 1} - {Math.min(indexOfLastStudent, filteredStudents.length)} of {filteredStudents.length})
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -695,7 +694,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                 onClick={() => setPreviewImage(null)}
                 className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition-all"
               >
-                Đóng
+                Close
               </button>
             </div>
           </div>
@@ -706,14 +705,14 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
       {rejectModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md border border-slate-200/60 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Lý do từ chối</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Rejection Reason</h3>
             <p className="text-sm text-slate-500 mb-4">
-              Vui lòng cung cấp lý do từ chối minh chứng này để sinh viên có thể khắc phục.
+              Please provide a reason for rejecting this evidence so the student can make corrections.
             </p>
             <textarea
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mb-4"
               rows={3}
-              placeholder="VD: Hình ảnh mờ, không đúng định dạng..."
+              placeholder="e.g. Image is blurry, incorrect format..."
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
             />
@@ -726,7 +725,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                 }}
                 className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                Hủy
+                Cancel
               </button>
               <button
                 type="button"
@@ -734,7 +733,7 @@ export default function WorkshopAttendanceManager({ isOpen, onClose, workshop })
                 onClick={() => handleVerify(studentToReject, 'REJECTED', rejectReason)}
                 className="bg-rose-500 text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-rose-600 active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                Xác nhận từ chối
+                Confirm Rejection
               </button>
             </div>
           </div>

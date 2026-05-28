@@ -96,9 +96,8 @@ const WorkshopList = ({ workshops, onEdit, onDelete, onCheckIn, onManageAttendan
                     </span>
                   )}
                   {isStudent && studentMode && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
-                      studentMode === 'ONLINE' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
-                    }`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${studentMode === 'ONLINE' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                      }`}>
                       {studentMode === 'ONLINE' ? <Monitor size={10} /> : <Globe size={10} />}
                       {studentMode}
                     </span>
@@ -224,7 +223,7 @@ const WorkshopList = ({ workshops, onEdit, onDelete, onCheckIn, onManageAttendan
                       onClick={() => onManageAttendance(ws)}
                       className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 active:scale-[0.98] rounded-xl text-xs font-bold text-white shadow-sm transition-all"
                     >
-                      <span>Quản lý điểm danh</span>
+                      <span>Attendance Management</span>
                     </button>
                   )}
                 </div>
