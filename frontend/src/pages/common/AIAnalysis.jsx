@@ -108,7 +108,7 @@ const AIAnalysis = () => {
   const handleAnalyze = async (e) => {
     e?.preventDefault();
     if (!formData.startup_name || !formData.problem || !formData.solution) {
-      toast.error('Vui lòng điền đủ tên, vấn đề và giải pháp');
+      toast.error('Please fill in the startup name, problem, and solution.');
       return;
     }
     setAnalyzing(true);
@@ -117,13 +117,13 @@ const AIAnalysis = () => {
       const res = await aiApi.analyzeStartup(formData);
       setAnalysis(res.data);
       if (res.data?.overall_score === 50 && res.data?.ai_feedback?.includes("phản hồi dự phòng")) {
-        toast.error('AI đang dùng phản hồi dự phòng. Vui lòng kiểm tra Gemini API key hoặc thử lại sau.', { duration: 5000 });
+        toast.error('AI is using a fallback response. Please check your Gemini API key or try again later.', { duration: 5000 });
       } else {
         toast.success('AI Analysis complete!');
       }
     } catch (err) {
       if (err.response?.status === 401 || err.response?.status === 403) {
-        toast.error('Phiên đăng nhập đã hết hạn hoặc bạn chưa có quyền sử dụng AI.');
+        toast.error('Your session has expired or you do not have permission to use AI.');
       } else {
         toast.error(err.response?.data?.error || err.message || 'Analysis failed');
       }
@@ -135,7 +135,7 @@ const AIAnalysis = () => {
   const handleSuggest = async (e) => {
     e?.preventDefault();
     if (!formData.startup_name) {
-      toast.error('Vui lòng nhập Tên Startup bên tab Analysis trước');
+      toast.error('Please enter the Startup Name in the Analysis tab first.');
       setActiveTab('analysis');
       return;
     }
@@ -144,12 +144,12 @@ const AIAnalysis = () => {
     try {
       const currentProp = `Problem: ${formData.problem || ''}. Solution: ${formData.solution || ''}. Customer: ${formData.target_customer || ''}`;
       if (!formData.problem && !formData.solution) {
-        toast.error('Vui lòng điền thông tin Vấn đề/Giải pháp ở tab Analysis trước để có suggestion chất lượng nhất');
+        toast.error('Please fill in the Problem/Solution in the Analysis tab first for best suggestion quality.');
       }
       
       const payload = {
         startup_name: formData.startup_name,
-        current_proposal: currentProp.trim().length > 20 ? currentProp : "Đang phát triển ý tưởng khởi nghiệp mới",
+        current_proposal: currentProp.trim().length > 20 ? currentProp : "Developing a new startup idea",
         stage: suggestData.stage,
         focus_area: suggestData.focus_area
       };
@@ -162,7 +162,7 @@ const AIAnalysis = () => {
       }
     } catch (err) {
       if (err.response?.status === 401 || err.response?.status === 403) {
-        toast.error('Phiên đăng nhập đã hết hạn.');
+        toast.error('Your session has expired.');
       } else {
         toast.error(err.response?.data?.error || err.message || 'Suggestion failed');
       }
@@ -239,32 +239,32 @@ const AIAnalysis = () => {
             {activeTab === 'analysis' ? (
               <form onSubmit={handleAnalyze} className="space-y-4 flex flex-col h-full">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Tên Startup *</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Startup Name *</label>
                   <input required name="startup_name" value={formData.startup_name} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. EduTrack" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Vấn đề (Problem) *</label>
-                  <textarea required rows={2} name="problem" value={formData.problem} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="Mô tả nỗi đau của khách hàng..." />
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Problem *</label>
+                  <textarea required rows={2} name="problem" value={formData.problem} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="Describe the customer pain point..." />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Giải pháp (Solution) *</label>
-                  <textarea required rows={2} name="solution" value={formData.solution} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="Sản phẩm của bạn giải quyết vấn đề thế nào..." />
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Solution *</label>
+                  <textarea required rows={2} name="solution" value={formData.solution} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="How does your product solve the problem..." />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Khách hàng mục tiêu *</label>
-                  <input required name="target_customer" value={formData.target_customer} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. Sinh viên 18-24 tuổi" />
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Target Customer *</label>
+                  <input required name="target_customer" value={formData.target_customer} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. Students aged 18-24" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Mô hình kinh doanh</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Business Model</label>
                   <input name="business_model" value={formData.business_model} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. B2B SaaS, Freemium" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Công nghệ</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Technology</label>
                   <input name="technology" value={formData.technology} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. React Native, AI, Blockchain" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Thị trường</label>
-                  <input name="market" value={formData.market} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. EdTech Việt Nam" />
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Market</label>
+                  <input name="market" value={formData.market} onChange={handleChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#034EA2] focus:border-[#034EA2]" placeholder="e.g. EdTech Vietnam" />
                 </div>
                 
                 <div className="pt-4 mt-auto">
@@ -276,25 +276,25 @@ const AIAnalysis = () => {
             ) : (
               <form onSubmit={handleSuggest} className="space-y-4 flex flex-col h-full">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Tên Startup</label>
-                  <input disabled value={formData.startup_name || '(Trống - vui lòng nhập ở tab Analysis)'} className="w-full text-sm border-slate-200 bg-slate-50 rounded-lg text-slate-500" />
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Startup Name</label>
+                  <input disabled value={formData.startup_name || '(Empty — please enter in the Analysis tab)'} className="w-full text-sm border-slate-200 bg-slate-50 rounded-lg text-slate-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Giai đoạn hiện tại (Stage) *</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Current Stage *</label>
                   <select required name="stage" value={suggestData.stage} onChange={handleSuggestChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#F37021] focus:border-[#F37021]">
-                    <option value="Idea">Idea (Mới có ý tưởng)</option>
-                    <option value="Prototype">Prototype (Đang làm bản nháp)</option>
-                    <option value="MVP">MVP (Đã có sản phẩm mẫu)</option>
-                    <option value="Growth">Growth (Đang tìm kiếm khách hàng)</option>
+                    <option value="Idea">Idea (Just an idea)</option>
+                    <option value="Prototype">Prototype (Building a draft)</option>
+                    <option value="MVP">MVP (Have a sample product)</option>
+                    <option value="Growth">Growth (Finding customers)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Khu vực tập trung (Focus Area) *</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Focus Area *</label>
                   <select required name="focus_area" value={suggestData.focus_area} onChange={handleSuggestChange} className="w-full text-sm border-slate-200 rounded-lg focus:ring-[#F37021] focus:border-[#F37021]">
-                    <option value="General">General (Tổng quan)</option>
-                    <option value="Product">Product (Sản phẩm / Tính năng)</option>
-                    <option value="Market">Market (Thị trường / Khách hàng)</option>
-                    <option value="Tech">Tech (Công nghệ / Kiến trúc)</option>
+                    <option value="General">General (Overview)</option>
+                    <option value="Product">Product (Features)</option>
+                    <option value="Market">Market (Customers)</option>
+                    <option value="Tech">Tech (Technology / Architecture)</option>
                   </select>
                 </div>
                 <div className="pt-4 mt-auto">
@@ -334,7 +334,7 @@ const AIAnalysis = () => {
                    {analysis.overall_score === 50 && analysis.ai_feedback?.includes("phản hồi dự phòng") && (
                      <div className="mb-2 bg-orange-100 text-orange-800 text-xs px-3 py-1.5 rounded-md flex items-center gap-1.5 font-medium border border-orange-200">
                        <AlertTriangle className="w-3.5 h-3.5" />
-                       AI đang dùng phản hồi dự phòng.
+                       AI is using a fallback response.
                      </div>
                    )}
                    <p className="text-slate-500 text-sm">Risk Level: <span className={`font-bold ${analysis.risk_level === 'Low' ? 'text-[#51B848]' : analysis.risk_level === 'High' ? 'text-red-500' : 'text-[#F37021]'}`}>{analysis.risk_level || 'Unknown'}</span></p>
@@ -441,10 +441,10 @@ const AIAnalysis = () => {
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 {/* Fallback Warning */}
-                {suggestion.suggestions?.[0]?.current_issue?.includes("dự phòng") && (
+                {suggestion.suggestions?.[0]?.current_issue?.includes("fallback") && (
                    <div className="bg-orange-100 text-orange-800 text-sm px-4 py-3 rounded-xl flex items-center gap-2 font-medium border border-orange-200 shadow-sm">
                      <AlertTriangle className="w-5 h-5 shrink-0" />
-                     AI đang dùng phản hồi dự phòng. Vui lòng kiểm tra cấu hình Gemini API.
+                      AI is using a fallback response. Please check your Gemini API configuration.
                    </div>
                 )}
                 

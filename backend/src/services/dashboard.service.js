@@ -41,14 +41,14 @@ const getAdminDashboard = async () => {
   const { getGlobalRankings } = require('./ranking.service');
   const allRanked = await getGlobalRankings();
   const topTeams = allRanked.slice(0, 10).map(r => ({
-    startupName: r?.startupName || r?.team?.name || '—',
+    startupName: r?.startupName || r?.teamName || '—',
     team: {
-      _id: r?.team?._id || null,
-      name: r?.team?.name || null,
-      classId: r?.team?.class || null,
+      _id: r?.teamId || null,
+      name: r?.teamName || null,
+      classId: { classCode: r?.className || '—' },
     },
     avgScore: r.finalScore || 0,
-    evaluationCount: r.evalCount || 0,
+    evaluationCount: 0,
   }));
 
   const overallTaskProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;

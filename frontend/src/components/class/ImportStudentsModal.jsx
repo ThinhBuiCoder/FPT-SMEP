@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { X, Upload, FileSpreadsheet, Download, CheckCircle2, AlertCircle, Loader2, Info } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 
-const TEMPLATE_HEADERS = 'RollNumber,Fullname,Chuyên ngành,SubjectCode,Email\n';
+const TEMPLATE_HEADERS = 'RollNumber,Fullname,Major,SubjectCode,Email\n';
 const TEMPLATE_ROW     = 'SE170001,Nguyen Van An,BIT_SE,EXE101,an.nguyen@fpt.edu.vn\n';
 
 const downloadTemplate = () => {
@@ -75,7 +75,7 @@ export default function ImportStudentsModal({ classId, onClose, onImported }) {
               <FileSpreadsheet className="w-5 h-5 text-secondary" />
               <div>
                 <p className="text-sm font-medium text-secondary">Download Template</p>
-                <p className="text-xs text-slate-400">Columns: RollNumber, Fullname, Chuyên ngành, SubjectCode, Email</p>
+                <p className="text-xs text-slate-400">Columns: RollNumber, Fullname, Major, SubjectCode, Email</p>
               </div>
             </div>
             <button
@@ -90,7 +90,7 @@ export default function ImportStudentsModal({ classId, onClose, onImported }) {
           <div className="flex items-start gap-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
             <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
             <p className="text-xs text-blue-700">
-              <strong>Major will be imported from the 'Chuyên ngành' column.</strong>
+              <strong>Major will be imported from the 'Major' column.</strong>
             </p>
           </div>
 

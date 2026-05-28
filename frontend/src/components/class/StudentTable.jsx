@@ -79,7 +79,7 @@ export default function StudentTable({ students: rawStudents, teams: rawTeams, c
     onSelectionChange(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
       if (prev.length >= 6) {
-        toast.error('Chỉ được chọn tối đa 6 sinh viên cho một nhóm.');
+        toast.error('You can only select up to 6 students per team.');
         return prev;
       }
       return [...prev, id];
@@ -96,11 +96,11 @@ export default function StudentTable({ students: rawStudents, teams: rawTeams, c
         const newIds = unassigned.filter(id => !prev.includes(id));
         const allowedToAdd = 6 - prev.length;
         if (allowedToAdd <= 0) {
-          toast.error('Đã đạt tối đa 6 sinh viên.');
+          toast.error('Maximum of 6 students reached.');
           return prev;
         }
         if (newIds.length > allowedToAdd) {
-          toast.error(`Chỉ chọn thêm ${allowedToAdd} sinh viên để đạt tối đa 6.`);
+          toast.error(`You can only add ${allowedToAdd} more students to reach the maximum of 6.`);
           return [...prev, ...newIds.slice(0, allowedToAdd)];
         }
         return [...prev, ...newIds];
