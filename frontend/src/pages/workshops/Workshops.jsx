@@ -16,6 +16,23 @@ const Workshops = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('ALL'); // ALL, UPCOMING, PAST
+  const [filterSem, setFilterSem] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+
+  const SEMESTERS = ['SP', 'SU', 'FA'];
+  const CURRENT_YEAR = new Date().getFullYear();
+  const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 1 + i);
+
+  const getSemesterFromDate = (date) => {
+    const d = new Date(date);
+    const month = d.getMonth() + 1;
+    if (month >= 1 && month <= 4) return 'SP';
+    if (month >= 5 && month <= 8) return 'SU';
+    return 'FA';
+  };
+  const getYearFromDate = (date) => {
+    return new Date(date).getFullYear().toString();
+  };
 
   // Modal State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -83,6 +100,9 @@ const Workshops = () => {
       ws.description?.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
+    if (filterSem && getSemesterFromDate(ws.startDate) !== filterSem) return false;
+    if (filterYear && getYearFromDate(ws.startDate) !== filterYear) return false;
+
     if (filter === 'UPCOMING') {
       return new Date(ws.startDate) >= now.setHours(0, 0, 0, 0);
     }
@@ -119,8 +139,8 @@ const Workshops = () => {
       </motion.div>
 
       {/* Toolbar */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col sm:flex-row gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60">
-        <div className="flex-1 relative group">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col sm:flex-row gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60 flex-wrap">
+        <div className="flex-1 relative group min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
@@ -130,6 +150,24 @@ const Workshops = () => {
             placeholder="Search events by title or description..."
           />
         </div>
+
+        <select
+          value={filterSem}
+          onChange={(e) => setFilterSem(e.target.value)}
+          className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shrink-0"
+        >
+          <option value="">All Semesters</option>
+          {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <select
+          value={filterYear}
+          onChange={(e) => setFilterYear(e.target.value)}
+          className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shrink-0"
+        >
+          <option value="">All Years</option>
+          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
         <div className="flex gap-2 p-1 bg-slate-50 border border-slate-100 rounded-xl overflow-x-auto hide-scrollbar">
           {['ALL', 'UPCOMING', 'PAST'].map(f => (
             <button

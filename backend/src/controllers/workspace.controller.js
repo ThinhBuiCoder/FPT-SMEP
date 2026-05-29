@@ -12,24 +12,8 @@ const PitchDeck = require("../models/PitchDeck");
 const CheckpointSubmission = require("../models/CheckpointSubmission");
 const workspacePerm = require("../utils/workspacePermission");
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, "../../../uploads/pitch-decks");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const teamId = req.params.teamId || "unknown";
-    const timestamp = Date.now();
-    const cleanOriginalName = file.originalname.replace(/[^a-zA-Z0-9.]/g, "_");
-    cb(null, `${teamId}_${timestamp}_${cleanOriginalName}`);
-  }
-});
+// Use memory storage for Cloudinary
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowedExtensions = [".pdf", ".ppt", ".pptx"];
@@ -52,6 +36,8 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: fileFilter
 }).single("file");
+
+const { uploadToCloudinary } = require('../services/cloudinary.service');
 
 // Helpers for responses
 const successResponse = (res, data, message = "") => {
@@ -530,10 +516,11 @@ exports.uploadPitchDeck = (req, res) => {
 
       const team = await Team.findById(teamId);
       if (!team) {
-        // Cleanup uploaded file if team error
-        fs.unlinkSync(req.file.path);
         return errorResponse(res, "Team not found.", 404);
       }
+
+      // Upload to Cloudinary
+      const result = await uploadToCloudinary(req.file.buffer, 'fpt_smep/pitch_decks');
 
       const proposal = await Proposal.findOne({ teamId });
 
@@ -548,10 +535,10 @@ exports.uploadPitchDeck = (req, res) => {
         teamId,
         classId: team.classId,
         proposalId: proposal ? proposal._id : null,
-        fileName: req.file.filename,
+        fileName: req.file.originalname,
         originalName: req.file.originalname,
-        fileUrl: `/uploads/pitch-decks/${req.file.filename}`,
-        filePath: req.file.path,
+        fileUrl: result.secure_url,
+        publicId: result.public_id,
         fileType: path.extname(req.file.originalname).substring(1).toLowerCase(),
         mimeType: req.file.mimetype,
         fileSize: req.file.size,
@@ -563,14 +550,10 @@ exports.uploadPitchDeck = (req, res) => {
       const savedDeck = await newDeck.save();
       return successResponse(res, savedDeck, "Pitch deck uploaded successfully");
     } catch (dbErr) {
-      // Cleanup uploaded file if db errors out
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       if (dbErr.statusCode === 403) {
         return errorResponse(res, dbErr.message, 403);
       }
-      return errorResponse(res, "Database error: " + dbErr.message);
+      return errorResponse(res, "Upload/Database error: " + dbErr.message);
     }
   });
 };
@@ -605,11 +588,12 @@ exports.downloadPitchDeck = async (req, res) => {
 
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, deck.teamId);
 
-    if (!fs.existsSync(deck.filePath)) {
-      return errorResponse(res, "File not found on server.", 404);
+    if (!deck.fileUrl) {
+      return errorResponse(res, "File not found.", 404);
     }
 
-    return res.download(deck.filePath, deck.originalName);
+    // Since it's on Cloudinary, we should ideally redirect to the URL or provide it
+    return res.redirect(deck.fileUrl);
   } catch (err) {
     if (err.statusCode === 403) {
       return errorResponse(res, err.message, 403);

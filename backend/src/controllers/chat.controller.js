@@ -168,33 +168,11 @@ const updateMemberNickname = async (req, res) => {
   }
 };
 
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
-
-// Configure multer disk storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-}).single('file');
+const { uploadToCloudinary } = require('../services/cloudinary.service');
+const uploadMiddleware = require('../middlewares/upload.middleware');
 
 const uploadChatFile = (req, res) => {
-  upload(req, res, (err) => {
+  uploadMiddleware.single('file')(req, res, async (err) => {
     if (err) {
       console.error('File upload error:', err);
       return errorResponse(res, err.message || 'File upload failed.', 400);
@@ -204,21 +182,26 @@ const uploadChatFile = (req, res) => {
       return errorResponse(res, 'No file uploaded.', 400);
     }
 
-    // Determine type
-    let fileType = 'file';
-    if (req.file.mimetype.startsWith('image/')) {
-      fileType = 'image';
+    try {
+      // Upload to Cloudinary instead of disk
+      const result = await uploadToCloudinary(req.file.buffer, 'fpt_smep/chat_files');
+
+      // Determine type
+      let fileType = 'file';
+      if (req.file.mimetype.startsWith('image/')) {
+        fileType = 'image';
+      }
+
+      return successResponse(res, {
+        url: result.secure_url,
+        name: req.file.originalname,
+        fileType,
+        publicId: result.public_id,
+      }, 'File uploaded successfully.');
+    } catch (uploadErr) {
+      console.error('Cloudinary upload error:', uploadErr);
+      return errorResponse(res, 'Cloudinary upload failed.', 500);
     }
-
-    const host = req.get('host');
-    const protocol = req.protocol;
-    const url = `${protocol}://${host}/uploads/${req.file.filename}`;
-
-    return successResponse(res, {
-      url,
-      name: req.file.originalname,
-      fileType
-    }, 'File uploaded successfully.');
   });
 };
 
