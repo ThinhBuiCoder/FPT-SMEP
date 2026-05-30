@@ -3,7 +3,6 @@ const WeeklyTask = require('../models/WeeklyTask');
 const Team = require('../models/Team');
 const Class = require('../models/Class');
 const Student = require('../models/Student');
-const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
 // ── Role Authorization Helpers ───────────────────────────
@@ -68,6 +67,8 @@ const normalizeDateOnly = (date) => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const computeTaskStatus = (task, today) => {
   const baseStatus =
@@ -253,23 +254,29 @@ const getTeamTaskBoard = async (req, res) => {
         return errorResponse(res, 'Invalid status filter.', 400);
       }
     }
-    if (search) {
-      query.title = { $regex: search, $options: 'i' };
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      const safeSearch = escapeRegex(trimmedSearch);
+      query.$or = [
+        { title: { $regex: safeSearch, $options: 'i' } },
+        { description: { $regex: safeSearch, $options: 'i' } },
+        { tags: { $regex: safeSearch, $options: 'i' } },
+      ];
     }
 
     const tasks = await WeeklyTask.find(query)
+      .select('title description taskType scope weekNumber courseCode classId teamId assigneeStudentId createdBy status priority startDate dueDate checklist tags completionPercentage estimatedHours createdAt updatedAt')
       .populate('assigneeStudentId', 'fullName rollNumber email')
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 });
+      .populate('createdBy', 'name email avatar')
+      .sort({ createdAt: -1 })
+      .lean();
 
     const today = normalizeDateOnly(new Date());
 
     const mappedTasks = tasks.map(task => {
-      const taskObj = task.toObject();
-      const computedStatus = computeTaskStatus(taskObj, today);
-      
+      const computedStatus = computeTaskStatus(task, today);
       return {
-        ...taskObj,
+        ...task,
         computedStatus
       };
     });

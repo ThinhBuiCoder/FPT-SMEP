@@ -6,6 +6,8 @@ import { workshopApi } from '../../api/workshopApi';
 import { useAuth } from '../../hooks/useAuth';
 import WorkshopList from '../../components/workspace/WorkshopList';
 import WorkshopForm from '../../components/workspace/WorkshopForm';
+import WorkshopCheckInModal from '../../components/workspace/WorkshopCheckInModal';
+import WorkshopAttendanceManager from '../../components/workspace/WorkshopAttendanceManager';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 
 const Workshops = () => {
@@ -14,10 +16,32 @@ const Workshops = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('ALL'); // ALL, UPCOMING, PAST
+  const [filterSem, setFilterSem] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+
+  const SEMESTERS = ['SP', 'SU', 'FA'];
+  const CURRENT_YEAR = new Date().getFullYear();
+  const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 1 + i);
+
+  const getSemesterFromDate = (date) => {
+    const d = new Date(date);
+    const month = d.getMonth() + 1;
+    if (month >= 1 && month <= 4) return 'SP';
+    if (month >= 5 && month <= 8) return 'SU';
+    return 'FA';
+  };
+  const getYearFromDate = (date) => {
+    return new Date(date).getFullYear().toString();
+  };
 
   // Modal State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
+
+  // Check-in and Attendance State
+  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+  const [isAttendanceManagerOpen, setIsAttendanceManagerOpen] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
 
   const canCreate = user?.role === 'ADMIN' || user?.role === 'LECTURER';
 
@@ -59,18 +83,31 @@ const Workshops = () => {
     setIsFormOpen(true);
   };
 
+  const handleCheckIn = (workshop) => {
+    setSelectedWorkshop(workshop);
+    setIsCheckInOpen(true);
+  };
+
+  const handleManageAttendance = (workshop) => {
+    setSelectedWorkshop(workshop);
+    setIsAttendanceManagerOpen(true);
+  };
+
   // Filter and Search Logic
   const now = new Date();
   const filteredWorkshops = workshops.filter(ws => {
-    const matchesSearch = ws.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          ws.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = ws.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ws.description?.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
+    if (filterSem && getSemesterFromDate(ws.startDate) !== filterSem) return false;
+    if (filterYear && getYearFromDate(ws.startDate) !== filterYear) return false;
+
     if (filter === 'UPCOMING') {
-      return new Date(ws.startDate) >= now.setHours(0,0,0,0);
+      return new Date(ws.startDate) >= now.setHours(0, 0, 0, 0);
     }
     if (filter === 'PAST') {
-      return new Date(ws.startDate) < now.setHours(0,0,0,0);
+      return new Date(ws.startDate) < now.setHours(0, 0, 0, 0);
     }
     return true;
   });
@@ -102,8 +139,8 @@ const Workshops = () => {
       </motion.div>
 
       {/* Toolbar */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col sm:flex-row gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60">
-        <div className="flex-1 relative group">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col sm:flex-row gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60 flex-wrap">
+        <div className="flex-1 relative group min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
@@ -113,16 +150,33 @@ const Workshops = () => {
             placeholder="Search events by title or description..."
           />
         </div>
+
+        <select
+          value={filterSem}
+          onChange={(e) => setFilterSem(e.target.value)}
+          className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shrink-0"
+        >
+          <option value="">All Semesters</option>
+          {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <select
+          value={filterYear}
+          onChange={(e) => setFilterYear(e.target.value)}
+          className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all shrink-0"
+        >
+          <option value="">All Years</option>
+          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
         <div className="flex gap-2 p-1 bg-slate-50 border border-slate-100 rounded-xl overflow-x-auto hide-scrollbar">
           {['ALL', 'UPCOMING', 'PAST'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                filter === f
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${filter === f
                   ? 'bg-white text-primary shadow-sm border border-slate-200/50'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               {f === 'ALL' ? 'All Events' : f === 'UPCOMING' ? 'Upcoming' : 'Past'}
             </button>
@@ -143,6 +197,8 @@ const Workshops = () => {
             workshops={filteredWorkshops}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onCheckIn={handleCheckIn}
+            onManageAttendance={handleManageAttendance}
           />
         )}
       </motion.div>
@@ -153,6 +209,27 @@ const Workshops = () => {
         onClose={() => setIsFormOpen(false)}
         workshop={editingWorkshop}
         onSave={fetchWorkshops}
+      />
+
+      {/* Check-In Modal */}
+      <WorkshopCheckInModal
+        isOpen={isCheckInOpen}
+        onClose={() => {
+          setIsCheckInOpen(false);
+          setSelectedWorkshop(null);
+        }}
+        workshop={selectedWorkshop}
+        onCheckInSuccess={fetchWorkshops}
+      />
+
+      {/* Attendance Manager Modal */}
+      <WorkshopAttendanceManager
+        isOpen={isAttendanceManagerOpen}
+        onClose={() => {
+          setIsAttendanceManagerOpen(false);
+          setSelectedWorkshop(null);
+        }}
+        workshop={selectedWorkshop}
       />
     </div>
   );

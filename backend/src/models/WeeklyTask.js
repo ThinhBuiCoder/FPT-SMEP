@@ -169,5 +169,9 @@ weeklyTaskSchema.index({ taskType: 1, courseCode: 1, weekNumber: 1 });
 weeklyTaskSchema.index({ taskType: 1, classId: 1, weekNumber: 1 });
 weeklyTaskSchema.index({ taskType: 1, teamId: 1, weekNumber: 1 });
 weeklyTaskSchema.index({ teamId: 1, assigneeStudentId: 1, status: 1 });
+weeklyTaskSchema.index({ teamId: 1, taskType: 1, priority: 1, weekNumber: 1, createdAt: -1 });
+weeklyTaskSchema.index({ teamId: 1, taskType: 1, assigneeStudentId: 1, createdAt: -1 });
+weeklyTaskSchema.index({ teamId: 1, taskType: 1, dueDate: 1, status: 1 });
+weeklyTaskSchema.index({ title: 'text', description: 'text' });
 
 module.exports = mongoose.model('WeeklyTask', weeklyTaskSchema);

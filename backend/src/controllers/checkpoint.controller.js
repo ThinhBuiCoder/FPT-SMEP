@@ -152,6 +152,31 @@ exports.getCheckpointData = async (req, res) => {
   }
 };
 
+// ─── GET /api/workspace/checkpoints/teams/:teamId/history ────────────────────
+exports.getFeedbackHistory = async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { checkpointNumber } = req.query;
+
+    await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
+
+    const query = { teamId };
+    if (checkpointNumber) {
+      query.checkpointNumber = parseInt(checkpointNumber, 10);
+    }
+
+    const feedbacks = await CheckpointFeedback.find(query)
+      .populate('user', 'name email avatar role')
+      .sort({ createdAt: 1 });
+
+    return ok(res, { feedbacks }, 'Feedback history loaded');
+  } catch (e) {
+    if (e.statusCode === 403) return err(res, e.message, 403);
+    console.error('getFeedbackHistory:', e);
+    return err(res, 'Server error: ' + e.message);
+  }
+};
+
 // ─── POST .../upload ───────────────────────────────────────────────────────────
 exports.uploadCheckpointFile = (req, res) => {
   const role = req.user?.role?.toUpperCase();

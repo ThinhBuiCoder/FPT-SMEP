@@ -24,8 +24,8 @@ const formatBytes = (bytes) => {
 };
 
 const FILE_TYPE_STYLES = {
-  pdf:  { bg: 'bg-red-50',    text: 'text-red-600',    label: 'PDF' },
-  docx: { bg: 'bg-blue-50',   text: 'text-blue-600',   label: 'DOCX' },
+  pdf: { bg: 'bg-red-50', text: 'text-red-600', label: 'PDF' },
+  docx: { bg: 'bg-blue-50', text: 'text-blue-600', label: 'DOCX' },
   pptx: { bg: 'bg-orange-50', text: 'text-orange-600', label: 'PPTX' },
 };
 
@@ -274,25 +274,22 @@ export default function CheckpointPanel({
                 return (
                   <div
                     key={i}
-                    className={`rounded-xl border bg-white transition-colors ${
-                      filled
+                    className={`rounded-xl border bg-white transition-colors ${filled
                         ? 'border-primary-200 shadow-sm'
                         : 'border-slate-200/80'
-                    }`}
+                      }`}
                   >
                     <div
-                      className={`flex items-center gap-2 px-3 py-2 border-b text-xs font-bold uppercase tracking-wide ${
-                        filled
+                      className={`flex items-center gap-2 px-3 py-2 border-b text-xs font-bold uppercase tracking-wide ${filled
                           ? 'bg-primary-50/80 border-primary-100 text-primary-800'
                           : 'bg-slate-50 border-slate-100 text-slate-500'
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] ${
-                          filled
+                        className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] ${filled
                             ? 'bg-primary text-white'
                             : 'bg-slate-200 text-slate-600'
-                        }`}
+                          }`}
                       >
                         {i + 1}
                       </span>
@@ -328,20 +325,37 @@ export default function CheckpointPanel({
               })}
 
               {checkpoint.rubrics?.length > 0 && (
-                <div className="pt-2 space-y-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
-                    Evaluation rubric
-                  </p>
-                  {checkpoint.rubrics.map((r, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2 p-3 rounded-xl bg-amber-50/60 border border-amber-100/80 text-sm text-slate-700"
-                    >
-                      <Award className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      {r}
-                    </div>
-                  ))}
-                </div>
+                <section className="space-y-3">
+                  <SectionTitle icon={Award}>Evaluation rubric</SectionTitle>
+                  <ul className="space-y-2">
+                    {checkpoint.rubrics.map((r, i) => (
+                      <li
+                        key={i}
+                        className="p-3 rounded-xl bg-amber-50/80 border border-amber-100 text-sm text-slate-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          <Award className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
+                              <span>{r.label}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-amber-700 border border-amber-200">{r.weight}%</span>
+                            </div>
+                            {r.description && <p className="text-xs text-slate-600 mt-1">{r.description}</p>}
+                            {Array.isArray(r.levels) && r.levels.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                                {r.levels.map((level) => (
+                                  <span key={level.key} className="px-2 py-1 rounded-full bg-white border border-slate-200">
+                                    {level.label} {level.range}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
             </div>
 

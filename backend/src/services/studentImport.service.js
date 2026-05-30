@@ -4,6 +4,7 @@
 const XLSX = require('xlsx');
 const Student = require('../models/Student');
 const User    = require('../models/User');
+const Class   = require('../models/Class');
 const { getProgramGroupFromMajor } = require('../constants/majors');
 
 // ─── Excel Parsing ─────────────────────────────────────────────────────────────
@@ -15,6 +16,15 @@ const REQUIRED_COLS = ['rollnumber', 'fullname', 'email'];
 const normalizeHeader = (h) => {
   const normalized = String(h).trim().toLowerCase().replace(/\s+/g, '');
   if (['chuyênngành', 'chuyennganh', 'major'].includes(normalized)) return 'major';
+  // Outcome columns: "Outcome 1" → "outcome1", "Outcome 1_Comment" → "outcome1_comment"
+  const outcomeMatch = normalized.match(/^outcome(\d+)_?comment$/);
+  if (outcomeMatch) return `outcome${outcomeMatch[1]}_comment`;
+  const outcomeNumMatch = normalized.match(/^outcome(\d+)$/);
+  if (outcomeNumMatch) return `outcome${outcomeNumMatch[1]}`;
+  if (normalized === 'examdate')  return 'examdate';
+  if (normalized === 'examnote')  return 'examnote';
+  if (normalized === 'membercode') return 'membercode';
+  if (normalized === 'class')     return 'class'; // read but ignored
   return normalized;
 };
 
@@ -115,17 +125,43 @@ const importStudents = async (buffer, classId) => {
     return { totalRows, successCount, failedCount: 0, errors, imported };
   }
 
-  // --- Pre-fetch existing students for this class ---
-  const existingStudents = await Student.find({ classId });
-  const rollMap = new Map();
-  const emailMap = new Map();
-  for (const s of existingStudents) {
-    rollMap.set(s.rollNumber.toUpperCase(), s);
-    emailMap.set(s.email.toLowerCase(), s);
+  // --- Find Target Class & Same Semester Classes ---
+  const targetClass = await Class.findById(classId);
+  if (!targetClass) {
+    throw new Error('Target class not found');
+  }
+
+  const sameSemesterClasses = await Class.find({
+    semester: targetClass.semester,
+    year: targetClass.year
+  }).select('_id classCode');
+  
+  const sameSemesterClassIds = sameSemesterClasses.map(c => c._id);
+
+  const incomingEmails = rows.map(r => r.email ? String(r.email).toLowerCase() : '').filter(Boolean);
+  const incomingRolls = rows.map(r => r.rollnumber ? String(r.rollnumber).trim().toUpperCase() : '').filter(Boolean);
+
+  // --- Pre-fetch existing students in SAME SEMESTER matching incoming data ---
+  let existingStudentsInSemester = [];
+  if (incomingEmails.length > 0 || incomingRolls.length > 0) {
+    const orConditions = [];
+    if (incomingEmails.length > 0) orConditions.push({ email: { $in: incomingEmails } });
+    if (incomingRolls.length > 0) orConditions.push({ rollNumber: { $in: incomingRolls } });
+
+    existingStudentsInSemester = await Student.find({
+      classId: { $in: sameSemesterClassIds },
+      $or: orConditions
+    }).populate('classId', 'classCode');
+  }
+
+  const sameSemesterRollMap = new Map();
+  const sameSemesterEmailMap = new Map();
+  for (const s of existingStudentsInSemester) {
+    sameSemesterRollMap.set(s.rollNumber.toUpperCase(), s);
+    sameSemesterEmailMap.set(s.email.toLowerCase(), s);
   }
 
   // --- Pre-fetch Users matching incoming emails ---
-  const incomingEmails = rows.map(r => r.email ? String(r.email).toLowerCase() : '').filter(Boolean);
   const existingUsers = await User.find({ email: { $in: incomingEmails } });
   const userMap = new Map();
   for (const u of existingUsers) {
@@ -165,39 +201,49 @@ const importStudents = async (buffer, classId) => {
       programGroup = existingUser.programGroup;
     }
 
-    // Check duplicate rollNumber within this class
-    const existsByRoll = rollMap.get(rollUpper);
-    if (existsByRoll) {
-      // Update major/programGroup if it changed or was missing
-      if (existsByRoll.major !== major || existsByRoll.programGroup !== programGroup) {
-        updatesToExecute.push({
-          updateOne: {
-            filter: { _id: existsByRoll._id },
-            update: { $set: { major, programGroup } }
-          }
-        });
-        existsByRoll.major = major; // update local cache
-        existsByRoll.programGroup = programGroup;
+    // Check duplicate rollNumber in same semester
+    const enrolledByRoll = sameSemesterRollMap.get(rollUpper);
+    if (enrolledByRoll) {
+      if (enrolledByRoll.classId._id.toString() === classId.toString()) {
+        // Exists in THIS class
+        if (enrolledByRoll.major !== major || enrolledByRoll.programGroup !== programGroup) {
+          updatesToExecute.push({
+            updateOne: {
+              filter: { _id: enrolledByRoll._id },
+              update: { $set: { major, programGroup } }
+            }
+          });
+          enrolledByRoll.major = major; // update local cache
+          enrolledByRoll.programGroup = programGroup;
+        }
+        errors.push({ row: rowNum, reason: `RollNumber "${rollUpper}" already exists in this class (major updated to ${major})` });
+      } else {
+        // Exists in ANOTHER class in the SAME semester
+        errors.push({ row: rowNum, reason: `RollNumber "${rollUpper}" is already enrolled in class ${enrolledByRoll.classId.classCode} in the same semester` });
       }
-      errors.push({ row: rowNum, reason: `RollNumber "${rollUpper}" already exists in this class (major updated to ${major})` });
       continue;
     }
 
-    // Check duplicate email within this class
-    const existsByEmail = emailMap.get(emailLower);
-    if (existsByEmail) {
-      // Update major/programGroup if needed
-      if (existsByEmail.major !== major || existsByEmail.programGroup !== programGroup) {
-        updatesToExecute.push({
-          updateOne: {
-            filter: { _id: existsByEmail._id },
-            update: { $set: { major, programGroup } }
-          }
-        });
-        existsByEmail.major = major; // update local cache
-        existsByEmail.programGroup = programGroup;
+    // Check duplicate email in same semester
+    const enrolledByEmail = sameSemesterEmailMap.get(emailLower);
+    if (enrolledByEmail) {
+      if (enrolledByEmail.classId._id.toString() === classId.toString()) {
+        // Exists in THIS class
+        if (enrolledByEmail.major !== major || enrolledByEmail.programGroup !== programGroup) {
+          updatesToExecute.push({
+            updateOne: {
+              filter: { _id: enrolledByEmail._id },
+              update: { $set: { major, programGroup } }
+            }
+          });
+          enrolledByEmail.major = major; // update local cache
+          enrolledByEmail.programGroup = programGroup;
+        }
+        errors.push({ row: rowNum, reason: `Email "${emailLower}" already exists in this class (major updated to ${major})` });
+      } else {
+        // Exists in ANOTHER class in the SAME semester
+        errors.push({ row: rowNum, reason: `Email "${emailLower}" is already enrolled in class ${enrolledByEmail.classId.classCode} in the same semester` });
       }
-      errors.push({ row: rowNum, reason: `Email "${emailLower}" already exists in this class (major updated to ${major})` });
       continue;
     }
 
@@ -219,6 +265,13 @@ const importStudents = async (buffer, classId) => {
       avatarUrl = existingUser.avatar || null;
     }
 
+    // Parse examDate (support formats like MM/DD/YYYY or YYYY-MM-DD)
+    let examDate = null;
+    if (row.examdate) {
+      const parsed = new Date(row.examdate);
+      if (!isNaN(parsed.getTime())) examDate = parsed;
+    }
+
     // Build student document
     const studentData = {
       rollNumber: rollUpper,
@@ -234,6 +287,15 @@ const importStudents = async (buffer, classId) => {
       classId,
       userId:    linkedUserId,
       avatarUrl,
+      // Exam & Outcome fields
+      examDate,
+      examNote:        row.examnote        || null,
+      outcome1:        row.outcome1        || null,
+      outcome1Comment: row['outcome1_comment'] || null,
+      outcome2:        row.outcome2        || null,
+      outcome2Comment: row['outcome2_comment'] || null,
+      outcome3:        row.outcome3        || null,
+      outcome3Comment: row['outcome3_comment'] || null,
     };
 
     studentsToInsert.push(studentData);

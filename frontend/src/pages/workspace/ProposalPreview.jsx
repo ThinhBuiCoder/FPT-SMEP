@@ -92,7 +92,7 @@ export default function ProposalPreview({ proposal, onBack }) {
             
             {/* Inline Comment Section */}
             <div className="border-t border-slate-200/50 pt-2 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-              <InlineCommentUI proposalId={proposal._id} sectionKey={key} />
+              <InlineCommentUI proposalId={proposal._id} sectionKey={key} sectionLabel={label} />
             </div>
           </div>
         ))}

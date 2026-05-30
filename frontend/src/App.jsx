@@ -36,7 +36,7 @@ import StudentClassDetail from './pages/student/StudentClassDetail';
 import Rankings from './pages/common/Rankings';
 import AIAnalysis from './pages/common/AIAnalysis';
 import IdeaDetail from './pages/common/IdeaDetail';
-import MilestoneTracking from './pages/common/MilestoneTracking';
+import ExecutionBoard from './pages/common/ExecutionBoard';
 import MentoringSessions from './pages/common/MentoringSessions';
 import GroupChat from './pages/common/GroupChat';
 import TeamWorkspace from './pages/workspace/TeamWorkspace';
@@ -116,7 +116,7 @@ function App() {
               {/* Shared */}
               <Route path="/rankings"   element={<Rankings />} />
               <Route path="/evaluations" element={<IdeaDetail />} />
-              <Route path="/milestones"  element={<MilestoneTracking />} />
+              <Route path="/executionboard"  element={<ExecutionBoard />} />
               <Route path="/sessions"    element={<MentoringSessions />} />
               <Route path="/workshops"   element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','STUDENT','MENTOR']}><Workshops /></ProtectedRoute>} />
               <Route path="/chat"        element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER','STUDENT','MENTOR']}><GroupChat /></ProtectedRoute>} />
