@@ -16,7 +16,7 @@ services:
         fromService:
           type: web
           name: fpt-startup-frontend
-          envVar: RENDER_EXTERNAL_URL
+          envVarKey: RENDER_EXTERNAL_URL
       # These values must be set securely in the Render Dashboard after deployment
       - key: MONGO_URI
         sync: false
@@ -40,4 +40,4 @@ services:
         fromService:
           type: web
           name: fpt-startup-backend
-          envVar: RENDER_EXTERNAL_URL
+          envVarKey: RENDER_EXTERNAL_URL
