@@ -1,5 +1,6 @@
 // src/controllers/checkpoint.controller.js
 const path = require('path');
+const mongoose = require('mongoose');
 
 const Team                 = require('../models/Team');
 const CheckpointSubmission = require('../models/CheckpointSubmission');
@@ -24,11 +25,47 @@ const buildDownloadUrl = (teamId, checkpointNumber, fileId) =>
   `/api/workspace/checkpoints/teams/${teamId}/checkpoints/${checkpointNumber}/files/${fileId}/download`;
 
 const populateSubmissionFiles = (query) =>
-  query.populate({
-    path: 'files',
-    select: '-data',
-    populate: { path: 'uploadedBy', select: 'name email avatar role' },
+  query
+    .populate({
+      path: 'files',
+      select: '-data',
+      populate: { path: 'uploadedBy', select: 'name email avatar role' },
+    })
+    .populate({
+      path: 'requirementContents.updatedBy',
+      select: 'name email avatar role',
+    });
+
+const toTeamObjectId = (teamId) => {
+  if (!teamId) return null;
+  if (teamId instanceof mongoose.Types.ObjectId) return teamId;
+  if (mongoose.Types.ObjectId.isValid(teamId)) {
+    return new mongoose.Types.ObjectId(String(teamId));
+  }
+  return null;
+};
+
+const enrichRequirementContents = (doc) => {
+  const cpConfig = getCheckpointConfig(doc.checkpointNumber);
+  if (!cpConfig) return doc;
+
+  const savedMap = new Map(
+    (doc.requirementContents || []).map((r) => [Number(r.index), r])
+  );
+
+  doc.requirementContents = cpConfig.requirements.map((label, index) => {
+    const saved = savedMap.get(index);
+    return {
+      index,
+      label,
+      content: saved?.content || '',
+      updatedBy: saved?.updatedBy || null,
+      updatedAt: saved?.updatedAt || null,
+    };
   });
+
+  return doc;
+};
 
 const attachFileUrls = (submission) => {
   if (!submission) return submission;
@@ -41,7 +78,7 @@ const attachFileUrls = (submission) => {
       fileUrl: buildDownloadUrl(teamId, cpNum, f._id),
     }));
   }
-  return doc;
+  return enrichRequirementContents(doc);
 };
 
 const formatSubmissions = (submissions) =>
@@ -91,13 +128,18 @@ exports.getCheckpointData = async (req, res) => {
     const { teamId } = req.params;
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
 
+    const teamObjectId = toTeamObjectId(teamId);
+    if (!teamObjectId) return err(res, 'Invalid team id.', 400);
+
     const submissions = await populateSubmissionFiles(
-      CheckpointSubmission.find({ teamId })
+      CheckpointSubmission.find({ teamId: teamObjectId })
     );
 
-    const feedbacks = await CheckpointFeedback.find({ teamId })
+    const feedbacks = await CheckpointFeedback.find({ teamId: teamObjectId })
       .populate('user', 'name email avatar role')
       .sort({ createdAt: 1 });
+
+    res.set('Cache-Control', 'no-store');
 
     return ok(res, {
       submissions: formatSubmissions(submissions),
@@ -279,6 +321,100 @@ exports.downloadCheckpointFile = async (req, res) => {
   } catch (e) {
     if (e.statusCode === 403) return err(res, e.message, 403);
     console.error('downloadCheckpointFile:', e);
+    return err(res, 'Server error: ' + e.message);
+  }
+};
+
+// ─── PUT .../requirements ──────────────────────────────────────────────────────
+exports.updateRequirementContents = async (req, res) => {
+  try {
+    const role = req.user?.role?.toUpperCase();
+    if (role !== 'STUDENT') {
+      return err(
+        res,
+        'Access Denied: Only student team members can edit requirement content.',
+        403
+      );
+    }
+
+    const { teamId, checkpointNumber } = req.params;
+    const cpNum = parseInt(checkpointNumber, 10);
+    const { contents } = req.body;
+
+    if (!Array.isArray(contents) || contents.length === 0) {
+      return err(res, 'Contents array is required.', 400);
+    }
+
+    await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+
+    const team = await Team.findById(teamId);
+    if (!team) return err(res, 'Team not found.', 404);
+
+    const cpConfig = getCheckpointConfig(cpNum);
+    if (!cpConfig) return err(res, 'Invalid checkpoint number.', 400);
+
+    const maxIndex = cpConfig.requirements.length - 1;
+    const now = new Date();
+
+    for (const item of contents) {
+      const idx = parseInt(item.index, 10);
+      if (Number.isNaN(idx) || idx < 0 || idx > maxIndex) {
+        return err(res, `Invalid requirement index: ${item.index}`, 400);
+      }
+      if (typeof item.content !== 'string') {
+        return err(res, 'Each requirement content must be a string.', 400);
+      }
+    }
+
+    const teamObjectId = toTeamObjectId(teamId);
+
+    let submission = await CheckpointSubmission.findOne({
+      teamId: teamObjectId,
+      checkpointNumber: cpNum,
+    });
+    if (!submission) {
+      submission = new CheckpointSubmission({
+        teamId: teamObjectId,
+        classId: team.classId,
+        checkpointNumber: cpNum,
+        files: [],
+        requirementContents: cpConfig.requirements.map((label, index) => ({
+          index,
+          label,
+          content: '',
+        })),
+      });
+    } else if (!submission.requirementContents?.length) {
+      submission.requirementContents = cpConfig.requirements.map((label, index) => ({
+        index,
+        label,
+        content: '',
+      }));
+    }
+
+    for (const item of contents) {
+      const idx = parseInt(item.index, 10);
+      const entry = submission.requirementContents.find(
+        (r) => Number(r.index) === idx
+      );
+      if (entry) {
+        entry.content = item.content.trim();
+        entry.updatedBy = req.user._id;
+        entry.updatedAt = now;
+      }
+    }
+
+    submission.markModified('requirementContents');
+    await submission.save();
+
+    const populated = await populateSubmissionFiles(
+      CheckpointSubmission.findById(submission._id)
+    );
+
+    return ok(res, attachFileUrls(populated), 'Requirement content saved successfully');
+  } catch (e) {
+    if (e.statusCode === 403) return err(res, e.message, 403);
+    console.error('updateRequirementContents:', e);
     return err(res, 'Server error: ' + e.message);
   }
 };

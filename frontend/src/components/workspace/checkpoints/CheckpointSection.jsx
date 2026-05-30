@@ -22,16 +22,21 @@ export default function CheckpointSection({ teamId, isEditable }) {
     if (!teamId) return;
     setLoading(true);
     try {
-      const res = await checkpointApi.getCheckpointData(teamId);
+      const res = await checkpointApi.getCheckpointData(String(teamId));
       if (res.success) {
         const map = {};
         res.data.submissions.forEach((sub) => {
           const sorted = [...(sub.files || [])].sort(
             (a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)
           );
-          map[sub.checkpointNumber] = {
+          const reqFilled = (sub.requirementContents || []).filter(
+            (r) => r.content && String(r.content).trim()
+          ).length;
+          map[Number(sub.checkpointNumber)] = {
             count: sorted.length,
             latest: sorted[0] || null,
+            reqFilled,
+            reqTotal: sub.requirementContents?.length || 0,
           };
         });
         setStats(map);
@@ -45,9 +50,10 @@ export default function CheckpointSection({ teamId, isEditable }) {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  const completedCount = configs.filter(
-    (cp) => (stats[cp.number]?.count || 0) > 0
-  ).length;
+  const completedCount = configs.filter((cp) => {
+    const s = stats[cp.number];
+    return (s?.count || 0) > 0 || (s?.reqFilled || 0) > 0;
+  }).length;
 
   return (
     <>
@@ -117,6 +123,7 @@ export default function CheckpointSection({ teamId, isEditable }) {
           checkpoint={selected}
           teamId={teamId}
           isEditable={isEditable}
+          onRequirementsSaved={fetchStats}
           onClose={() => {
             setSelected(null);
             fetchStats();

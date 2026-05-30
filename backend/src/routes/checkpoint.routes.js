@@ -37,6 +37,13 @@ router.get(
   ctrl.downloadCheckpointFile
 );
 
+// ── Requirement content (student edit, others read-only) ─────────────────────
+// PUT /api/workspace/checkpoints/teams/:teamId/checkpoints/:checkpointNumber/requirements
+router.put(
+  '/teams/:teamId/checkpoints/:checkpointNumber/requirements',
+  ctrl.updateRequirementContents
+);
+
 // ── Feedback / replies ───────────────────────────────────────────────────────
 // POST /api/workspace/checkpoints/teams/:teamId/checkpoints/:checkpointNumber/feedback
 router.post(

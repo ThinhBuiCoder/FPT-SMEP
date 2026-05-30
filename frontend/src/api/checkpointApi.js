@@ -61,6 +61,13 @@ export const checkpointApi = {
     URL.revokeObjectURL(objectUrl);
   },
 
+  // Update requirement text content (Student only)
+  updateRequirements: (teamId, checkpointNumber, contents) =>
+    axiosClient.put(
+      `/workspace/checkpoints/teams/${teamId}/checkpoints/${checkpointNumber}/requirements`,
+      { contents }
+    ),
+
   // Post a new comment or a reply (parentFeedbackId optional)
   addFeedback: (teamId, checkpointNumber, payload) =>
     axiosClient.post(
