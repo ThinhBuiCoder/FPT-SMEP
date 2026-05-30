@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { evaluationApi } from '../../api/evaluationApi';
 import RubricForm from './RubricForm';
 import { useAuth } from '../../hooks/useAuth';
+import { MentorEvaluationCard } from '../evaluation/PerformanceLevelBadge';
+import PerformanceLevelBadge from '../evaluation/PerformanceLevelBadge';
 
 const CHECKPOINTS = [1, 2, 3, 4];
 
@@ -17,7 +19,7 @@ const roleLabel = (role) => ({
 
 export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
   const { user } = useAuth();
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState(4);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState(1);
   const [checkpointData, setCheckpointData] = useState(null);
   const [evaluations, setEvaluations] = useState([]);
   const [history, setHistory] = useState([]);
@@ -27,7 +29,8 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
   const [error, setError] = useState(null);
 
   const isStudent = user?.role === 'STUDENT' || user?.role === 'USER';
-  const canEdit = user?.role === 'LECTURER' || user?.role === 'ADMIN';
+  const isMentor = user?.role === 'MENTOR';
+  const canEdit = user?.role === 'LECTURER';
   const activeEvaluation = useMemo(
     () => evaluations.find((ev) => ev.lecturerId?._id === user?._id) || null,
     [evaluations, user?._id]
@@ -134,7 +137,9 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
                 ? 'View the official evaluation, comments, and history for each checkpoint.'
                 : canEdit
                   ? 'Score the startup team, save drafts, and submit the official evaluation.'
-                  : 'View evaluation summary and history.'}
+                  : isMentor
+                    ? 'Track team progress and performance direction. Exact scores are not shown.'
+                    : 'View evaluation summary and history.'}
             </p>
           </div>
 
@@ -163,10 +168,26 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
             <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">Submitted</p>
             <p className="mt-1 text-2xl font-black text-blue-700">{summary?.submittedCount ?? evaluations.filter((ev) => ev.status === 'SUBMITTED' || ev.status === 'PUBLISHED').length}</p>
           </div>
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500">Average score</p>
-            <p className="mt-1 text-2xl font-black text-emerald-700">{Number(latestScore || 0).toFixed(2)} / 10</p>
-          </div>
+          {/* Average score hidden for Mentor/Student — show overall performance level instead */}
+          {(isMentor || isStudent) ? (
+            summary?.overallPerformance && summary.overallPerformance.level !== 'Unscored' ? (
+              <div className="rounded-2xl bg-white border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Overall Performance</p>
+                <div className="mt-2">
+                  <PerformanceLevelBadge
+                    level={summary.overallPerformance.level}
+                    label={summary.overallPerformance.label}
+                    size="lg"
+                  />
+                </div>
+              </div>
+            ) : null
+          ) : (
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500">Average score</p>
+              <p className="mt-1 text-2xl font-black text-emerald-700">{Number(latestScore || 0).toFixed(2)} / 10</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -220,7 +241,11 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">Evaluation summary</h3>
-                  <p className="text-sm text-slate-500">{roleLabel(user?.role)} access is read-only.</p>
+                  <p className="text-sm text-slate-500">
+                    {(isMentor || isStudent)
+                      ? 'Performance levels only, no numeric scores.'
+                      : `${roleLabel(user?.role)} access is read-only.`}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                   <History className="w-4 h-4" /> History preserved
@@ -231,7 +256,15 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
                   No evaluations recorded for this checkpoint yet.
                 </div>
+              ) : (isMentor || isStudent) ? (
+                /* ── MENTOR / STUDENT VIEW: badges only, no numeric scores ── */
+                <div className="space-y-4">
+                  {evaluations.map((ev) => (
+                    <MentorEvaluationCard key={ev._id} evaluation={ev} />
+                  ))}
+                </div>
               ) : (
+                /* ── LECTURER / ADMIN VIEW: full numeric data ── */
                 <div className="space-y-4">
                   {evaluations.map((ev) => (
                     <div key={ev._id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -241,6 +274,9 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
                           <p className="text-xs text-slate-400">{ev.evaluatorRole} · {new Date(ev.updatedAt).toLocaleString()}</p>
                         </div>
                         <div className="text-right">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold mb-1 ${ev.status === 'SUBMITTED' || ev.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {ev.status || 'DRAFT'}
+                          </span>
                           <p className="text-2xl font-black text-primary">{Number(ev.checkpointTotal || ev.weightedScore || 0).toFixed(2)}</p>
                           <p className="text-xs text-slate-400">/ 10</p>
                         </div>
@@ -250,10 +286,18 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
                           <div key={item.criterionKey} className="rounded-xl bg-white border border-slate-200 p-2">
                             <p className="text-slate-500 truncate">{item.criterionName}</p>
                             <p className="font-bold text-slate-900">{Number(item.score || 0).toFixed(1)}</p>
+                            {item.comment && <p className="mt-1 text-slate-600 whitespace-pre-wrap">{item.comment}</p>}
                           </div>
                         ))}
                       </div>
-                      {ev.overallFeedback && <p className="text-sm text-slate-600 whitespace-pre-wrap">{ev.overallFeedback}</p>}
+                      {(ev.overallFeedback || ev.strengths || ev.weaknesses || ev.suggestions) && (
+                        <div className="space-y-2 text-sm">
+                          {ev.overallFeedback && <p className="text-slate-600 whitespace-pre-wrap"><span className="font-semibold text-slate-700">Overall:</span> {ev.overallFeedback}</p>}
+                          {ev.strengths && <p className="text-emerald-700 whitespace-pre-wrap"><span className="font-semibold">Strengths:</span> {ev.strengths}</p>}
+                          {ev.weaknesses && <p className="text-red-700 whitespace-pre-wrap"><span className="font-semibold">Weaknesses:</span> {ev.weaknesses}</p>}
+                          {ev.suggestions && <p className="text-blue-700 whitespace-pre-wrap"><span className="font-semibold">Suggestions:</span> {ev.suggestions}</p>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
