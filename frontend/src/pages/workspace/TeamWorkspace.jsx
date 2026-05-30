@@ -281,7 +281,7 @@ export default function TeamWorkspace() {
 
             {/* Startup Checkpoints */}
             <CheckpointSection 
-              teamId={team._id} 
+              teamId={String(team._id)} 
               isEditable={isEditable}
             />
           </div>

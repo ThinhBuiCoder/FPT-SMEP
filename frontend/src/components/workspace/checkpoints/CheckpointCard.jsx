@@ -6,15 +6,19 @@ export default function CheckpointCard({ checkpoint, submissionStats, onOpen }) 
   const Icon = ICONS[checkpoint.icon] || FileText;
   const stat = submissionStats[checkpoint.number] || {};
   const fileCount = stat.count || 0;
+  const reqFilled = stat.reqFilled || 0;
+  const reqTotal = stat.reqTotal || checkpoint.requirements?.length || 0;
   const latest = stat.latest || null;
   const hasFiles = fileCount > 0;
+  const hasRequirements = reqFilled > 0;
+  const hasSubmission = hasFiles || hasRequirements;
 
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`group w-full text-left rounded-2xl border p-5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2
-        ${hasFiles
+        ${hasSubmission
           ? 'bg-gradient-to-br from-orange-50/50 to-white border-orange-200/70 shadow-sm hover:shadow-lg hover:border-orange-300'
           : 'bg-white border-slate-200/80 hover:border-orange-200 hover:shadow-md'}`}
     >
@@ -22,11 +26,11 @@ export default function CheckpointCard({ checkpoint, submissionStats, onOpen }) 
         {/* Number badge */}
         <div
           className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg shadow-sm transition-colors
-            ${hasFiles
+            ${hasSubmission
               ? 'bg-orange-500 text-white'
               : 'bg-slate-100 text-slate-400 group-hover:bg-orange-100 group-hover:text-orange-600'}`}
         >
-          {hasFiles ? <CheckCircle2 className="w-6 h-6" /> : checkpoint.number}
+          {hasSubmission ? <CheckCircle2 className="w-6 h-6" /> : checkpoint.number}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -41,7 +45,7 @@ export default function CheckpointCard({ checkpoint, submissionStats, onOpen }) 
             </div>
             <div
               className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0
-                ${hasFiles ? 'bg-orange-100 text-orange-600' : 'bg-slate-50 text-slate-400 group-hover:bg-orange-50 group-hover:text-orange-500'}`}
+                ${hasSubmission ? 'bg-orange-100 text-orange-600' : 'bg-slate-50 text-slate-400 group-hover:bg-orange-50 group-hover:text-orange-500'}`}
             >
               <Icon className="w-4 h-4" />
             </div>
@@ -59,10 +63,19 @@ export default function CheckpointCard({ checkpoint, submissionStats, onOpen }) 
           )}
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100/80">
-            {hasFiles ? (
-              <span className="text-[10px] font-bold px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg">
-                {fileCount} file{fileCount !== 1 ? 's' : ''}
-              </span>
+            {hasSubmission ? (
+              <div className="flex flex-wrap gap-1.5">
+                {hasRequirements && (
+                  <span className="text-[10px] font-bold px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg">
+                    {reqFilled}/{reqTotal} requirements
+                  </span>
+                )}
+                {hasFiles && (
+                  <span className="text-[10px] font-bold px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg">
+                    {fileCount} file{fileCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="text-[10px] font-medium px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg">
                 Not submitted
