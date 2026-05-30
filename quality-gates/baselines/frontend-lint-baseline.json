@@ -1,0 +1,1491 @@
+{
+  "generatedAt": "2026-05-29T17:33:33.785Z",
+  "sourceReport": "frontend-lint-report.json",
+  "findings": [
+    {
+      "key": "frontend/src/components/ai/RubricGeneratorTab.jsx|no-unused-vars|3|78|'ChevronDown' is defined but never used.",
+      "filePath": "frontend/src/components/ai/RubricGeneratorTab.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 78,
+      "severity": 2,
+      "message": "'ChevronDown' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/ai/RubricGeneratorTab.jsx|react-hooks/set-state-in-effect|28|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  26 |\n  27 |   useEffect(() => {\n> 28 |     setFormData(prev => ({\n     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  29 |       ...prev,\n  30 |       startup_name: prev.startup_name || initialData?.startup_name || '',\n  31 |       business_model: prev.business_model || initialData?.business_model || '',",
+      "filePath": "frontend/src/components/ai/RubricGeneratorTab.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 28,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  26 |\n  27 |   useEffect(() => {\n> 28 |     setFormData(prev => ({\n     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  29 |       ...prev,\n  30 |       startup_name: prev.startup_name || initialData?.startup_name || '',\n  31 |       business_model: prev.business_model || initialData?.business_model || '',"
+    },
+    {
+      "key": "frontend/src/components/ai/RubricGeneratorTab.jsx|no-unused-vars|39|9|'handleCheckbox' is assigned a value but never used.",
+      "filePath": "frontend/src/components/ai/RubricGeneratorTab.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 39,
+      "column": 9,
+      "severity": 2,
+      "message": "'handleCheckbox' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/ai/SentimentAnalysisTab.jsx|no-unused-vars|3|25|'Zap' is defined but never used.",
+      "filePath": "frontend/src/components/ai/SentimentAnalysisTab.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 25,
+      "severity": 2,
+      "message": "'Zap' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/ai/SimilarIdeasTab.jsx|no-unused-vars|3|77|'Map' is defined but never used.",
+      "filePath": "frontend/src/components/ai/SimilarIdeasTab.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 77,
+      "severity": 2,
+      "message": "'Map' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/ai/SimilarIdeasTab.jsx|react-hooks/set-state-in-effect|22|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  20 |   useEffect(() => {\n  21 |     // Keep it synced if parent changes (initial click)\n> 22 |     setFormData(prev => ({\n     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  23 |       ...prev,\n  24 |       startup_name: prev.startup_name || initialData?.startup_name || '',\n  25 |       problem: prev.problem || initialData?.problem || '',",
+      "filePath": "frontend/src/components/ai/SimilarIdeasTab.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 22,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  20 |   useEffect(() => {\n  21 |     // Keep it synced if parent changes (initial click)\n> 22 |     setFormData(prev => ({\n     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  23 |       ...prev,\n  24 |       startup_name: prev.startup_name || initialData?.startup_name || '',\n  25 |       problem: prev.problem || initialData?.problem || '',"
+    },
+    {
+      "key": "frontend/src/components/class/AssignLectureModal.jsx|no-unused-vars|3|22|'GraduationCap' is defined but never used.",
+      "filePath": "frontend/src/components/class/AssignLectureModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 22,
+      "severity": 2,
+      "message": "'GraduationCap' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/AssignLectureModal.jsx|no-unused-vars|20|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/class/AssignLectureModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 20,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/AssignMentorsModal.jsx|no-unused-vars|36|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/class/AssignMentorsModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 36,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/BulkCreateModal.jsx|no-unused-vars|39|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/class/BulkCreateModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 39,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/BulkCreateModal.jsx|react-hooks/exhaustive-deps|46|6|React Hook useEffect has a missing dependency: 'allLecturers.length'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/class/BulkCreateModal.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 46,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'allLecturers.length'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/class/EditScheduleModal.jsx|no-unused-vars|32|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/class/EditScheduleModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 32,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/StudentTable.jsx|no-unused-vars|49|114|'onRefresh' is defined but never used.",
+      "filePath": "frontend/src/components/class/StudentTable.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 49,
+      "column": 114,
+      "severity": 2,
+      "message": "'onRefresh' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/class/StudentTable.jsx|react-hooks/exhaustive-deps|50|9|The 'students' conditional could make the dependencies of useMemo Hook (at line 67) change on every render. To fix this, wrap the initialization of 'students' in its own useMemo() Hook.",
+      "filePath": "frontend/src/components/class/StudentTable.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 50,
+      "column": 9,
+      "severity": 1,
+      "message": "The 'students' conditional could make the dependencies of useMemo Hook (at line 67) change on every render. To fix this, wrap the initialization of 'students' in its own useMemo() Hook."
+    },
+    {
+      "key": "frontend/src/components/class/StudentTable.jsx|react-hooks/exhaustive-deps|50|9|The 'students' conditional could make the dependencies of useMemo Hook (at line 76) change on every render. To fix this, wrap the initialization of 'students' in its own useMemo() Hook.",
+      "filePath": "frontend/src/components/class/StudentTable.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 50,
+      "column": 9,
+      "severity": 1,
+      "message": "The 'students' conditional could make the dependencies of useMemo Hook (at line 76) change on every render. To fix this, wrap the initialization of 'students' in its own useMemo() Hook."
+    },
+    {
+      "key": "frontend/src/components/class/StudentTable.jsx|react-hooks/exhaustive-deps|51|9|The 'teams' conditional could make the dependencies of useMemo Hook (at line 58) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'teams' in its own useMemo() Hook.",
+      "filePath": "frontend/src/components/class/StudentTable.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 51,
+      "column": 9,
+      "severity": 1,
+      "message": "The 'teams' conditional could make the dependencies of useMemo Hook (at line 58) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'teams' in its own useMemo() Hook."
+    },
+    {
+      "key": "frontend/src/components/class/TeamGeneratePanel.jsx|react-hooks/exhaustive-deps|17|9|The 'students' conditional could make the dependencies of useMemo Hook (at line 46) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'students' in its own useMemo() Hook.",
+      "filePath": "frontend/src/components/class/TeamGeneratePanel.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 17,
+      "column": 9,
+      "severity": 1,
+      "message": "The 'students' conditional could make the dependencies of useMemo Hook (at line 46) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'students' in its own useMemo() Hook."
+    },
+    {
+      "key": "frontend/src/components/class/TeamGeneratePanel.jsx|react-hooks/exhaustive-deps|18|9|The 'selected' conditional could make the dependencies of useMemo Hook (at line 46) change on every render. To fix this, wrap the initialization of 'selected' in its own useMemo() Hook.",
+      "filePath": "frontend/src/components/class/TeamGeneratePanel.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 18,
+      "column": 9,
+      "severity": 1,
+      "message": "The 'selected' conditional could make the dependencies of useMemo Hook (at line 46) change on every render. To fix this, wrap the initialization of 'selected' in its own useMemo() Hook."
+    },
+    {
+      "key": "frontend/src/components/evaluation/CommentThread.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/CommentThread.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/CommentThread.jsx|no-unused-vars|3|10|'formatDistanceToNow' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/CommentThread.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 10,
+      "severity": 2,
+      "message": "'formatDistanceToNow' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|2|27|'useEffect' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 27,
+      "severity": 2,
+      "message": "'useEffect' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|17|3|'evaluation' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 17,
+      "column": 3,
+      "severity": 2,
+      "message": "'evaluation' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|18|3|'teamId' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 18,
+      "column": 3,
+      "severity": 2,
+      "message": "'teamId' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|22|10|'selectedVersion' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 22,
+      "column": 10,
+      "severity": 2,
+      "message": "'selectedVersion' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|22|27|'setSelectedVersion' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 22,
+      "column": 27,
+      "severity": 2,
+      "message": "'setSelectedVersion' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|23|10|'compareMode' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 23,
+      "column": 10,
+      "severity": 2,
+      "message": "'compareMode' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|23|23|'setCompareMode' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 23,
+      "column": 23,
+      "severity": 2,
+      "message": "'setCompareMode' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|24|10|'compareWithVersion' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 24,
+      "column": 10,
+      "severity": 2,
+      "message": "'compareWithVersion' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|24|30|'setCompareWithVersion' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 24,
+      "column": 30,
+      "severity": 2,
+      "message": "'setCompareWithVersion' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx|no-unused-vars|106|29|'index' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationHistoryPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 106,
+      "column": 29,
+      "severity": 2,
+      "message": "'index' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|2|27|'useEffect' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 27,
+      "severity": 2,
+      "message": "'useEffect' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|4|8|'CommentThread' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 4,
+      "column": 8,
+      "severity": 2,
+      "message": "'CommentThread' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|20|3|'isMentor' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 20,
+      "column": 3,
+      "severity": 2,
+      "message": "'isMentor' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|21|3|'currentUserId' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 21,
+      "column": 3,
+      "severity": 2,
+      "message": "'currentUserId' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/EvaluationSummary.jsx|no-unused-vars|22|3|'currentUserRole' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/EvaluationSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 22,
+      "column": 3,
+      "severity": 2,
+      "message": "'currentUserRole' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/FeedbackDetailPage.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/FeedbackDetailPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/FeedbackDetailPage.jsx|no-unused-vars|2|27|'useEffect' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/FeedbackDetailPage.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 27,
+      "severity": 2,
+      "message": "'useEffect' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|no-unused-vars|3|10|'getCheckpointConfig' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 10,
+      "severity": 2,
+      "message": "'getCheckpointConfig' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|no-unused-vars|21|10|'checkpoint' is assigned a value but never used.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 21,
+      "column": 10,
+      "severity": 2,
+      "message": "'checkpoint' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|no-unused-vars|67|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 67,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|react-hooks/set-state-in-effect|88|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  86 |     });\n  87 |\n> 88 |     setScores(updated);\n     |     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  89 |     \n  90 |     // Calculate total\n  91 |     const total = updated.reduce((sum, s) => sum + s.weightedScore, 0);",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 88,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  86 |     });\n  87 |\n> 88 |     setScores(updated);\n     |     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  89 |     \n  90 |     // Calculate total\n  91 |     const total = updated.reduce((sum, s) => sum + s.weightedScore, 0);"
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|react-hooks/exhaustive-deps|94|6|React Hook useEffect has missing dependencies: 'onScoresChange', 'onTotalChange', and 'scores'. Either include them or remove the dependency array. If 'onTotalChange' changes too often, find the parent component that defines it and wrap that definition in useCallback.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 94,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has missing dependencies: 'onScoresChange', 'onTotalChange', and 'scores'. Either include them or remove the dependency array. If 'onTotalChange' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+    },
+    {
+      "key": "frontend/src/components/evaluation/RubricScoringForm.jsx|react-hooks/exhaustive-deps|94|7|React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.",
+      "filePath": "frontend/src/components/evaluation/RubricScoringForm.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 94,
+      "column": 7,
+      "severity": 1,
+      "message": "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."
+    },
+    {
+      "key": "frontend/src/components/layout/Navbar.jsx|no-unused-vars|1|8|'toast' is defined but never used.",
+      "filePath": "frontend/src/components/layout/Navbar.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'toast' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/layout/NotificationDropdown.jsx|react-hooks/set-state-in-effect|28|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  26 |\n  27 |   useEffect(() => {\n> 28 |     fetchNotifications();\n     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  29 |     // Poll every 30 seconds\n  30 |     const interval = setInterval(fetchNotifications, 30000);\n  31 |     return () => clearInterval(interval);",
+      "filePath": "frontend/src/components/layout/NotificationDropdown.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 28,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  26 |\n  27 |   useEffect(() => {\n> 28 |     fetchNotifications();\n     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  29 |     // Poll every 30 seconds\n  30 |     const interval = setInterval(fetchNotifications, 30000);\n  31 |     return () => clearInterval(interval);"
+    },
+    {
+      "key": "frontend/src/components/ui/ConfirmDialog.jsx|no-unused-vars|5|88|'confirmText' is assigned a value but never used.",
+      "filePath": "frontend/src/components/ui/ConfirmDialog.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 88,
+      "severity": 2,
+      "message": "'confirmText' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/EvaluationPanel.jsx|no-unused-vars|2|10|'Calendar' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/EvaluationPanel.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 10,
+      "severity": 2,
+      "message": "'Calendar' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/EvaluationPanel.jsx|react-hooks/immutability|37|5|Error: Cannot access variable before it is declared\n\n`fetchCheckpointData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  35 |\n  36 |   useEffect(() => {\n> 37 |     fetchCheckpointData();\n     |     ^^^^^^^^^^^^^^^^^^^ `fetchCheckpointData` accessed before it is declared\n  38 |   }, [teamId, selectedCheckpoint]);\n  39 |\n  40 |   const fetchCheckpointData = async () => {\n\n  38 |   }, [teamId, selectedCheckpoint]);\n  39 |\n> 40 |   const fetchCheckpointData = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 41 |     if (!teamId) return;\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 42 |     try {\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 58 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 59 |   };\n     | ^^^^^ `fetchCheckpointData` is declared here\n  60 |\n  61 |   const saveEvaluation = async (formData) => {\n  62 |     try {",
+      "filePath": "frontend/src/components/workspace/EvaluationPanel.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 37,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`fetchCheckpointData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  35 |\n  36 |   useEffect(() => {\n> 37 |     fetchCheckpointData();\n     |     ^^^^^^^^^^^^^^^^^^^ `fetchCheckpointData` accessed before it is declared\n  38 |   }, [teamId, selectedCheckpoint]);\n  39 |\n  40 |   const fetchCheckpointData = async () => {\n\n  38 |   }, [teamId, selectedCheckpoint]);\n  39 |\n> 40 |   const fetchCheckpointData = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 41 |     if (!teamId) return;\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 42 |     try {\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 58 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^^^^\n> 59 |   };\n     | ^^^^^ `fetchCheckpointData` is declared here\n  60 |\n  61 |   const saveEvaluation = async (formData) => {\n  62 |     try {"
+    },
+    {
+      "key": "frontend/src/components/workspace/EvaluationPanel.jsx|react-hooks/exhaustive-deps|38|6|React Hook useEffect has a missing dependency: 'fetchCheckpointData'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/EvaluationPanel.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 38,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchCheckpointData'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/InlineCommentUI.jsx|no-unused-vars|2|10|'CornerDownRight' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/InlineCommentUI.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 10,
+      "severity": 2,
+      "message": "'CornerDownRight' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/InlineCommentUI.jsx|react-hooks/immutability|168|7|Error: Cannot access variable before it is declared\n\n`fetchComments` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  166 |   useEffect(() => {\n  167 |     if (proposalId && isOpen) {\n> 168 |       fetchComments();\n      |       ^^^^^^^^^^^^^ `fetchComments` accessed before it is declared\n  169 |     }\n  170 |   }, [proposalId, isOpen, sectionKey]);\n  171 |\n\n  170 |   }, [proposalId, isOpen, sectionKey]);\n  171 |\n> 172 |   const fetchComments = async () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 173 |     try {\n      | ^^^^^^^^^\n> 174 |       setLoading(true);\n      …\n      | ^^^^^^^^^\n> 185 |     }\n      | ^^^^^^^^^\n> 186 |   };\n      | ^^^^^ `fetchComments` is declared here\n  187 |\n  188 |   const handleAddComment = async (e) => {\n  189 |     e.preventDefault();",
+      "filePath": "frontend/src/components/workspace/InlineCommentUI.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 168,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`fetchComments` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  166 |   useEffect(() => {\n  167 |     if (proposalId && isOpen) {\n> 168 |       fetchComments();\n      |       ^^^^^^^^^^^^^ `fetchComments` accessed before it is declared\n  169 |     }\n  170 |   }, [proposalId, isOpen, sectionKey]);\n  171 |\n\n  170 |   }, [proposalId, isOpen, sectionKey]);\n  171 |\n> 172 |   const fetchComments = async () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 173 |     try {\n      | ^^^^^^^^^\n> 174 |       setLoading(true);\n      …\n      | ^^^^^^^^^\n> 185 |     }\n      | ^^^^^^^^^\n> 186 |   };\n      | ^^^^^ `fetchComments` is declared here\n  187 |\n  188 |   const handleAddComment = async (e) => {\n  189 |     e.preventDefault();"
+    },
+    {
+      "key": "frontend/src/components/workspace/InlineCommentUI.jsx|react-hooks/exhaustive-deps|170|6|React Hook useEffect has a missing dependency: 'fetchComments'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/InlineCommentUI.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 170,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchComments'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/KanbanBoard.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/KanbanBoard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/MentoringPanel.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/MentoringPanel.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/MentoringPanel.jsx|react-hooks/immutability|21|5|Error: Cannot access variable before it is declared\n\n`fetchSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  19 |\n  20 |   useEffect(() => {\n> 21 |     fetchSessions();\n     |     ^^^^^^^^^^^^^ `fetchSessions` accessed before it is declared\n  22 |   }, [teamId]);\n  23 |\n  24 |   const fetchSessions = async () => {\n\n  22 |   }, [teamId]);\n  23 |\n> 24 |   const fetchSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 25 |     try {\n     | ^^^^^^^^^\n> 26 |       setLoading(true);\n     …\n     | ^^^^^^^^^\n> 33 |     }\n     | ^^^^^^^^^\n> 34 |   };\n     | ^^^^^ `fetchSessions` is declared here\n  35 |\n  36 |   const openModal = (session = null) => {\n  37 |     if (session) {",
+      "filePath": "frontend/src/components/workspace/MentoringPanel.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 21,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`fetchSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  19 |\n  20 |   useEffect(() => {\n> 21 |     fetchSessions();\n     |     ^^^^^^^^^^^^^ `fetchSessions` accessed before it is declared\n  22 |   }, [teamId]);\n  23 |\n  24 |   const fetchSessions = async () => {\n\n  22 |   }, [teamId]);\n  23 |\n> 24 |   const fetchSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 25 |     try {\n     | ^^^^^^^^^\n> 26 |       setLoading(true);\n     …\n     | ^^^^^^^^^\n> 33 |     }\n     | ^^^^^^^^^\n> 34 |   };\n     | ^^^^^ `fetchSessions` is declared here\n  35 |\n  36 |   const openModal = (session = null) => {\n  37 |     if (session) {"
+    },
+    {
+      "key": "frontend/src/components/workspace/MentoringPanel.jsx|react-hooks/exhaustive-deps|22|6|React Hook useEffect has a missing dependency: 'fetchSessions'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/MentoringPanel.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 22,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchSessions'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/MentoringPanel.jsx|no-unused-vars|29|14|'err' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/MentoringPanel.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 29,
+      "column": 14,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/MilestoneModal.jsx|react-hooks/set-state-in-effect|33|9|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  31 |     if (isOpen) {\n  32 |       if (initialData) {\n> 33 |         setForm({\n     |         ^^^^^^^ Avoid calling setState() directly within an effect\n  34 |           title: initialData.title || '',\n  35 |           description: initialData.description || '',\n  36 |           startDate: toDateInputValue(initialData.startDate),",
+      "filePath": "frontend/src/components/workspace/MilestoneModal.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 33,
+      "column": 9,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  31 |     if (isOpen) {\n  32 |       if (initialData) {\n> 33 |         setForm({\n     |         ^^^^^^^ Avoid calling setState() directly within an effect\n  34 |           title: initialData.title || '',\n  35 |           description: initialData.description || '',\n  36 |           startDate: toDateInputValue(initialData.startDate),"
+    },
+    {
+      "key": "frontend/src/components/workspace/MilestoneTimeline.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/MilestoneTimeline.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/ProgressSummary.jsx|no-unused-vars|1|50|'Loader2' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/ProgressSummary.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 50,
+      "severity": 2,
+      "message": "'Loader2' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/RubricForm.jsx|react-hooks/set-state-in-effect|68|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  66 |\n  67 |   useEffect(() => {\n> 68 |     setRubricScores(initialRows(criteria, initialData));\n     |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  69 |     setOverallFeedback(initialData?.overallFeedback || '');\n  70 |     setStrengths(initialData?.strengths || '');\n  71 |     setWeaknesses(initialData?.weaknesses || '');",
+      "filePath": "frontend/src/components/workspace/RubricForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 68,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  66 |\n  67 |   useEffect(() => {\n> 68 |     setRubricScores(initialRows(criteria, initialData));\n     |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  69 |     setOverallFeedback(initialData?.overallFeedback || '');\n  70 |     setStrengths(initialData?.strengths || '');\n  71 |     setWeaknesses(initialData?.weaknesses || '');"
+    },
+    {
+      "key": "frontend/src/components/workspace/SprintPanel.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/SprintPanel.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/SprintPanel.jsx|no-unused-vars|24|11|'user' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/SprintPanel.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 24,
+      "column": 11,
+      "severity": 2,
+      "message": "'user' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/SprintPanel.jsx|react-hooks/set-state-in-effect|65|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  63 |\n  64 |   useEffect(() => {\n> 65 |     setLoading(true);\n     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  66 |     fetchData();\n  67 |   }, [fetchData]);\n  68 |",
+      "filePath": "frontend/src/components/workspace/SprintPanel.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 65,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  63 |\n  64 |   useEffect(() => {\n> 65 |     setLoading(true);\n     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  66 |     fetchData();\n  67 |   }, [fetchData]);\n  68 |"
+    },
+    {
+      "key": "frontend/src/components/workspace/TaskCard.jsx|no-unused-vars|1|10|'useState' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/TaskCard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 10,
+      "severity": 2,
+      "message": "'useState' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/TaskCard.jsx|no-unused-vars|2|40|'Milestone' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/TaskCard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 40,
+      "severity": 2,
+      "message": "'Milestone' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/TaskCard.jsx|no-unused-vars|43|78|'members' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/TaskCard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 43,
+      "column": 78,
+      "severity": 2,
+      "message": "'members' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/TaskModal.jsx|react-hooks/set-state-in-effect|47|9|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  45 |     if (isOpen) {\n  46 |       if (initialData) {\n> 47 |         setForm({\n     |         ^^^^^^^ Avoid calling setState() directly within an effect\n  48 |           title: initialData.title || '',\n  49 |           description: initialData.description || '',\n  50 |           milestoneId: initialData.milestoneId?._id || initialData.milestoneId || '',",
+      "filePath": "frontend/src/components/workspace/TaskModal.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 47,
+      "column": 9,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  45 |     if (isOpen) {\n  46 |       if (initialData) {\n> 47 |         setForm({\n     |         ^^^^^^^ Avoid calling setState() directly within an effect\n  48 |           title: initialData.title || '',\n  49 |           description: initialData.description || '',\n  50 |           milestoneId: initialData.milestoneId?._id || initialData.milestoneId || '',"
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|no-unused-vars|7|3|'ChevronRight' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 7,
+      "column": 3,
+      "severity": 2,
+      "message": "'ChevronRight' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|no-unused-vars|7|23|'Shield' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 7,
+      "column": 23,
+      "severity": 2,
+      "message": "'Shield' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|no-unused-vars|38|7|'LEADER_ROLE_KEYS' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 38,
+      "column": 7,
+      "severity": 2,
+      "message": "'LEADER_ROLE_KEYS' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|react-hooks/set-state-in-effect|278|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  276 |   useEffect(() => {\n  277 |     if (task) {\n> 278 |       setForm({\n      |       ^^^^^^^ Avoid calling setState() directly within an effect\n  279 |         title: task.title || '',\n  280 |         description: task.description || '',\n  281 |         taskType: task.taskType || fixedTaskType || 'TEAM_TASK',",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 278,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  276 |   useEffect(() => {\n  277 |     if (task) {\n> 278 |       setForm({\n      |       ^^^^^^^ Avoid calling setState() directly within an effect\n  279 |         title: task.title || '',\n  280 |         description: task.description || '',\n  281 |         taskType: task.taskType || fixedTaskType || 'TEAM_TASK',"
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|no-unused-vars|496|3|'roleInTeam' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 496,
+      "column": 3,
+      "severity": 2,
+      "message": "'roleInTeam' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx|react-hooks/set-state-in-effect|588|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  586 |\n  587 |   useEffect(() => {\n> 588 |     setLoading(true);\n      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  589 |     fetchTasks();\n  590 |   }, [fetchTasks]);\n  591 |",
+      "filePath": "frontend/src/components/workspace/WeeklyRoadmapPlanner.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 588,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  586 |\n  587 |   useEffect(() => {\n> 588 |     setLoading(true);\n      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  589 |     fetchTasks();\n  590 |   }, [fetchTasks]);\n  591 |"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|no-unused-vars|8|11|'user' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 8,
+      "column": 11,
+      "severity": 2,
+      "message": "'user' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/set-state-in-effect|39|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  37 |   useEffect(() => {\n  38 |     if (isOpen) {\n> 39 |       setSelectedClassId('');\n     |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  40 |       setStudents([]);\n  41 |       setPreviewImage(null);\n  42 |",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 39,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  37 |   useEffect(() => {\n  38 |     if (isOpen) {\n> 39 |       setSelectedClassId('');\n     |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  40 |       setStudents([]);\n  41 |       setPreviewImage(null);\n  42 |"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/immutability|53|7|Error: Cannot access variable before it is declared\n\n`fetchClasses` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  51 |       setStudentPage(1);\n  52 |\n> 53 |       fetchClasses();\n     |       ^^^^^^^^^^^^ `fetchClasses` accessed before it is declared\n  54 |     }\n  55 |   }, [isOpen, workshop]);\n  56 |\n\n  66 |   }, [selectedClassId]);\n  67 |\n> 68 |   const fetchClasses = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 69 |     setLoadingClasses(true);\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 70 |     try {\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 95 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 96 |   };\n     | ^^^^^ `fetchClasses` is declared here\n  97 |\n  98 |   const fetchAttendance = async () => {\n  99 |     if (!selectedClassId || !workshop?._id) return;",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 53,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`fetchClasses` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  51 |       setStudentPage(1);\n  52 |\n> 53 |       fetchClasses();\n     |       ^^^^^^^^^^^^ `fetchClasses` accessed before it is declared\n  54 |     }\n  55 |   }, [isOpen, workshop]);\n  56 |\n\n  66 |   }, [selectedClassId]);\n  67 |\n> 68 |   const fetchClasses = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 69 |     setLoadingClasses(true);\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 70 |     try {\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 95 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 96 |   };\n     | ^^^^^ `fetchClasses` is declared here\n  97 |\n  98 |   const fetchAttendance = async () => {\n  99 |     if (!selectedClassId || !workshop?._id) return;"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/exhaustive-deps|55|6|React Hook useEffect has a missing dependency: 'fetchClasses'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 55,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchClasses'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/set-state-in-effect|59|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  57 |   useEffect(() => {\n  58 |     if (selectedClassId) {\n> 59 |       setStudentSearch('');\n     |       ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  60 |       setStudentStatusFilter('ALL');\n  61 |       setStudentPage(1);\n  62 |       fetchAttendance();",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 59,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  57 |   useEffect(() => {\n  58 |     if (selectedClassId) {\n> 59 |       setStudentSearch('');\n     |       ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  60 |       setStudentStatusFilter('ALL');\n  61 |       setStudentPage(1);\n  62 |       fetchAttendance();"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/immutability|62|7|Error: Cannot access variable before it is declared\n\n`fetchAttendance` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  60 |       setStudentStatusFilter('ALL');\n  61 |       setStudentPage(1);\n> 62 |       fetchAttendance();\n     |       ^^^^^^^^^^^^^^^ `fetchAttendance` accessed before it is declared\n  63 |     } else {\n  64 |       setStudents([]);\n  65 |     }\n\n   96 |   };\n   97 |\n>  98 |   const fetchAttendance = async () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n>  99 |     if (!selectedClassId || !workshop?._id) return;\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 100 |     setLoadingStudents(true);\n      …\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 110 |     }\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 111 |   };\n      | ^^^^^ `fetchAttendance` is declared here\n  112 |\n  113 |   const handleVerify = async (studentId, status, reason = '') => {\n  114 |     if (status === 'REJECTED' && !reason) {",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 62,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`fetchAttendance` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  60 |       setStudentStatusFilter('ALL');\n  61 |       setStudentPage(1);\n> 62 |       fetchAttendance();\n     |       ^^^^^^^^^^^^^^^ `fetchAttendance` accessed before it is declared\n  63 |     } else {\n  64 |       setStudents([]);\n  65 |     }\n\n   96 |   };\n   97 |\n>  98 |   const fetchAttendance = async () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n>  99 |     if (!selectedClassId || !workshop?._id) return;\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 100 |     setLoadingStudents(true);\n      …\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 110 |     }\n      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 111 |   };\n      | ^^^^^ `fetchAttendance` is declared here\n  112 |\n  113 |   const handleVerify = async (studentId, status, reason = '') => {\n  114 |     if (status === 'REJECTED' && !reason) {"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|react-hooks/exhaustive-deps|66|6|React Hook useEffect has a missing dependency: 'fetchAttendance'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 66,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchAttendance'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx|no-unused-vars|191|9|'uniqueMajors' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopAttendanceManager.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 191,
+      "column": 9,
+      "severity": 2,
+      "message": "'uniqueMajors' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopCheckInModal.jsx|no-unused-vars|10|10|'uploading' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopCheckInModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 10,
+      "column": 10,
+      "severity": 2,
+      "message": "'uploading' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|2|122|'ArrowRightLeft' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 122,
+      "severity": 2,
+      "message": "'ArrowRightLeft' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|62|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 62,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|89|16|'err' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 89,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/set-state-in-effect|98|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n   96 |   useEffect(() => {\n   97 |     if (workshop) {\n>  98 |       setTitle(workshop.title || '');\n      |       ^^^^^^^^ Avoid calling setState() directly within an effect\n   99 |       setDescription(workshop.description || '');\n  100 |       setType(workshop.type || 'WORKSHOP');\n  101 |       setTargetAudience(workshop.targetAudience || 'CLASS');",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 98,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n   96 |   useEffect(() => {\n   97 |     if (workshop) {\n>  98 |       setTitle(workshop.title || '');\n      |       ^^^^^^^^ Avoid calling setState() directly within an effect\n   99 |       setDescription(workshop.description || '');\n  100 |       setType(workshop.type || 'WORKSHOP');\n  101 |       setTargetAudience(workshop.targetAudience || 'CLASS');"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/immutability|129|7|Error: Cannot access variable before it is declared\n\n`resetForm` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  127 |       }\n  128 |     } else {\n> 129 |       resetForm();\n      |       ^^^^^^^^^ `resetForm` accessed before it is declared\n  130 |     }\n  131 |   }, [workshop, isOpen]);\n  132 |\n\n  210 |   }, [availableClasses, targetAudience]);\n  211 |\n> 212 |   const resetForm = () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^\n> 213 |     setTitle('');\n      | ^^^^^^^^^^^^^^^^^\n> 214 |     setDescription('');\n      …\n      | ^^^^^^^^^^^^^^^^^\n> 234 |     setOfflinePage(1);\n      | ^^^^^^^^^^^^^^^^^\n> 235 |   };\n      | ^^^^^ `resetForm` is declared here\n  236 |\n  237 |   const getDerivedFormat = () => {\n  238 |     if (onlineClassIds.length > 0 && offlineClassIds.length > 0) return 'HYBRID';",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 129,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`resetForm` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  127 |       }\n  128 |     } else {\n> 129 |       resetForm();\n      |       ^^^^^^^^^ `resetForm` accessed before it is declared\n  130 |     }\n  131 |   }, [workshop, isOpen]);\n  132 |\n\n  210 |   }, [availableClasses, targetAudience]);\n  211 |\n> 212 |   const resetForm = () => {\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^\n> 213 |     setTitle('');\n      | ^^^^^^^^^^^^^^^^^\n> 214 |     setDescription('');\n      …\n      | ^^^^^^^^^^^^^^^^^\n> 234 |     setOfflinePage(1);\n      | ^^^^^^^^^^^^^^^^^\n> 235 |   };\n      | ^^^^^ `resetForm` is declared here\n  236 |\n  237 |   const getDerivedFormat = () => {\n  238 |     if (onlineClassIds.length > 0 && offlineClassIds.length > 0) return 'HYBRID';"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|134|9|'handleClassSelection' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 134,
+      "column": 9,
+      "severity": 2,
+      "message": "'handleClassSelection' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|154|9|'handleSelectAll' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 154,
+      "column": 9,
+      "severity": 2,
+      "message": "'handleSelectAll' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|165|9|'handleDeselectAll' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 165,
+      "column": 9,
+      "severity": 2,
+      "message": "'handleDeselectAll' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|178|9|'swapClassMode' is assigned a value but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 178,
+      "column": 9,
+      "severity": 2,
+      "message": "'swapClassMode' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/set-state-in-effect|193|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  191 |       const allIds = availableClasses.map(c => c._id);\n  192 |       // All classes default to Offline initially. Admin can check any class to make it Online.\n> 193 |       setOfflineClassIds(allIds);\n      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  194 |       setOnlineClassIds([]);\n  195 |     }\n  196 |   }, [availableClasses, workshop, targetAudience]);",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 193,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  191 |       const allIds = availableClasses.map(c => c._id);\n  192 |       // All classes default to Offline initially. Admin can check any class to make it Online.\n> 193 |       setOfflineClassIds(allIds);\n      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  194 |       setOnlineClassIds([]);\n  195 |     }\n  196 |   }, [availableClasses, workshop, targetAudience]);"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/exhaustive-deps|196|6|React Hook useEffect has missing dependencies: 'offlineClassIds.length' and 'onlineClassIds.length'. Either include them or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 196,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has missing dependencies: 'offlineClassIds.length' and 'onlineClassIds.length'. Either include them or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/set-state-in-effect|207|9|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  205 |       if (missingIds.length > 0) {\n  206 |         // Any missing/new class defaults to Offline format\n> 207 |         setOfflineClassIds(prev => [...prev, ...missingIds]);\n      |         ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  208 |       }\n  209 |     }\n  210 |   }, [availableClasses, targetAudience]);",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 207,
+      "column": 9,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  205 |       if (missingIds.length > 0) {\n  206 |         // Any missing/new class defaults to Offline format\n> 207 |         setOfflineClassIds(prev => [...prev, ...missingIds]);\n      |         ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  208 |       }\n  209 |     }\n  210 |   }, [availableClasses, targetAudience]);"
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|react-hooks/exhaustive-deps|210|6|React Hook useEffect has missing dependencies: 'offlineClassIds' and 'onlineClassIds'. Either include them or remove the dependency array.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 210,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has missing dependencies: 'offlineClassIds' and 'onlineClassIds'. Either include them or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopForm.jsx|no-unused-vars|344|14|'err' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 344,
+      "column": 14,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/WorkshopPreviewModal.jsx|no-unused-vars|2|8|'React' is defined but never used.",
+      "filePath": "frontend/src/components/workspace/WorkshopPreviewModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/components/workspace/checkpoints/CheckpointPanel.jsx|react-hooks/set-state-in-effect|76|21|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  74 |   }, [teamId, checkpoint]);\n  75 |\n> 76 |   useEffect(() => { fetchData(); }, [fetchData]);\n     |                     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  77 |\n  78 |   useEffect(() => {\n  79 |     document.body.style.overflow = 'hidden';",
+      "filePath": "frontend/src/components/workspace/checkpoints/CheckpointPanel.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 76,
+      "column": 21,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  74 |   }, [teamId, checkpoint]);\n  75 |\n> 76 |   useEffect(() => { fetchData(); }, [fetchData]);\n     |                     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  77 |\n  78 |   useEffect(() => {\n  79 |     document.body.style.overflow = 'hidden';"
+    },
+    {
+      "key": "frontend/src/components/workspace/checkpoints/CheckpointSection.jsx|react-hooks/set-state-in-effect|46|21|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  44 |   }, [teamId]);\n  45 |\n> 46 |   useEffect(() => { fetchStats(); }, [fetchStats]);\n     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  47 |\n  48 |   const completedCount = configs.filter(\n  49 |     (cp) => (stats[cp.number]?.count || 0) > 0",
+      "filePath": "frontend/src/components/workspace/checkpoints/CheckpointSection.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 46,
+      "column": 21,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  44 |   }, [teamId]);\n  45 |\n> 46 |   useEffect(() => { fetchStats(); }, [fetchStats]);\n     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect\n  47 |\n  48 |   const completedCount = configs.filter(\n  49 |     (cp) => (stats[cp.number]?.count || 0) > 0"
+    },
+    {
+      "key": "frontend/src/pages/auth/Login.jsx|react-hooks/set-state-in-effect|36|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  34 |   useEffect(() => {\n  35 |     if (location.state?.prefillEmail || location.state?.email) {\n> 36 |       setEmail(location.state.prefillEmail || location.state.email);\n     |       ^^^^^^^^ Avoid calling setState() directly within an effect\n  37 |     }\n  38 |     if (location.state?.isPending) {\n  39 |       setPendingApproval(true);",
+      "filePath": "frontend/src/pages/auth/Login.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 36,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  34 |   useEffect(() => {\n  35 |     if (location.state?.prefillEmail || location.state?.email) {\n> 36 |       setEmail(location.state.prefillEmail || location.state.email);\n     |       ^^^^^^^^ Avoid calling setState() directly within an effect\n  37 |     }\n  38 |     if (location.state?.isPending) {\n  39 |       setPendingApproval(true);"
+    },
+    {
+      "key": "frontend/src/pages/auth/Login.jsx|no-unused-vars|105|15|'googleUser' is assigned a value but never used.",
+      "filePath": "frontend/src/pages/auth/Login.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 105,
+      "column": 15,
+      "severity": 2,
+      "message": "'googleUser' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/pages/auth/Login.jsx|no-unused-vars|130|9|'demoAccounts' is assigned a value but never used.",
+      "filePath": "frontend/src/pages/auth/Login.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 130,
+      "column": 9,
+      "severity": 2,
+      "message": "'demoAccounts' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/pages/auth/Login.jsx|no-unused-vars|136|9|'fillDemo' is assigned a value but never used.",
+      "filePath": "frontend/src/pages/auth/Login.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 136,
+      "column": 9,
+      "severity": 2,
+      "message": "'fillDemo' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/pages/auth/Register.jsx|react-hooks/set-state-in-effect|27|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  25 |   // Reset major when programGroup changes\n  26 |   useEffect(() => {\n> 27 |     setMajor('');\n     |     ^^^^^^^^ Avoid calling setState() directly within an effect\n  28 |   }, [programGroup]);\n  29 |\n  30 |   // ── State: Step 2 (OTP) ───────────────────────────────────",
+      "filePath": "frontend/src/pages/auth/Register.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 27,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  25 |   // Reset major when programGroup changes\n  26 |   useEffect(() => {\n> 27 |     setMajor('');\n     |     ^^^^^^^^ Avoid calling setState() directly within an effect\n  28 |   }, [programGroup]);\n  29 |\n  30 |   // ── State: Step 2 (OTP) ───────────────────────────────────"
+    },
+    {
+      "key": "frontend/src/pages/auth/Register.jsx|react-hooks/set-state-in-effect|46|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  44 |   useEffect(() => {\n  45 |     if (location.state?.step === 'otp' && location.state?.email) {\n> 46 |       setEmail(location.state.email);\n     |       ^^^^^^^^ Avoid calling setState() directly within an effect\n  47 |       setStep(2);\n  48 |       startCountdown();\n  49 |     }",
+      "filePath": "frontend/src/pages/auth/Register.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 46,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  44 |   useEffect(() => {\n  45 |     if (location.state?.step === 'otp' && location.state?.email) {\n> 46 |       setEmail(location.state.email);\n     |       ^^^^^^^^ Avoid calling setState() directly within an effect\n  47 |       setStep(2);\n  48 |       startCountdown();\n  49 |     }"
+    },
+    {
+      "key": "frontend/src/pages/auth/Register.jsx|react-hooks/immutability|48|7|Error: Cannot access variable before it is declared\n\n`startCountdown` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  46 |       setEmail(location.state.email);\n  47 |       setStep(2);\n> 48 |       startCountdown();\n     |       ^^^^^^^^^^^^^^ `startCountdown` accessed before it is declared\n  49 |     }\n  50 |   }, []);\n  51 |\n\n  51 |\n  52 |   // ── OTP expiry countdown ─────────────────────────────────────────\n> 53 |   const startCountdown = () => setCountdown(OTP_EXPIRE_SECONDS);\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `startCountdown` is declared here\n  54 |\n  55 |   useEffect(() => {\n  56 |     if (step !== 2) return;",
+      "filePath": "frontend/src/pages/auth/Register.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 48,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`startCountdown` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  46 |       setEmail(location.state.email);\n  47 |       setStep(2);\n> 48 |       startCountdown();\n     |       ^^^^^^^^^^^^^^ `startCountdown` accessed before it is declared\n  49 |     }\n  50 |   }, []);\n  51 |\n\n  51 |\n  52 |   // ── OTP expiry countdown ─────────────────────────────────────────\n> 53 |   const startCountdown = () => setCountdown(OTP_EXPIRE_SECONDS);\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `startCountdown` is declared here\n  54 |\n  55 |   useEffect(() => {\n  56 |     if (step !== 2) return;"
+    },
+    {
+      "key": "frontend/src/pages/auth/Register.jsx|react-hooks/exhaustive-deps|50|6|React Hook useEffect has missing dependencies: 'location.state.email' and 'location.state?.step'. Either include them or remove the dependency array.",
+      "filePath": "frontend/src/pages/auth/Register.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 50,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has missing dependencies: 'location.state.email' and 'location.state?.step'. Either include them or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/pages/common/AIAnalysis.jsx|no-unused-vars|9|8|'EmptyState' is defined but never used.",
+      "filePath": "frontend/src/pages/common/AIAnalysis.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 9,
+      "column": 8,
+      "severity": 2,
+      "message": "'EmptyState' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/AIAnalysis.jsx|no-unused-vars|11|73|'Link2' is defined but never used.",
+      "filePath": "frontend/src/pages/common/AIAnalysis.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 11,
+      "column": 73,
+      "severity": 2,
+      "message": "'Link2' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/AIAnalysis.jsx|no-unused-vars|75|19|'e' is defined but never used.",
+      "filePath": "frontend/src/pages/common/AIAnalysis.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 75,
+      "column": 19,
+      "severity": 2,
+      "message": "'e' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/AIAnalysis.jsx|no-unused-vars|91|16|'err' is defined but never used.",
+      "filePath": "frontend/src/pages/common/AIAnalysis.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 91,
+      "column": 16,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/GroupChat.jsx|no-unused-vars|9|29|'UserCircle2' is defined but never used.",
+      "filePath": "frontend/src/pages/common/GroupChat.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 9,
+      "column": 29,
+      "severity": 2,
+      "message": "'UserCircle2' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/GroupChat.jsx|react-hooks/set-state-in-effect|67|22|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  65 |\n  66 |   useEffect(() => {\n> 67 |     if (chatGroupId) fetchMembers();\n     |                      ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  68 |     // eslint-disable-next-line react-hooks/exhaustive-deps\n  69 |   }, [chatGroupId]);\n  70 |",
+      "filePath": "frontend/src/pages/common/GroupChat.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 67,
+      "column": 22,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  65 |\n  66 |   useEffect(() => {\n> 67 |     if (chatGroupId) fetchMembers();\n     |                      ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  68 |     // eslint-disable-next-line react-hooks/exhaustive-deps\n  69 |   }, [chatGroupId]);\n  70 |"
+    },
+    {
+      "key": "frontend/src/pages/common/GroupChat.jsx|react-hooks/set-state-in-effect|75|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  73 |     if (data?.members) {\n  74 |       const me = data.members.find(m => m.userId?.toString() === currentUserId?.toString());\n> 75 |       setNickInput(me?.nickname || '');\n     |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  76 |     }\n  77 |   }, [data, currentUserId]);\n  78 |",
+      "filePath": "frontend/src/pages/common/GroupChat.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 75,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  73 |     if (data?.members) {\n  74 |       const me = data.members.find(m => m.userId?.toString() === currentUserId?.toString());\n> 75 |       setNickInput(me?.nickname || '');\n     |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  76 |     }\n  77 |   }, [data, currentUserId]);\n  78 |"
+    },
+    {
+      "key": "frontend/src/pages/common/GroupChat.jsx|react-hooks/immutability|259|18|Error: Cannot access variable before it is declared\n\n`scrollToBottom` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  257 |         return [...prev, msg];\n  258 |       });\n> 259 |       setTimeout(scrollToBottom, 100);\n      |                  ^^^^^^^^^^^^^^ `scrollToBottom` accessed before it is declared\n  260 |     });\n  261 |\n  262 |     return () => socket.disconnect();\n\n  325 |   }, [selectedChannel]);\n  326 |\n> 327 |   const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `scrollToBottom` is declared here\n  328 |\n  329 |   const handleFileSelect = (e) => {\n  330 |     const file = e.target.files[0];",
+      "filePath": "frontend/src/pages/common/GroupChat.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 259,
+      "column": 18,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`scrollToBottom` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  257 |         return [...prev, msg];\n  258 |       });\n> 259 |       setTimeout(scrollToBottom, 100);\n      |                  ^^^^^^^^^^^^^^ `scrollToBottom` accessed before it is declared\n  260 |     });\n  261 |\n  262 |     return () => socket.disconnect();\n\n  325 |   }, [selectedChannel]);\n  326 |\n> 327 |   const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });\n      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `scrollToBottom` is declared here\n  328 |\n  329 |   const handleFileSelect = (e) => {\n  330 |     const file = e.target.files[0];"
+    },
+    {
+      "key": "frontend/src/pages/common/Rankings.jsx|no-unused-vars|9|25|'Star' is defined but never used.",
+      "filePath": "frontend/src/pages/common/Rankings.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 9,
+      "column": 25,
+      "severity": 2,
+      "message": "'Star' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/common/Rankings.jsx|react-hooks/set-state-in-effect|59|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  57 |\n  58 |   useEffect(() => {\n> 59 |     fetchRankings();\n     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  60 |   }, [selectedClass]);\n  61 |\n  62 |   if (loading && rankings.length === 0) return <LoadingSkeleton />;",
+      "filePath": "frontend/src/pages/common/Rankings.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 59,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  57 |\n  58 |   useEffect(() => {\n> 59 |     fetchRankings();\n     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  60 |   }, [selectedClass]);\n  61 |\n  62 |   if (loading && rankings.length === 0) return <LoadingSkeleton />;"
+    },
+    {
+      "key": "frontend/src/pages/common/Rankings.jsx|react-hooks/exhaustive-deps|60|6|React Hook useEffect has a missing dependency: 'fetchRankings'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/pages/common/Rankings.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 60,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchRankings'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/pages/mentor/MentorDashboard.jsx|no-unused-vars|15|3|'ArrowRight' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/MentorDashboard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 15,
+      "column": 3,
+      "severity": 2,
+      "message": "'ArrowRight' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/MentorDashboard.jsx|no-unused-vars|15|26|'AlertCircle' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/MentorDashboard.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 15,
+      "column": 26,
+      "severity": 2,
+      "message": "'AlertCircle' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/PastSessionList.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/PastSessionList.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/PastSessionList.jsx|react-hooks/immutability|15|5|Error: Cannot access variable before it is declared\n\n`loadPastSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  13 |\n  14 |   useEffect(() => {\n> 15 |     loadPastSessions();\n     |     ^^^^^^^^^^^^^^^^ `loadPastSessions` accessed before it is declared\n  16 |   }, []);\n  17 |\n  18 |   const loadPastSessions = async () => {\n\n  16 |   }, []);\n  17 |\n> 18 |   const loadPastSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 19 |     setLoading(true);\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 20 |     setError('');\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 30 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 31 |   };\n     | ^^^^^ `loadPastSessions` is declared here\n  32 |\n  33 |   const handleNoteClick = (session) => {\n  34 |     setSelectedSession(session);",
+      "filePath": "frontend/src/pages/mentor/PastSessionList.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 15,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`loadPastSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  13 |\n  14 |   useEffect(() => {\n> 15 |     loadPastSessions();\n     |     ^^^^^^^^^^^^^^^^ `loadPastSessions` accessed before it is declared\n  16 |   }, []);\n  17 |\n  18 |   const loadPastSessions = async () => {\n\n  16 |   }, []);\n  17 |\n> 18 |   const loadPastSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 19 |     setLoading(true);\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 20 |     setError('');\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 30 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 31 |   };\n     | ^^^^^ `loadPastSessions` is declared here\n  32 |\n  33 |   const handleNoteClick = (session) => {\n  34 |     setSelectedSession(session);"
+    },
+    {
+      "key": "frontend/src/pages/mentor/ScheduleSessionModal.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/ScheduleSessionModal.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/ScheduleSessionModal.jsx|react-hooks/set-state-in-effect|20|7|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  18 |   useEffect(() => {\n  19 |     if (session) {\n> 20 |       setFormData({\n     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  21 |         title: session.title || '',\n  22 |         description: session.description || '',\n  23 |         meetingDate: session.meetingDate ? session.meetingDate.split('T')[0] : '',",
+      "filePath": "frontend/src/pages/mentor/ScheduleSessionModal.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 20,
+      "column": 7,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  18 |   useEffect(() => {\n  19 |     if (session) {\n> 20 |       setFormData({\n     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  21 |         title: session.title || '',\n  22 |         description: session.description || '',\n  23 |         meetingDate: session.meetingDate ? session.meetingDate.split('T')[0] : '',"
+    },
+    {
+      "key": "frontend/src/pages/mentor/SessionCalendar.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/SessionCalendar.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/SessionCalendar.jsx|react-hooks/immutability|16|5|Error: Cannot access variable before it is declared\n\n`loadSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  14 |\n  15 |   useEffect(() => {\n> 16 |     loadSessions();\n     |     ^^^^^^^^^^^^ `loadSessions` accessed before it is declared\n  17 |   }, [teamId]);\n  18 |\n  19 |   const loadSessions = async () => {\n\n  17 |   }, [teamId]);\n  18 |\n> 19 |   const loadSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 20 |     setLoading(true);\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 21 |     setError('');\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 31 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 32 |   };\n     | ^^^^^ `loadSessions` is declared here\n  33 |\n  34 |   const handleScheduleClick = (session = null) => {\n  35 |     setSelectedSession(session);",
+      "filePath": "frontend/src/pages/mentor/SessionCalendar.jsx",
+      "ruleId": "react-hooks/immutability",
+      "line": 16,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Cannot access variable before it is declared\n\n`loadSessions` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.\n\n  14 |\n  15 |   useEffect(() => {\n> 16 |     loadSessions();\n     |     ^^^^^^^^^^^^ `loadSessions` accessed before it is declared\n  17 |   }, [teamId]);\n  18 |\n  19 |   const loadSessions = async () => {\n\n  17 |   }, [teamId]);\n  18 |\n> 19 |   const loadSessions = async () => {\n     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n> 20 |     setLoading(true);\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 21 |     setError('');\n     …\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 31 |     }\n     | ^^^^^^^^^^^^^^^^^^^^^\n> 32 |   };\n     | ^^^^^ `loadSessions` is declared here\n  33 |\n  34 |   const handleScheduleClick = (session = null) => {\n  35 |     setSelectedSession(session);"
+    },
+    {
+      "key": "frontend/src/pages/mentor/SessionCalendar.jsx|react-hooks/exhaustive-deps|17|6|React Hook useEffect has a missing dependency: 'loadSessions'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/pages/mentor/SessionCalendar.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 17,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'loadSessions'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/pages/mentor/SessionNoteForm.jsx|no-unused-vars|1|8|'React' is defined but never used.",
+      "filePath": "frontend/src/pages/mentor/SessionNoteForm.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 8,
+      "severity": 2,
+      "message": "'React' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/mentor/SessionNoteForm.jsx|react-hooks/set-state-in-effect|10|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n   8 |\n   9 |   useEffect(() => {\n> 10 |     setNotes(initialNotes);\n     |     ^^^^^^^^ Avoid calling setState() directly within an effect\n  11 |     setError('');\n  12 |   }, [initialNotes, sessionId]);\n  13 |",
+      "filePath": "frontend/src/pages/mentor/SessionNoteForm.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 10,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n   8 |\n   9 |   useEffect(() => {\n> 10 |     setNotes(initialNotes);\n     |     ^^^^^^^^ Avoid calling setState() directly within an effect\n  11 |     setError('');\n  12 |   }, [initialNotes, sessionId]);\n  13 |"
+    },
+    {
+      "key": "frontend/src/pages/shared/ClassDetail.jsx|no-unused-vars|7|21|'UserPlus' is defined but never used.",
+      "filePath": "frontend/src/pages/shared/ClassDetail.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 7,
+      "column": 21,
+      "severity": 2,
+      "message": "'UserPlus' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/shared/ClassDetail.jsx|no-unused-vars|7|31|'CheckCircle2' is defined but never used.",
+      "filePath": "frontend/src/pages/shared/ClassDetail.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 7,
+      "column": 31,
+      "severity": 2,
+      "message": "'CheckCircle2' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/shared/ClassDetail.jsx|no-unused-vars|7|45|'AlertTriangle' is defined but never used.",
+      "filePath": "frontend/src/pages/shared/ClassDetail.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 7,
+      "column": 45,
+      "severity": 2,
+      "message": "'AlertTriangle' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/shared/ClassDetail.jsx|react-hooks/set-state-in-effect|57|21|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  55 |   }, [id]);\n  56 |\n> 57 |   useEffect(() => { fetchData(); }, [fetchData]);\n     |                     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  58 |\n  59 |   const handleImported = async () => {\n  60 |     setShowImport(false);",
+      "filePath": "frontend/src/pages/shared/ClassDetail.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 57,
+      "column": 21,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  55 |   }, [id]);\n  56 |\n> 57 |   useEffect(() => { fetchData(); }, [fetchData]);\n     |                     ^^^^^^^^^ Avoid calling setState() directly within an effect\n  58 |\n  59 |   const handleImported = async () => {\n  60 |     setShowImport(false);"
+    },
+    {
+      "key": "frontend/src/pages/student/StudentClassDetail.jsx|no-unused-vars|3|45|'Calendar' is defined but never used.",
+      "filePath": "frontend/src/pages/student/StudentClassDetail.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 45,
+      "severity": 2,
+      "message": "'Calendar' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/student/StudentClassDetail.jsx|no-unused-vars|3|70|'Sparkles' is defined but never used.",
+      "filePath": "frontend/src/pages/student/StudentClassDetail.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 70,
+      "severity": 2,
+      "message": "'Sparkles' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workshops/Workshops.jsx|react-hooks/set-state-in-effect|62|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  60 |\n  61 |   useEffect(() => {\n> 62 |     fetchWorkshops();\n     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  63 |   }, []);\n  64 |\n  65 |   const handleDelete = async (id) => {",
+      "filePath": "frontend/src/pages/workshops/Workshops.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 62,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  60 |\n  61 |   useEffect(() => {\n> 62 |     fetchWorkshops();\n     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  63 |   }, []);\n  64 |\n  65 |   const handleDelete = async (id) => {"
+    },
+    {
+      "key": "frontend/src/pages/workspace/PitchDeckUpload.jsx|no-unused-vars|3|70|'User' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/PitchDeckUpload.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 70,
+      "severity": 2,
+      "message": "'User' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|no-unused-vars|5|3|'FileText' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 3,
+      "severity": 2,
+      "message": "'FileText' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|no-unused-vars|5|45|'AlertCircle' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 45,
+      "severity": 2,
+      "message": "'AlertCircle' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|no-unused-vars|5|58|'RefreshCw' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 58,
+      "severity": 2,
+      "message": "'RefreshCw' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|react-hooks/set-state-in-effect|90|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  88 |\n  89 |   useEffect(() => {\n> 90 |     fetchWorkspaceAndProposal();\n     |     ^^^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  91 |   }, [teamId]);\n  92 |\n  93 |   const handleBack = () => {",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 90,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  88 |\n  89 |   useEffect(() => {\n> 90 |     fetchWorkspaceAndProposal();\n     |     ^^^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  91 |   }, [teamId]);\n  92 |\n  93 |   const handleBack = () => {"
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|react-hooks/exhaustive-deps|91|6|React Hook useEffect has a missing dependency: 'fetchWorkspaceAndProposal'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 91,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchWorkspaceAndProposal'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|no-unused-vars|134|15|'res' is assigned a value but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 134,
+      "column": 15,
+      "severity": 2,
+      "message": "'res' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalEditor.jsx|no-unused-vars|141|15|'res' is assigned a value but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalEditor.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 141,
+      "column": 15,
+      "severity": 2,
+      "message": "'res' is assigned a value but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalPreview.jsx|no-unused-vars|1|41|'User' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalPreview.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 1,
+      "column": 41,
+      "severity": 2,
+      "message": "'User' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/ProposalPreview.jsx|no-unused-vars|2|8|'Badge' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/ProposalPreview.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 2,
+      "column": 8,
+      "severity": 2,
+      "message": "'Badge' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|5|10|'Calendar' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 10,
+      "severity": 2,
+      "message": "'Calendar' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|5|45|'UploadCloud' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 45,
+      "severity": 2,
+      "message": "'UploadCloud' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|5|58|'History' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 58,
+      "severity": 2,
+      "message": "'History' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|6|3|'ChevronRight' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 3,
+      "severity": 2,
+      "message": "'ChevronRight' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|6|30|'User' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 30,
+      "severity": 2,
+      "message": "'User' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|6|47|'Download' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 47,
+      "severity": 2,
+      "message": "'Download' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|6|57|'Trash2' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 57,
+      "severity": 2,
+      "message": "'Trash2' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|6|73|'MapPin' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 73,
+      "severity": 2,
+      "message": "'MapPin' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|8|8|'toast' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 8,
+      "column": 8,
+      "severity": 2,
+      "message": "'toast' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|no-unused-vars|11|8|'Badge' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 11,
+      "column": 8,
+      "severity": 2,
+      "message": "'Badge' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|react-hooks/set-state-in-effect|49|14|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  47 |     const params = new URLSearchParams(location.search);\n  48 |     const tab = params.get('tab');\n> 49 |     if (tab) setActiveTab(tab);\n     |              ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  50 |   }, [location.search]);\n  51 |\n  52 |   const fetchWorkspaceData = async () => {",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 49,
+      "column": 14,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  47 |     const params = new URLSearchParams(location.search);\n  48 |     const tab = params.get('tab');\n> 49 |     if (tab) setActiveTab(tab);\n     |              ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  50 |   }, [location.search]);\n  51 |\n  52 |   const fetchWorkspaceData = async () => {"
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|react-hooks/set-state-in-effect|78|5|Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  76 |\n  77 |   useEffect(() => {\n> 78 |     fetchWorkspaceData();\n     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  79 |   }, [teamId]);\n  80 |\n  81 |   if (loading) {",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "react-hooks/set-state-in-effect",
+      "line": 78,
+      "column": 5,
+      "severity": 2,
+      "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\n  76 |\n  77 |   useEffect(() => {\n> 78 |     fetchWorkspaceData();\n     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  79 |   }, [teamId]);\n  80 |\n  81 |   if (loading) {"
+    },
+    {
+      "key": "frontend/src/pages/workspace/TeamWorkspace.jsx|react-hooks/exhaustive-deps|79|6|React Hook useEffect has a missing dependency: 'fetchWorkspaceData'. Either include it or remove the dependency array.",
+      "filePath": "frontend/src/pages/workspace/TeamWorkspace.jsx",
+      "ruleId": "react-hooks/exhaustive-deps",
+      "line": 79,
+      "column": 6,
+      "severity": 1,
+      "message": "React Hook useEffect has a missing dependency: 'fetchWorkspaceData'. Either include it or remove the dependency array."
+    },
+    {
+      "key": "frontend/src/pages/workspace/VersionHistory.jsx|no-unused-vars|3|51|'FileText' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/VersionHistory.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 51,
+      "severity": 2,
+      "message": "'FileText' is defined but never used."
+    },
+    {
+      "key": "frontend/src/pages/workspace/VersionHistory.jsx|no-unused-vars|3|61|'Check' is defined but never used.",
+      "filePath": "frontend/src/pages/workspace/VersionHistory.jsx",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 61,
+      "severity": 2,
+      "message": "'Check' is defined but never used."
+    }
+  ]
+}

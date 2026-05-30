@@ -1,0 +1,78 @@
+name: Progressive Quality Gate
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+  push:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run backend progressive lint gate
+        run: >
+          node scripts/progressive-lint-gate.cjs
+          --project backend
+          --target .
+          --report reports/backend-lint-report.json
+          --baseline quality-gates/baselines/backend-lint-baseline.json
+
+      - name: Run frontend progressive lint gate
+        run: >
+          node scripts/progressive-lint-gate.cjs
+          --project frontend
+          --target .
+          --report reports/frontend-lint-report.json
+          --baseline quality-gates/baselines/frontend-lint-baseline.json
+
+      - name: Run backend tests if available
+        working-directory: backend
+        run: npm run test --if-present
+
+      - name: Run frontend tests if available
+        working-directory: frontend
+        run: npm run test --if-present
+
+      - name: Run MongoDB duplicate and index-readiness preflight
+        run: >
+          node scripts/mongodb-duplicate-preflight.cjs
+          --collection shortcuts
+          --team-field teamId
+          --url-field url
+          --normalized-url-field normalizedUrl
+          --report reports/mongodb-duplicate-report.json
+
+      - name: Upload quality gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progressive-quality-gate-reports
+          path: reports/*.json
+          if-no-files-found: warn

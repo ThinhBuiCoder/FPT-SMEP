@@ -1,0 +1,564 @@
+{
+  "generatedAt": "2026-05-29T17:33:33.777Z",
+  "sourceReport": "backend-lint-report.json",
+  "findings": [
+    {
+      "key": "backend/fix_teams.js|no-unused-vars|6|7|'Class' is assigned a value but never used.",
+      "filePath": "backend/fix_teams.js",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 7,
+      "severity": 2,
+      "message": "'Class' is assigned a value but never used."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|6|23|'Class' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 6,
+      "column": 23,
+      "severity": 2,
+      "message": "'Class' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|7|22|'errorResponse' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 7,
+      "column": 22,
+      "severity": 2,
+      "message": "'errorResponse' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|11|14|'errorResponse' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 11,
+      "column": 14,
+      "severity": 2,
+      "message": "'errorResponse' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|15|29|'errorResponse' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 15,
+      "column": 29,
+      "severity": 2,
+      "message": "'errorResponse' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|18|14|'errorResponse' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 18,
+      "column": 14,
+      "severity": 2,
+      "message": "'errorResponse' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|22|28|'Student' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 22,
+      "column": 28,
+      "severity": 2,
+      "message": "'Student' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|24|25|'Team' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 24,
+      "column": 25,
+      "severity": 2,
+      "message": "'Team' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|29|26|'ExcelJS' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 29,
+      "column": 26,
+      "severity": 2,
+      "message": "'ExcelJS' is not defined."
+    },
+    {
+      "key": "backend/scratch.js|no-undef|123|12|'errorResponse' is not defined.",
+      "filePath": "backend/scratch.js",
+      "ruleId": "no-undef",
+      "line": 123,
+      "column": 12,
+      "severity": 2,
+      "message": "'errorResponse' is not defined."
+    },
+    {
+      "key": "backend/src/controllers/ai.controller.js|no-unused-vars|4|7|'Team' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/ai.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 4,
+      "column": 7,
+      "severity": 2,
+      "message": "'Team' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/ai.controller.js|no-unused-vars|48|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/ai.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 48,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/ai.controller.js|no-unused-vars|60|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/ai.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 60,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/auth.controller.js|no-unused-vars|74|11|'user' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/auth.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 74,
+      "column": 11,
+      "severity": 2,
+      "message": "'user' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/auth.controller.js|no-unused-vars|334|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/auth.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 334,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/auth.controller.js|no-unused-vars|353|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/auth.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 353,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/auth.controller.js|no-unused-vars|409|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/auth.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 409,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/chat.controller.js|no-unused-vars|5|7|'Team' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/chat.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 5,
+      "column": 7,
+      "severity": 2,
+      "message": "'Team' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|9|9|'sendClassCreatedNotification' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 9,
+      "column": 9,
+      "severity": 2,
+      "message": "'sendClassCreatedNotification' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|246|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 246,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|282|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 282,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|297|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 297,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|342|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 342,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|453|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 453,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|643|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 643,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/class.controller.js|no-unused-vars|699|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/class.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 699,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/evaluation.controller.js|no-unused-vars|6|7|'Class' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/evaluation.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 7,
+      "severity": 2,
+      "message": "'Class' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/evaluation.controller.js|no-unused-vars|114|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/evaluation.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 114,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/evaluation.controller.js|no-unused-vars|126|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/evaluation.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 126,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/evaluation.controller.js|no-unused-vars|143|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/evaluation.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 143,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/geminiAi.controller.js|no-unused-vars|3|9|'successResponse' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/geminiAi.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 9,
+      "severity": 2,
+      "message": "'successResponse' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/geminiAi.controller.js|no-unused-vars|3|26|'errorResponse' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/geminiAi.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 26,
+      "severity": 2,
+      "message": "'errorResponse' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/mentoring.controller.js|no-unused-vars|236|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/mentoring.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 236,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/mentoring.controller.js|no-unused-vars|550|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/mentoring.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 550,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/milestone.controller.js|no-unused-vars|6|9|'recalculateMilestoneProgress' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/milestone.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 6,
+      "column": 9,
+      "severity": 2,
+      "message": "'recalculateMilestoneProgress' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/controllers/startupIdea.controller.js|no-unused-vars|79|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/startupIdea.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 79,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/startupIdea.controller.js|no-unused-vars|98|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/startupIdea.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 98,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/startupIdea.controller.js|no-unused-vars|109|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/startupIdea.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 109,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/startupIdea.controller.js|no-unused-vars|125|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/startupIdea.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 125,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-undef|58|66|'teamIndex' is not defined.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-undef",
+      "line": 58,
+      "column": 66,
+      "severity": 2,
+      "message": "'teamIndex' is not defined."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|132|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 132,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|161|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 161,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|191|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 191,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|217|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 217,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|234|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 234,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|253|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 253,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/team.controller.js|no-unused-vars|264|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/team.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 264,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/user.controller.js|no-unused-vars|29|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/user.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 29,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/user.controller.js|no-unused-vars|40|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/user.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 40,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/user.controller.js|no-unused-vars|60|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/user.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 60,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/user.controller.js|no-unused-vars|102|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/user.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 102,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/user.controller.js|no-unused-vars|115|12|'err' is defined but never used.",
+      "filePath": "backend/src/controllers/user.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 115,
+      "column": 12,
+      "severity": 2,
+      "message": "'err' is defined but never used."
+    },
+    {
+      "key": "backend/src/controllers/workspace.controller.js|no-unused-vars|3|7|'fs' is assigned a value but never used.",
+      "filePath": "backend/src/controllers/workspace.controller.js",
+      "ruleId": "no-unused-vars",
+      "line": 3,
+      "column": 7,
+      "severity": 2,
+      "message": "'fs' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/middlewares/error.middleware.js|no-unused-vars|10|44|'next' is defined but never used.",
+      "filePath": "backend/src/middlewares/error.middleware.js",
+      "ruleId": "no-unused-vars",
+      "line": 10,
+      "column": 44,
+      "severity": 2,
+      "message": "'next' is defined but never used."
+    },
+    {
+      "key": "backend/src/services/chatGroup.service.js|no-unused-vars|118|12|'_' is defined but never used.",
+      "filePath": "backend/src/services/chatGroup.service.js",
+      "ruleId": "no-unused-vars",
+      "line": 118,
+      "column": 12,
+      "severity": 2,
+      "message": "'_' is defined but never used."
+    },
+    {
+      "key": "backend/src/services/dashboard.service.js|no-unused-vars|12|7|'PitchDeck' is assigned a value but never used.",
+      "filePath": "backend/src/services/dashboard.service.js",
+      "ruleId": "no-unused-vars",
+      "line": 12,
+      "column": 7,
+      "severity": 2,
+      "message": "'PitchDeck' is assigned a value but never used."
+    },
+    {
+      "key": "backend/src/services/email.service.js|no-useless-assignment|158|7|The value assigned to 'locationInfoHtml' is not used in subsequent statements.",
+      "filePath": "backend/src/services/email.service.js",
+      "ruleId": "no-useless-assignment",
+      "line": 158,
+      "column": 7,
+      "severity": 2,
+      "message": "The value assigned to 'locationInfoHtml' is not used in subsequent statements."
+    },
+    {
+      "key": "backend/src/services/email.service.js|no-useless-assignment|159|7|The value assigned to 'locationInfoText' is not used in subsequent statements.",
+      "filePath": "backend/src/services/email.service.js",
+      "ruleId": "no-useless-assignment",
+      "line": 159,
+      "column": 7,
+      "severity": 2,
+      "message": "The value assigned to 'locationInfoText' is not used in subsequent statements."
+    },
+    {
+      "key": "backend/src/services/geminiService.js|no-control-regex|29|39|Unexpected control character(s) in regular expression: \\x00, \\x1f.",
+      "filePath": "backend/src/services/geminiService.js",
+      "ruleId": "no-control-regex",
+      "line": 29,
+      "column": 39,
+      "severity": 2,
+      "message": "Unexpected control character(s) in regular expression: \\x00, \\x1f."
+    },
+    {
+      "key": "backend/src/services/geminiService.js|preserve-caught-error|40|7|There is no `cause` attached to the symptom error being thrown.",
+      "filePath": "backend/src/services/geminiService.js",
+      "ruleId": "preserve-caught-error",
+      "line": 40,
+      "column": 7,
+      "severity": 2,
+      "message": "There is no `cause` attached to the symptom error being thrown."
+    },
+    {
+      "key": "backend/src/services/studentImport.service.js|preserve-caught-error|308|9|There is no `cause` attached to the symptom error being thrown.",
+      "filePath": "backend/src/services/studentImport.service.js",
+      "ruleId": "preserve-caught-error",
+      "line": 308,
+      "column": 9,
+      "severity": 2,
+      "message": "There is no `cause` attached to the symptom error being thrown."
+    },
+    {
+      "key": "backend/src/services/teamGeneration.service.js|no-unused-vars|20|58|'mode' is defined but never used.",
+      "filePath": "backend/src/services/teamGeneration.service.js",
+      "ruleId": "no-unused-vars",
+      "line": 20,
+      "column": 58,
+      "severity": 2,
+      "message": "'mode' is defined but never used."
+    }
+  ]
+}

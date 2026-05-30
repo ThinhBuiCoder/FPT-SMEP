@@ -1,0 +1,102 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{url}
+
+\title{A Progressive CI/CD Quality Gate Approach for Managing Legacy Lint Debt and MongoDB Uniqueness Violations in Student Web Projects}
+
+\author{
+\IEEEauthorblockN{Author Name}
+\IEEEauthorblockA{
+Department or University\\
+Email
+}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Student web projects frequently accumulate technical debt while still requiring continuous integration and deployment support. This paper reports an empirical case study of a progressive CI/CD quality gate for a MERN-based student project. The approach tolerates existing ESLint debt through a baseline while blocking newly introduced lint violations. It also introduces a MongoDB preflight check to detect duplicate records before deployment and to assess readiness for a unique compound index on \texttt{\{ teamId, normalizedUrl \}}. The study evaluates whether progressive enforcement can balance software quality and student development productivity under legacy debt conditions.
+\end{abstract}
+
+\begin{IEEEkeywords}
+CI/CD, quality gate, technical debt, ESLint, MongoDB, Mongoose, student software engineering
+\end{IEEEkeywords}
+
+\section{Introduction}
+Modern student web projects often adopt industry-style stacks and deployment workflows, but their repositories may contain legacy lint debt and inconsistent database state. Strict quality gates can improve quality, but they may also block development when historical issues are treated the same as newly introduced defects. This study investigates a progressive quality gate that separates existing debt from new violations and adds a database-integrity preflight check before deployment.
+
+\section{Related Work}
+This section should discuss continuous integration, quality gates, technical debt management, static analysis adoption, and database integrity constraints in software engineering education.
+
+\section{Progressive Quality Gate Model}
+The proposed model consists of two mechanisms. First, ESLint findings are recorded as a baseline and future CI runs fail only when new findings appear. Second, MongoDB records are checked for duplicate compound keys before deployment. The index readiness decision is derived from whether existing data satisfies the proposed uniqueness rule.
+
+\section{Methodology}
+The study uses a before/after empirical case study design. The baseline phase records existing lint debt, CI outcomes, and database-integrity status before the intervention. The intervention phase enables progressive lint enforcement and MongoDB duplicate preflight checks. The unit of analysis is the CI run, supplemented by deployment status and student survey responses.
+
+\section{Experimental Setup}
+The subject system is a MERN student web project using React, Node.js/Express, MongoDB, Mongoose, GitHub Actions, and ESLint. The backend baseline contains 62 lint errors. The frontend baseline contains 145 lint errors and 20 warnings. These findings are intentionally retained as legacy debt rather than repaired before the experiment.
+
+\begin{table}[htbp]
+\caption{Baseline Quality State}
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Backend Lint Errors & 62 \\
+Frontend Lint Errors & 145 \\
+Frontend Warnings & 20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Results}
+This section should be completed after collecting GitHub Actions logs, lint JSON artifacts, MongoDB duplicate reports, and survey responses.
+
+\begin{table}[htbp]
+\caption{Progressive Gate Validation}
+\centering
+\begin{tabular}{ll}
+\toprule
+Scenario & Result \\
+\midrule
+Existing lint debt & Allowed \\
+New lint violation & Blocked \\
+Duplicate MongoDB records & Detected \\
+Unique index unsafe & Blocked \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\caption{MongoDB Integrity Check}
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Documents scanned & TBD \\
+Duplicate groups & TBD \\
+Duplicate documents & TBD \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+The discussion should interpret the results as empirical case-study evidence. The analysis should avoid causal overclaiming and focus on feasibility, observed CI behavior, developer workflow impact, and implications for student teams managing existing technical debt.
+
+\section{Threats to Validity}
+Construct validity is limited because lint findings and duplicate records represent only selected aspects of quality. Internal validity is limited because changes in student behavior, feature complexity, and workload may influence CI outcomes. External validity is limited by the single-project MERN context. Conclusion validity is limited by the number of observed CI runs and survey responses.
+
+\section{Conclusion}
+This paper evaluates a progressive CI/CD quality gate for a student MERN project with legacy lint debt and potential MongoDB uniqueness violations. The approach is intended to preserve development momentum while preventing new quality regressions and unsafe deployment conditions.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
+
