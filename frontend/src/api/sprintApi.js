@@ -1,7 +1,12 @@
 // frontend/src/api/sprintApi.js
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return 'http://localhost:5000/api';
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+};
+const API_URL = getBaseUrl();
 
 const auth = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },

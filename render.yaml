@@ -1,0 +1,43 @@
+services:
+  # Backend API Service
+  - type: web
+    name: fpt-startup-backend
+    env: node
+    plan: free # Change to standard/pro if needed
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: fpt-startup-frontend
+          envVar: RENDER_EXTERNAL_URL
+      # These values must be set securely in the Render Dashboard after deployment
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+
+  # Frontend Web Service (Static Site)
+  - type: web # Using web instead of static because VITE_API_URL needs the backend URL dynamically
+    name: fpt-startup-frontend
+    env: static
+    plan: free # Static sites are free on Render
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: fpt-startup-backend
+          envVar: RENDER_EXTERNAL_URL
