@@ -25,7 +25,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const workshopRoutes = require('./routes/workshop.routes');
 const weeklyTaskRoutes = require('./routes/weeklyTask.routes');
 const checkpointRoutes = require('./routes/checkpoint.routes');
-
+const uploadRoutes = require('./routes/upload.routes');
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
 const path = require('path');
@@ -79,7 +79,7 @@ app.use('/api/rankings', rankingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/workshops', workshopRoutes);
 app.use('/api/weekly-tasks', weeklyTaskRoutes);
-
+app.use('/api/upload', uploadRoutes);
 // ─── ERROR HANDLERS ───────────────────────────────────────
 app.use(notFound);
 app.use(globalErrorHandler);
