@@ -1,5 +1,5 @@
 run_id,date,branch,commit_hash,phase,total_lint_errors,total_lint_warnings,new_lint_violations,ci_status,lint_gate_status,duplicate_groups_found,duplicate_documents_found,index_readiness_status,deployment_status,fix_time_minutes,notes
-R001,2026-05-30,local,local-baseline,baseline,207,20,0,passed,passed,,,not_checked,not_deployed,,Baseline lint debt captured: backend 62 errors; frontend 145 errors and 20 warnings
+R001,5/30/2026,research/pqg-mern,56b2b97,intervention,227,20,0,passed,passed,0,0,read,not_deployed,0,Initial quality gate validation
 R002,,,,after,207,20,0,,,,,,,,
-R003,,,,validation-new-lint,,,,,,,,,,,"Expected: add one unused variable on a test branch; new_lint_violations=1; ci_status=failed"
-R004,,,,validation-mongodb-duplicate,,,,,,,,,,,"Expected: insert normalized duplicate records in test DB; duplicate_groups_found=1; index_readiness_status=not_ready"
+R003,,,,validation-new-lint,,,,,,,,,,,Expected: add one unused variable on a test branch; new_lint_violations=1; ci_status=failed
+R004,,,,validation-mongodb-duplicate,,,,,,,,,,,Expected: insert normalized duplicate records in test DB; duplicate_groups_found=1; index_readiness_status=not_ready
