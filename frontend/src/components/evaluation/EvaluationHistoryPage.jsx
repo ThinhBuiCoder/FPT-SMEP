@@ -1,6 +1,7 @@
 // frontend/src/components/evaluation/EvaluationHistoryPage.jsx
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
+import PerformanceLevelBadge from './PerformanceLevelBadge';
 
 /**
  * EvaluationHistoryPage Component
@@ -16,9 +17,11 @@ const EvaluationHistoryPage = ({
   history = [],
   evaluation,
   teamId,
+  currentUserRole = '',
   loading = false,
   error = null
 }) => {
+  const isMentor = (currentUserRole || '').toUpperCase() === 'MENTOR' || (currentUserRole || '').toUpperCase() === 'STUDENT';
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareWithVersion, setCompareWithVersion] = useState(null);
@@ -153,13 +156,25 @@ const EvaluationHistoryPage = ({
                             <span className="text-sm text-gray-600">
                               Weight: {score.weight}%
                             </span>
-                            <span className="text-sm font-bold text-blue-700">
-                              {score.score}/10
-                            </span>
+                            {/* Mentor sees level badge; others see numeric score */}
+                            {isMentor ? (
+                              <PerformanceLevelBadge
+                                level={score.level || 'Unscored'}
+                                label={score.label || ''}
+                                size="sm"
+                                showLabel={false}
+                              />
+                            ) : (
+                              <span className="text-sm font-bold text-blue-700">
+                                {score.score}/10
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            Weighted: {score.weightedScore}
-                          </div>
+                          {!isMentor && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Weighted: {score.weightedScore}
+                            </div>
+                          )}
                           {score.comment && (
                             <div className="text-xs text-gray-700 mt-2 bg-white bg-opacity-75 p-2 rounded">
                               "{score.comment}"
@@ -213,13 +228,28 @@ const EvaluationHistoryPage = ({
 
                 {/* Change Summary */}
                 <div className="bg-white bg-opacity-75 p-3 rounded border border-gray-300">
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <div className="text-gray-600">Checkpoint Total</div>
-                      <div className="font-bold text-lg text-blue-700">
-                        {item.snapshot.checkpointTotal?.toFixed(2) || 'N/A'}
+                  <div className={`grid gap-3 text-sm ${isMentor ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                    {/* Checkpoint Total — hidden for Mentor */}
+                    {!isMentor && (
+                      <div>
+                        <div className="text-gray-600">Checkpoint Total</div>
+                        <div className="font-bold text-lg text-blue-700">
+                          {item.snapshot.checkpointTotal?.toFixed(2) || 'N/A'}
+                        </div>
                       </div>
-                    </div>
+                    )}
+                    {isMentor && (
+                      <div>
+                        <div className="text-gray-600">Overall Performance</div>
+                        <div className="mt-1">
+                          <PerformanceLevelBadge
+                            level={item.snapshot.overallLevel || 'Unscored'}
+                            label={item.snapshot.overallLabel || ''}
+                            size="sm"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <div className="text-gray-600">Status</div>
                       <div className="font-bold">

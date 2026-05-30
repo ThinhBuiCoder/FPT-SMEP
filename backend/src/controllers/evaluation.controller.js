@@ -8,6 +8,11 @@ const workspacePerm = require('../utils/workspacePermission');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { getCheckpointConfig } = require('../config/checkpointConfig');
 const { normalizeRubricScores, assertValidRubric } = require('../services/evaluationScoring.service');
+const {
+  formatEvaluationsByRole,
+  formatHistoryByRole,
+  getPerformanceLevel,
+} = require('../services/evaluationVisibility.service');
 
 const buildRole = (role) => {
   const normalized = (role || '').toString().toUpperCase();
@@ -159,7 +164,7 @@ const getTeamEvaluations = async (req, res) => {
     if (checkpointNumber) {
       query.checkpointNumber = parseInt(checkpointNumber, 10);
     }
-    
+
     // Students only see SUBMITTED or PUBLISHED
     if (req.user.role === 'STUDENT' || req.user.role === 'USER') {
       query.status = { $in: ['SUBMITTED', 'PUBLISHED'] };
@@ -169,7 +174,10 @@ const getTeamEvaluations = async (req, res) => {
       .populate('lecturerId', 'name email avatar role')
       .sort({ createdAt: -1 });
 
-    return successResponse(res, { evaluations });
+    // Apply role-based visibility — Mentor receives sanitized (score-free) data
+    const formattedEvaluations = formatEvaluationsByRole(evaluations, req.user.role);
+
+    return successResponse(res, { evaluations: formattedEvaluations });
   } catch (err) {
     if (err.statusCode === 403) return errorResponse(res, err.message, 403);
     return errorResponse(res, "Server error: " + err.message);
@@ -186,29 +194,59 @@ const getCheckpointEvaluationSummary = async (req, res) => {
     const checkpointConfig = getCheckpointConfig(cpNum);
     if (!checkpointConfig) return errorResponse(res, 'Invalid checkpoint number.', 400);
 
-    const evaluations = await Evaluation.find({ teamId, checkpointNumber: cpNum })
+    const evaluationQuery = { teamId, checkpointNumber: cpNum };
+    const historyQuery = { teamId, checkpointNumber: cpNum };
+
+    if (req.user.role === 'STUDENT' || req.user.role === 'USER') {
+      evaluationQuery.status = { $in: ['SUBMITTED', 'PUBLISHED'] };
+      historyQuery['snapshot.status'] = { $in: ['SUBMITTED', 'PUBLISHED'] };
+    }
+
+    const evaluations = await Evaluation.find(evaluationQuery)
       .populate('lecturerId', 'name email avatar role')
       .sort({ updatedAt: -1 });
 
-    const history = await EvaluationHistory.find({ teamId, checkpointNumber: cpNum })
+    const history = await EvaluationHistory.find(historyQuery)
       .populate('changedBy', 'name email avatar role')
       .sort({ createdAt: -1 });
 
     const published = evaluations.filter((ev) => ev.status === 'SUBMITTED' || ev.status === 'PUBLISHED');
-    const average = published.length
+    const hasPublished = published.length > 0;
+    const average = hasPublished
       ? Number((published.reduce((sum, ev) => sum + (ev.checkpointTotal || ev.weightedScore || 0), 0) / published.length).toFixed(2))
-      : 0;
+      : null;
+
+    const overallPerformance = hasPublished ? getPerformanceLevel(average) : null;
+
+    // Apply role-based visibility to evaluations and history
+    const isMentorOrStudent = ['MENTOR', 'STUDENT'].includes((req.user.role || '').toUpperCase());
+    const formattedEvaluations = formatEvaluationsByRole(evaluations, req.user.role);
+    const formattedHistory = formatHistoryByRole(history, req.user.role);
+
+    // For Mentor/Student: replace averageScore with overall performance level, omit numeric
+    const summaryBase = {
+      checkpointNumber: cpNum,
+      evaluationCount: evaluations.length,
+      submittedCount: published.length,
+    };
+
+    const summary = isMentorOrStudent
+      ? {
+          ...summaryBase,
+          overallPerformance,
+          // averageScore intentionally omitted
+        }
+      : {
+          ...summaryBase,
+          averageScore: average,
+          overallPerformance,
+        };
 
     return successResponse(res, {
       checkpoint: checkpointConfig,
-      evaluations,
-      history,
-      summary: {
-        checkpointNumber: cpNum,
-        evaluationCount: evaluations.length,
-        submittedCount: published.length,
-        averageScore: average,
-      },
+      evaluations: formattedEvaluations,
+      history: formattedHistory,
+      summary,
     });
   } catch (err) {
     if (err.statusCode === 403) return errorResponse(res, err.message, 403);
@@ -351,11 +389,18 @@ const getTeamEvaluationHistory = async (req, res) => {
     const query = { teamId };
     if (checkpointNumber) query.checkpointNumber = parseInt(checkpointNumber, 10);
 
+    if (req.user.role === 'STUDENT' || req.user.role === 'USER') {
+      query['snapshot.status'] = { $in: ['SUBMITTED', 'PUBLISHED'] };
+    }
+
     const history = await EvaluationHistory.find(query)
       .populate('changedBy', 'name email avatar role')
       .sort({ createdAt: -1 });
 
-    return successResponse(res, { history });
+    // Apply role-based visibility — Mentor sees history without numeric scores
+    const formattedHistory = formatHistoryByRole(history, req.user.role);
+
+    return successResponse(res, { history: formattedHistory });
   } catch (err) {
     if (err.statusCode === 403) return errorResponse(res, err.message, 403);
     return errorResponse(res, 'Server error: ' + err.message);

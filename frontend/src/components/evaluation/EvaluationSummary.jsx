@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import RubricScoringForm from './RubricScoringForm';
 import CommentThread from './CommentThread';
+import PerformanceLevelBadge from './PerformanceLevelBadge';
 
 /**
  * EvaluationSummary Component
@@ -24,6 +25,7 @@ const EvaluationSummary = ({
   onSubmit
 }) => {
   const [editMode, setEditMode] = useState(false);
+  const shouldHideSensitiveScores = isMentor || (currentUserRole || '').toUpperCase() === 'STUDENT' || (currentUserRole || '').toUpperCase() === 'USER';
   const [formData, setFormData] = useState({
     overallFeedback: evaluation?.overallFeedback || '',
     strengths: evaluation?.strengths || '',
@@ -68,16 +70,32 @@ const EvaluationSummary = ({
             </p>
           </div>
           <div className="text-right">
-            <div className="text-4xl font-bold text-blue-600">
-              {totalScore.toFixed(2)}/10
-            </div>
-            <div className={`text-sm font-semibold mt-1 px-3 py-1 rounded-full inline-block ${
-              evaluation?.status === 'SUBMITTED' ? 'bg-green-100 text-green-800' :
-              evaluation?.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {evaluation?.status || 'DRAFT'}
-            </div>
+            {shouldHideSensitiveScores ? (
+              /* Mentor: show performance badge instead of numeric total */
+              evaluation?.overallLevel && evaluation.overallLevel !== 'Unscored' ? (
+                <div className="flex flex-col items-end gap-1.5">
+                  <PerformanceLevelBadge
+                    level={evaluation.overallLevel}
+                    label={evaluation.overallLabel || ''}
+                    size="lg"
+                  />
+                </div>
+              ) : null
+            ) : (
+              /* Lecturer / Admin / Student: full numeric score */
+              <>
+                <div className="text-4xl font-bold text-blue-600">
+                  {totalScore.toFixed(2)}/10
+                </div>
+                <div className={`text-sm font-semibold mt-1 px-3 py-1 rounded-full inline-block ${
+                  evaluation?.status === 'SUBMITTED' ? 'bg-green-100 text-green-800' :
+                  evaluation?.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {evaluation?.status || 'DRAFT'}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -155,6 +173,7 @@ const EvaluationSummary = ({
           onScoresChange={setRubricScores}
           onTotalChange={setTotalScore}
           readOnly={!editMode || !canEdit}
+          hideSensitiveScores={shouldHideSensitiveScores}
         />
       </div>
 
@@ -174,7 +193,7 @@ const EvaluationSummary = ({
                 onChange={(e) => setFormData({...formData, overallFeedback: e.target.value})}
                 placeholder="Provide overall feedback and observations..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="3"
+                rows="5"
               />
             ) : (
               <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-700">
@@ -194,7 +213,7 @@ const EvaluationSummary = ({
                 onChange={(e) => setFormData({...formData, strengths: e.target.value})}
                 placeholder="What are the team's main strengths?"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="3"
+                rows="4"
               />
             ) : (
               <div className="bg-green-50 p-3 rounded-lg text-sm text-gray-700 border border-green-200">
@@ -214,7 +233,7 @@ const EvaluationSummary = ({
                 onChange={(e) => setFormData({...formData, weaknesses: e.target.value})}
                 placeholder="What areas need improvement?"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="3"
+                rows="4"
               />
             ) : (
               <div className="bg-red-50 p-3 rounded-lg text-sm text-gray-700 border border-red-200">
@@ -234,7 +253,7 @@ const EvaluationSummary = ({
                 onChange={(e) => setFormData({...formData, suggestions: e.target.value})}
                 placeholder="What should the team focus on?"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="3"
+                rows="4"
               />
             ) : (
               <div className="bg-blue-50 p-3 rounded-lg text-sm text-gray-700 border border-blue-200">
@@ -245,17 +264,19 @@ const EvaluationSummary = ({
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-          <div className="text-sm text-blue-700 font-semibold">Average Score</div>
-          <div className="text-2xl font-bold text-blue-900 mt-1">{totalScore.toFixed(2)}</div>
+      {/* Statistics — hidden for Mentor/Student */}
+      {!shouldHideSensitiveScores && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+            <div className="text-sm text-blue-700 font-semibold">Average Score</div>
+            <div className="text-2xl font-bold text-blue-900 mt-1">{totalScore.toFixed(2)}</div>
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+            <div className="text-sm text-purple-700 font-semibold">Criteria Evaluated</div>
+            <div className="text-2xl font-bold text-purple-900 mt-1">{rubricScores.length}</div>
+          </div>
         </div>
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-          <div className="text-sm text-purple-700 font-semibold">Criteria Evaluated</div>
-          <div className="text-2xl font-bold text-purple-900 mt-1">{rubricScores.length}</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
