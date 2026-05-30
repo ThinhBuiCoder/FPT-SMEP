@@ -27,7 +27,6 @@ services:
   - type: web # Using web instead of static because VITE_API_URL needs the backend URL dynamically
     name: fpt-startup-frontend
     env: static
-    plan: free # Static sites are free on Render
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
