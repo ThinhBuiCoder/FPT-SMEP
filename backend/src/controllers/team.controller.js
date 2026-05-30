@@ -46,7 +46,7 @@ exports.generateTeam = async (req, res) => {
   }
 
   // 4. Generate team code/name
-  const { teamCode, teamName } = await generateTeamCode(cls.classCode, classId);
+  const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
 
   // 5. Run inside a transaction for atomicity (Team + ChatGroup)
   const session = await mongoose.startSession();

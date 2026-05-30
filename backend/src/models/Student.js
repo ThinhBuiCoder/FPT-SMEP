@@ -23,6 +23,16 @@ const studentSchema = new mongoose.Schema(
     userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     // Which team (if any) this student has been assigned to within the class
     teamId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
+
+    // Exam & Outcome fields (from Excel import)
+    examDate:        { type: Date,   default: null },
+    examNote:        { type: String, default: null, trim: true },
+    outcome1:        { type: String, default: null, trim: true },
+    outcome1Comment: { type: String, default: null, trim: true },
+    outcome2:        { type: String, default: null, trim: true },
+    outcome2Comment: { type: String, default: null, trim: true },
+    outcome3:        { type: String, default: null, trim: true },
+    outcome3Comment: { type: String, default: null, trim: true },
   },
   { timestamps: true }
 );

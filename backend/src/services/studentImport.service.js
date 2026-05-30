@@ -16,6 +16,15 @@ const REQUIRED_COLS = ['rollnumber', 'fullname', 'email'];
 const normalizeHeader = (h) => {
   const normalized = String(h).trim().toLowerCase().replace(/\s+/g, '');
   if (['chuyênngành', 'chuyennganh', 'major'].includes(normalized)) return 'major';
+  // Outcome columns: "Outcome 1" → "outcome1", "Outcome 1_Comment" → "outcome1_comment"
+  const outcomeMatch = normalized.match(/^outcome(\d+)_?comment$/);
+  if (outcomeMatch) return `outcome${outcomeMatch[1]}_comment`;
+  const outcomeNumMatch = normalized.match(/^outcome(\d+)$/);
+  if (outcomeNumMatch) return `outcome${outcomeNumMatch[1]}`;
+  if (normalized === 'examdate')  return 'examdate';
+  if (normalized === 'examnote')  return 'examnote';
+  if (normalized === 'membercode') return 'membercode';
+  if (normalized === 'class')     return 'class'; // read but ignored
   return normalized;
 };
 
@@ -256,6 +265,13 @@ const importStudents = async (buffer, classId) => {
       avatarUrl = existingUser.avatar || null;
     }
 
+    // Parse examDate (support formats like MM/DD/YYYY or YYYY-MM-DD)
+    let examDate = null;
+    if (row.examdate) {
+      const parsed = new Date(row.examdate);
+      if (!isNaN(parsed.getTime())) examDate = parsed;
+    }
+
     // Build student document
     const studentData = {
       rollNumber: rollUpper,
@@ -271,6 +287,15 @@ const importStudents = async (buffer, classId) => {
       classId,
       userId:    linkedUserId,
       avatarUrl,
+      // Exam & Outcome fields
+      examDate,
+      examNote:        row.examnote        || null,
+      outcome1:        row.outcome1        || null,
+      outcome1Comment: row['outcome1_comment'] || null,
+      outcome2:        row.outcome2        || null,
+      outcome2Comment: row['outcome2_comment'] || null,
+      outcome3:        row.outcome3        || null,
+      outcome3Comment: row['outcome3_comment'] || null,
     };
 
     studentsToInsert.push(studentData);
