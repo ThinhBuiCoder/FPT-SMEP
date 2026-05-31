@@ -19,7 +19,16 @@ const getGroupMessages = async (req, res) => {
 
     const isMember = req.user.role === 'ADMIN' || group.members.some(
       m => m.userId && m.userId.toString() === req.user.id.toString()
-    );
+    ) || await (async () => {
+      // Fallback: check by student email
+      const studentRecords = await Student.find({
+        $or: [{ userId: req.user.id }, { email: req.user.email }]
+      }).lean();
+      const studentIds = studentRecords.map(s => s._id.toString());
+      return group.members.some(
+        m => m.studentId && studentIds.includes(m.studentId.toString())
+      );
+    })();
 
     if (!isMember) {
       return errorResponse(res, 'You are not a member of this chat group.', 403);
@@ -49,11 +58,45 @@ const getMyChatGroups = async (req, res) => {
         .populate('classId', 'classCode semester year')
         .sort({ updatedAt: -1 });
     } else {
-      // Find chat groups where user is a member
-      groups = await ChatGroup.find({ 'members.userId': req.user.id })
+      // Find student records linked to this user (by userId or email)
+      const studentRecords = await Student.find({
+        $or: [
+          { userId: req.user.id },
+          { email: req.user.email },
+        ]
+      }).lean();
+      const studentIds = studentRecords.map(s => s._id);
+
+      // Auto-link any unlinked student records on-the-fly
+      for (const s of studentRecords) {
+        if (!s.userId) {
+          await Student.findByIdAndUpdate(s._id, { userId: req.user.id });
+        }
+      }
+
+      // Query groups where user is member by userId OR studentId
+      groups = await ChatGroup.find({
+        $or: [
+          { 'members.userId': req.user.id },
+          { 'members.studentId': { $in: studentIds } },
+        ]
+      })
         .populate('teamId', 'teamName teamCode')
         .populate('classId', 'classCode semester year')
         .sort({ updatedAt: -1 });
+
+      // Auto-link userId into the ChatGroup members for future queries
+      for (const group of groups) {
+        let changed = false;
+        for (const member of group.members) {
+          if (!member.userId && member.studentId &&
+              studentIds.some(sid => sid.toString() === member.studentId.toString())) {
+            member.userId = req.user.id;
+            changed = true;
+          }
+        }
+        if (changed) await group.save();
+      }
     }
 
     // Map to include latest message for list view preview
