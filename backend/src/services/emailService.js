@@ -3,8 +3,8 @@ const nodemailer = require('nodemailer');
 
 // ── Create transporter ─────────────────────────────────────────
 const createTransporter = () => {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.GMAIL_USER || process.env.EMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS;
 
   if (!user || !pass) return null; // fallback to console mode
 
@@ -118,7 +118,7 @@ const sendOtpEmail = async (toEmail, otp, userName = 'there') => {
   }
 
   const mailOptions = {
-    from: `"FPT-SMEP · No Reply" <${process.env.GMAIL_USER}>`,
+    from: `"FPT-SMEP · No Reply" <${process.env.GMAIL_USER || process.env.EMAIL_USER}>`,
     to: toEmail,
     subject: `[FPT-SMEP] Your account verification code: ${otp}`,
     html: buildOtpHtml(userName, otp),
@@ -235,7 +235,7 @@ const sendResetPasswordEmail = async (toEmail, resetUrl, userName = 'there') => 
   }
 
   const mailOptions = {
-    from: `"FPT-SMEP · No Reply" <${process.env.GMAIL_USER}>`,
+    from: `"FPT-SMEP · No Reply" <${process.env.GMAIL_USER || process.env.EMAIL_USER}>`,
     to: toEmail,
     subject: '[FPT-SMEP] Reset your password',
     html: buildResetPasswordHtml(userName, resetUrl),
