@@ -46,14 +46,16 @@ axiosClient.interceptors.response.use(
       } else if (error.response.status === 403) {
         // Nếu là 403 từ auth (needVerify), KHÔNG redirect — để component tự xử lý
         const isAuthRoute = error.config?.url?.includes('/auth/');
-        if (!isAuthRoute) {
+        const isWorkspaceRoute = error.config?.url?.includes('/workspace');
+        if (!isAuthRoute && !isWorkspaceRoute) {
           window.location.href = '/403';
         }
       }
     }
     const errData = error.response?.data || {};
     const errMessage = errData.message || error.message || 'Lỗi kết nối server';
-    const errObj = new Error(errMessage);
+    const normalizedErrMessage = errData.error && errMessage === error.message ? errData.error : errMessage;
+    const errObj = new Error(normalizedErrMessage);
     errObj.data = errData.data || errData.errors || null;
     errObj.status = error.response?.status;
     return Promise.reject(errObj);

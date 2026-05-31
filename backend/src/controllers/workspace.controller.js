@@ -11,6 +11,7 @@ const ProposalVersion = require("../models/ProposalVersion");
 const PitchDeck = require("../models/PitchDeck");
 const CheckpointSubmission = require("../models/CheckpointSubmission");
 const workspacePerm = require("../utils/workspacePermission");
+const workspaceAccess = require("../services/workspaceAccess.service");
 
 // Use memory storage for Cloudinary
 const storage = multer.memoryStorage();
@@ -80,9 +81,9 @@ exports.getAccessibleTeams = async (req, res) => {
         .populate(teamListPopulate)
         .sort({ teamName: 1 });
     } else if (role === "STUDENT" || role === "USER") {
-      const student = await workspacePerm.getCurrentStudentByUser(req.user);
-      if (student?.teamId) {
-        teams = await Team.find({ _id: student.teamId }).populate(teamListPopulate);
+      const { team } = await workspacePerm.getCurrentStudentWorkspaceContext(req.user);
+      if (team?._id) {
+        teams = await Team.find({ _id: team._id }).populate(teamListPopulate);
       }
     } else {
       return errorResponse(res, "Access Denied.", 403);
@@ -115,6 +116,12 @@ exports.getAccessibleTeams = async (req, res) => {
         teamName: team.teamName,
         teamCode: team.teamCode,
         description: team.description,
+        lineageId: team.lineageId,
+        previousTeamId: team.previousTeamId,
+        nextTeamId: team.nextTeamId,
+        isArchived: team.isArchived,
+        courseCode: team.courseCode || team.classId?.subjectCode || null,
+        semester: team.semester || (team.classId ? `${team.classId.semester || ""}${team.classId.year || ""}` : null),
         class: team.classId,
         mentor: team.mentorId,
         lecturer: team.lectureId,
@@ -135,13 +142,20 @@ exports.getAccessibleTeams = async (req, res) => {
 // ─── GET /api/workspace/my-team ──────────────────────────────────────────────
 exports.getMyWorkspace = async (req, res) => {
   try {
-    const student = await workspacePerm.getCurrentStudentByUser(req.user);
-    if (!student || !student.teamId) {
-      return successResponse(res, null, "You have not been assigned to a team yet.");
+    const { student, team, reason } = await workspacePerm.getCurrentStudentWorkspaceContext(req.user);
+    if (!student) {
+      return successResponse(res, null, "You have not joined any class yet.");
+    }
+
+    if (!team) {
+      const message = reason === "NO_TEAM_IN_CURRENT_CLASS"
+        ? "You have joined this class but have not been assigned to a team yet."
+        : "Your saved team no longer matches your current class. Please contact your lecturer or administrator.";
+      return successResponse(res, null, message);
     }
     
     // Redirect to getTeamWorkspaceDetails helper
-    const workspaceData = await exports.getTeamWorkspaceDetails(student.teamId);
+    const workspaceData = await exports.getTeamWorkspaceDetails(team._id);
     return successResponse(res, workspaceData);
   } catch (err) {
     console.error("getMyWorkspace error:", err);
@@ -183,14 +197,24 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
   const students = await Student.find({ teamId }).populate("userId", "name email avatar role");
 
   const proposal = await Proposal.findOne({ teamId });
-  const pitchDecks = await PitchDeck.find({ teamId, status: "ACTIVE" }).sort({ createdAt: -1 });
-  const latestDeck = pitchDecks.length > 0 ? pitchDecks[0] : null;
+  const lineageTeamIds = team.lineageId
+    ? (await Team.find({ lineageId: team.lineageId }).select("_id")).map((item) => item._id)
+    : [team._id];
+  const pitchDecks = await PitchDeck.find({ teamId: { $in: lineageTeamIds }, status: "ACTIVE" })
+    .populate("teamId", "teamName teamCode courseCode semester isArchived")
+    .sort({ createdAt: -1 });
+  const latestDeck = pitchDecks.find((deck) => String(deck.teamId?._id || deck.teamId) === String(team._id))
+    || pitchDecks[0]
+    || null;
 
   let versions = [];
-  if (proposal) {
-    versions = await ProposalVersion.find({ proposalId: proposal._id })
+  const lineageProposals = await Proposal.find({ teamId: { $in: lineageTeamIds } }).select("_id teamId");
+  const proposalIds = lineageProposals.map((item) => item._id);
+  if (proposalIds.length > 0) {
+    versions = await ProposalVersion.find({ proposalId: { $in: proposalIds } })
       .populate("changedBy", "name email")
-      .sort({ versionNumber: -1 });
+      .populate("teamId", "teamName teamCode courseCode semester isArchived")
+      .sort({ createdAt: -1 });
   }
 
   return {
@@ -211,6 +235,7 @@ exports.createProposal = async (req, res) => {
   try {
     const { teamId } = req.params;
     await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const existingProposal = await Proposal.findOne({ teamId });
     if (existingProposal) {
@@ -299,6 +324,7 @@ exports.updateProposal = async (req, res) => {
     }
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, proposal.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, proposal.teamId);
 
     // Reset status to DRAFT if it was in any other stage
     if (proposal.status !== "DRAFT") {
@@ -356,6 +382,7 @@ exports.submitProposal = async (req, res) => {
     }
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, proposal.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, proposal.teamId);
 
     proposal.status = "SUBMITTED";
     proposal.submittedAt = new Date();
@@ -449,6 +476,7 @@ exports.restoreProposalVersion = async (req, res) => {
     }
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, proposal.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, proposal.teamId);
 
     const ver = await ProposalVersion.findById(versionId);
     if (!ver) {
@@ -513,6 +541,7 @@ exports.uploadPitchDeck = (req, res) => {
     try {
       const { teamId } = req.params;
       await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+      await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
       const team = await Team.findById(teamId);
       if (!team) {
@@ -612,6 +641,7 @@ exports.deletePitchDeck = async (req, res) => {
     }
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, deck.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, deck.teamId);
 
     deck.status = "ARCHIVED";
     await deck.save();

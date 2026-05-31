@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getSessionsByTeam, createSession, updateSession, deleteSession, cancelSession } from '../../api/mentoringApi';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 
-export default function MentoringPanel({ teamId }) {
+export default function MentoringPanel({ teamId, isReadOnly = false }) {
   const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,21 +17,23 @@ export default function MentoringPanel({ teamId }) {
 
   const isStudent = user?.role === 'STUDENT' || user?.role === 'USER';
 
-  useEffect(() => {
-    fetchSessions();
-  }, [teamId]);
-
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getSessionsByTeam(teamId);
       if (res.success) setSessions(res.data.sessions || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load mentoring sessions');
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId]);
+
+  useEffect(() => {
+    // Fetching sessions is the side effect owned by this panel.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSessions();
+  }, [fetchSessions]);
 
   const openModal = (session = null) => {
     if (session) {
@@ -110,7 +112,7 @@ export default function MentoringPanel({ teamId }) {
           <h2 className="text-lg font-medium text-gray-900">Mentoring Sessions</h2>
           <p className="text-sm text-gray-500">View and manage scheduled mentoring meetings.</p>
         </div>
-        {!isStudent && (
+        {!isStudent && !isReadOnly && (
           <button
             onClick={() => openModal()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -170,7 +172,7 @@ export default function MentoringPanel({ teamId }) {
                 </div>
               </div>
               
-              {!isStudent && (
+              {!isStudent && !isReadOnly && (
                 <div className="mt-4 md:mt-0 flex space-x-2">
                   <button onClick={() => openModal(s)} className="text-blue-600 hover:text-blue-900 text-sm font-medium">Edit</button>
                   <button onClick={() => handleDelete(s._id)} className="text-red-600 hover:text-red-900 text-sm font-medium">{user?.role === 'ADMIN' ? 'Delete' : 'Cancel'}</button>

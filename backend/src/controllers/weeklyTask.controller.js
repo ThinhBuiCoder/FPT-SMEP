@@ -4,17 +4,31 @@ const Team = require('../models/Team');
 const Class = require('../models/Class');
 const Student = require('../models/Student');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
+const workspaceAccess = require('../services/workspaceAccess.service');
 
 // ── Role Authorization Helpers ───────────────────────────
 
-const getStudentEntry = async (user) => {
+const getStudentEntry = async (user, team = null) => {
   if (!user) return null;
-  return await Student.findOne({
+  const query = {
     $or: [
       { userId: user._id },
       { email: user.email.toLowerCase() }
     ]
-  });
+  };
+
+  if (team) {
+    const memberStudentIds = (team.members || []).map((member) => member.studentId).filter(Boolean);
+    query.classId = team.classId;
+    query.$and = [{
+      $or: [
+        { teamId: team._id },
+        { _id: { $in: memberStudentIds } },
+      ],
+    }];
+  }
+
+  return await Student.findOne(query);
 };
 
 const canManageCourseTemplate = (user) => {
@@ -51,12 +65,8 @@ const canManageTeamTask = async (user, teamId) => {
   }
 
   if (role === 'STUDENT' || role === 'USER') {
-    const student = await getStudentEntry(user);
-    return !!(
-      student &&
-      student.teamId &&
-      student.teamId.toString() === team._id.toString()
-    );
+    const student = await getStudentEntry(user, team);
+    return Boolean(student);
   }
 
   return false;
@@ -386,6 +396,9 @@ const createWeeklyTask = async (req, res) => {
     if (!titleNormalized) return errorResponse(res, 'Task title is required.', 400);
     if (!taskType) return errorResponse(res, 'Task type is required.', 400);
     if (!weekNumber) return errorResponse(res, 'Week number is required.', 400);
+    if (taskType === 'TEAM_TASK' && teamId) {
+      await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
+    }
 
     const allowedPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
     let resolvedPriority = 'MEDIUM';
@@ -495,6 +508,7 @@ const createWeeklyTask = async (req, res) => {
     return successResponse(res, { task }, 'Weekly task created successfully!', 201);
   } catch (err) {
     if (err.code === 11000) return duplicateTaskResponse(res);
+    if (err.statusCode) return errorResponse(res, err.message, err.statusCode);
     console.error('createWeeklyTask error:', err);
     return errorResponse(res, 'Server error.', 500);
   }
@@ -506,6 +520,9 @@ const updateWeeklyTask = async (req, res) => {
   try {
     const task = await WeeklyTask.findById(req.params.id);
     if (!task) return errorResponse(res, 'Weekly task not found.', 404);
+    if (task.taskType === 'TEAM_TASK' && task.teamId) {
+      await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
+    }
 
     // Permission validations
     if (task.taskType === 'COURSE_TEMPLATE') {
@@ -623,6 +640,7 @@ const updateWeeklyTask = async (req, res) => {
     return successResponse(res, { task }, 'Weekly task updated successfully!');
   } catch (err) {
     if (err.code === 11000) return duplicateTaskResponse(res);
+    if (err.statusCode) return errorResponse(res, err.message, err.statusCode);
     console.error('updateWeeklyTask error:', err);
     return errorResponse(res, 'Server error.', 500);
   }
@@ -634,6 +652,9 @@ const deleteWeeklyTask = async (req, res) => {
   try {
     const task = await WeeklyTask.findById(req.params.id);
     if (!task) return errorResponse(res, 'Weekly task not found.', 404);
+    if (task.taskType === 'TEAM_TASK' && task.teamId) {
+      await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
+    }
 
     // Permission validations
     if (task.taskType === 'COURSE_TEMPLATE') {
@@ -666,6 +687,7 @@ const deleteWeeklyTask = async (req, res) => {
     await WeeklyTask.findByIdAndDelete(req.params.id);
     return successResponse(res, null, 'Weekly task deleted successfully!');
   } catch (err) {
+    if (err.statusCode) return errorResponse(res, err.message, err.statusCode);
     console.error('deleteWeeklyTask error:', err);
     return errorResponse(res, 'Server error.', 500);
   }
@@ -677,6 +699,9 @@ const updateWeeklyTaskStatus = async (req, res) => {
   try {
     const task = await WeeklyTask.findById(req.params.id);
     if (!task) return errorResponse(res, 'Weekly task not found.', 404);
+    if (task.taskType === 'TEAM_TASK' && task.teamId) {
+      await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
+    }
 
     const { status, checklist } = req.body;
 
@@ -730,6 +755,7 @@ const updateWeeklyTaskStatus = async (req, res) => {
 
     return successResponse(res, { task }, 'Task status and checklist updated successfully!');
   } catch (err) {
+    if (err.statusCode) return errorResponse(res, err.message, err.statusCode);
     console.error('updateWeeklyTaskStatus error:', err);
     return errorResponse(res, 'Server error.', 500);
   }

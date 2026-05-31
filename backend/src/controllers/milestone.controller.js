@@ -3,6 +3,7 @@ const Milestone = require('../models/Milestone');
 const SprintTask = require('../models/SprintTask');
 const Team = require('../models/Team');
 const workspacePerm = require('../utils/workspacePermission');
+const workspaceAccess = require('../services/workspaceAccess.service');
 const { recalculateMilestoneProgress } = require('../services/progress.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
@@ -57,6 +58,7 @@ const createMilestone = async (req, res) => {
 
   try {
     await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const team = await Team.findById(teamId);
     if (!team) return errorResponse(res, 'Team not found.', 404);
@@ -89,6 +91,7 @@ const updateMilestone = async (req, res) => {
     if (!m) return errorResponse(res, 'Milestone not found.', 404);
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, m.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, m.teamId);
 
     if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
       return errorResponse(res, 'Start date must be before due date.', 400);
@@ -116,6 +119,7 @@ const deleteMilestone = async (req, res) => {
     if (!m) return errorResponse(res, 'Milestone not found.', 404);
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, m.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, m.teamId);
 
     // Block delete if milestone has tasks
     const taskCount = await SprintTask.countDocuments({ milestoneId: m._id });

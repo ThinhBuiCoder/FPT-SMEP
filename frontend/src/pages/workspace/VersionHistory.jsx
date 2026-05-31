@@ -1,6 +1,6 @@
 // frontend/src/pages/workspace/VersionHistory.jsx
 import { useState } from 'react';
-import { History, Eye, RotateCcw, Calendar, User, FileText, Check } from 'lucide-react';
+import { History, Eye, RotateCcw, Calendar, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
 import Modal from '../../components/ui/Modal';
@@ -89,7 +89,15 @@ export default function VersionHistory({ proposalId, versions, isEditable, onRef
   const [restoring, setRestoring] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
 
+  const getWorkspaceLabel = (team) => {
+    if (!team) return null;
+    return [team.courseCode, team.semester, team.isArchived ? 'Archived' : null]
+      .filter(Boolean)
+      .join(' - ');
+  };
+
   const handleRestore = async (versionId, versionNumber) => {
+    if (!proposalId) return;
     if (!window.confirm(`Are you sure you want to restore the proposal to Version ${versionNumber}? This will create a new draft.`)) return;
     setRestoring(true);
     try {
@@ -151,6 +159,11 @@ export default function VersionHistory({ proposalId, versions, isEditable, onRef
                 <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-0.5">
                   <User className="w-2.5 h-2.5" /> {ver.changedBy?.name || 'Unknown'}
                 </p>
+                {getWorkspaceLabel(ver.teamId) && (
+                  <p className="text-[10px] text-slate-500 mt-1 font-semibold">
+                    {getWorkspaceLabel(ver.teamId)}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-1 shrink-0">
@@ -161,7 +174,7 @@ export default function VersionHistory({ proposalId, versions, isEditable, onRef
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </button>
-                {isEditable && (
+                {isEditable && proposalId && (
                   <button
                     disabled={restoring}
                     onClick={() => handleRestore(ver._id, ver.versionNumber)}
@@ -194,6 +207,9 @@ export default function VersionHistory({ proposalId, versions, isEditable, onRef
               <div>
                 <p className="text-xs text-slate-400">Created by <span className="font-semibold text-slate-700">{selectedVer.changedBy?.name}</span> ({selectedVer.changedBy?.email})</p>
                 <p className="text-xs text-slate-400 mt-0.5">Date: {new Date(selectedVer.createdAt).toLocaleString()}</p>
+                {getWorkspaceLabel(selectedVer.teamId) && (
+                  <p className="text-xs text-slate-400 mt-0.5">Workspace: {getWorkspaceLabel(selectedVer.teamId)}</p>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -275,7 +291,7 @@ export default function VersionHistory({ proposalId, versions, isEditable, onRef
               <Button variant="outline" size="sm" onClick={() => setSelectedVer(null)}>
                 Close
               </Button>
-              {isEditable && (
+              {isEditable && proposalId && (
                 <Button 
                   variant="primary" 
                   size="sm"

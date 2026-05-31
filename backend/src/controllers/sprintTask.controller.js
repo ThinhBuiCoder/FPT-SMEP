@@ -4,6 +4,7 @@ const Team = require('../models/Team');
 const Student = require('../models/Student');
 const Milestone = require('../models/Milestone');
 const workspacePerm = require('../utils/workspacePermission');
+const workspaceAccess = require('../services/workspaceAccess.service');
 const progressService = require('../services/progress.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
@@ -54,6 +55,7 @@ const createTask = async (req, res) => {
 
   try {
     await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const team = await Team.findById(teamId);
     if (!team) return errorResponse(res, 'Team not found.', 404);
@@ -137,6 +139,7 @@ const updateTask = async (req, res) => {
     if (!task) return errorResponse(res, 'Task not found.', 404);
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, task.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
 
     if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
       return errorResponse(res, 'Start date must be before due date.', 400);
@@ -213,6 +216,7 @@ const updateTaskStatus = async (req, res) => {
     if (!task) return errorResponse(res, 'Task not found.', 404);
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, task.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
 
     task.status = status;
     if (position !== undefined) task.position = position;
@@ -238,6 +242,7 @@ const deleteTask = async (req, res) => {
     if (!task) return errorResponse(res, 'Task not found.', 404);
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, task.teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, task.teamId);
 
     const milestoneId = task.milestoneId;
     await SprintTask.findByIdAndDelete(req.params.taskId);

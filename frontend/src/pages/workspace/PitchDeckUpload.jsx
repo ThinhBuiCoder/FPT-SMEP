@@ -1,12 +1,21 @@
 // frontend/src/pages/workspace/PitchDeckUpload.jsx
 import { useState, useRef } from 'react';
-import { UploadCloud, FileText, Download, Trash2, Loader2, Calendar, User } from 'lucide-react';
+import { UploadCloud, FileText, Download, Trash2, Loader2, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
 
 export default function PitchDeckUpload({ teamId, latestDeck, pitchDecks, isEditable, onRefresh }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  const getWorkspaceLabel = (team) => {
+    if (!team) return null;
+    return [team.courseCode, team.semester, team.isArchived ? 'Archived' : null]
+      .filter(Boolean)
+      .join(' - ');
+  };
+
+  const isCurrentTeamDeck = (deck) => String(deck?.teamId?._id || deck?.teamId || '') === String(teamId || '');
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -124,9 +133,17 @@ export default function PitchDeckUpload({ teamId, latestDeck, pitchDecks, isEdit
               <h3 className="text-sm font-bold text-slate-800 truncate" title={latestDeck.originalName}>
                 {latestDeck.originalName}
               </h3>
-              <p className="text-xs text-slate-400 mt-1">{formatBytes(latestDeck.fileSize)} • Version {latestDeck.versionNumber}</p>
+              <p className="text-xs text-slate-400 mt-1">{formatBytes(latestDeck.fileSize)} - Version {latestDeck.versionNumber}</p>
               <div className="flex items-center gap-3 mt-3 text-xs text-slate-400">
                 <span className="flex items-center gap-1 shrink-0"><Calendar className="w-3.5 h-3.5" />{new Date(latestDeck.createdAt).toLocaleDateString()}</span>
+                {getWorkspaceLabel(latestDeck.teamId) && (
+                  <span className="font-semibold text-slate-500">{getWorkspaceLabel(latestDeck.teamId)}</span>
+                )}
+                {!isCurrentTeamDeck(latestDeck) && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                    Inherited
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -139,7 +156,7 @@ export default function PitchDeckUpload({ teamId, latestDeck, pitchDecks, isEdit
             >
               <Download className="w-4 h-4" />
             </button>
-            {isEditable && (
+            {isEditable && isCurrentTeamDeck(latestDeck) && (
               <button 
                 onClick={() => handleDelete(latestDeck._id)}
                 className="p-2 border border-slate-200 bg-white text-slate-600 rounded-xl hover:text-red-600 hover:border-red-200 transition-all shadow-xs"
@@ -169,7 +186,10 @@ export default function PitchDeckUpload({ teamId, latestDeck, pitchDecks, isEdit
                     <p className="text-xs font-semibold text-slate-700 truncate" title={deck.originalName}>
                       {deck.originalName}
                     </p>
-                    <p className="text-[10px] text-slate-400">{formatBytes(deck.fileSize)} • Version {deck.versionNumber}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {formatBytes(deck.fileSize)} - Version {deck.versionNumber}
+                      {getWorkspaceLabel(deck.teamId) ? ` - ${getWorkspaceLabel(deck.teamId)}` : ''}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-1.5">

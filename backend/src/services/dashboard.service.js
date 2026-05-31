@@ -174,36 +174,39 @@ const getStudentDashboard = async (userId, weekNumber = 1) => {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
   }
 
+  const semesterRank = { SP: 1, SU: 2, FA: 3 };
   const students = await Student.find({
     $or: [
       { userId: userObj._id },
       { email: userObj.email.toLowerCase() }
     ]
+  }).populate({
+    path: 'classId',
+    match: { status: { $ne: 'disabled' } },
+    populate: { path: 'lectureId', select: 'name email avatar' }
   });
 
   if (!students || students.length === 0) {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
   }
 
-  let student = null;
-  let myClass = null;
+  const activeStudents = students
+    .filter((s) => s.classId)
+    .sort((a, b) => {
+      const yearDiff = Number(b.classId.year || 0) - Number(a.classId.year || 0);
+      if (yearDiff) return yearDiff;
+      return (semesterRank[b.classId.semester] || 0) - (semesterRank[a.classId.semester] || 0);
+    });
 
-  for (const s of students) {
-    const cls = await Class.findOne({ _id: s.classId, status: { $ne: 'disabled' } })
-      .populate('lectureId', 'name email avatar');
-    if (cls) {
-      student = s;
-      myClass = cls;
-      break;
-    }
-  }
+  const student = activeStudents[0] || null;
+  const myClass = student?.classId || null;
 
   if (!student || !myClass) {
     return { hasTeam: false, myClass: null, team: null, startupIdea: null };
   }
 
   const myTeam = student.teamId
-    ? await Team.findById(student.teamId)
+    ? await Team.findOne({ _id: student.teamId, classId: myClass._id })
       .populate('classId', 'classCode subjectCode semester year')
       .populate('members.studentId', 'fullName email rollNumber major')
     : null;

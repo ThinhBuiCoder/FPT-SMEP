@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   closestCorners,
   DndContext,
@@ -13,6 +14,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { AlertTriangle, CheckSquare, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import BoardColumn from '../../features/execution-board/components/BoardColumn';
@@ -73,6 +75,15 @@ export default function ExecutionBoard() {
 
   const teamContextQuery = useTeamContext({ user, queryTeamId });
   const teamId = teamContextQuery.data || null;
+  const workspaceContextQuery = useQuery({
+    queryKey: ['execution-board', 'workspace-context', teamId],
+    enabled: Boolean(teamId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const response = await teamWorkspaceApi.getWorkspaceContext(teamId);
+      return response.data || response;
+    },
+  });
   const teamMembersQuery = useTeamMembers(teamId);
   const teamMembers = teamMembersQuery.data || [];
   const boardQuery = useTaskBoard({ teamId, filters: queryFilters });
@@ -112,24 +123,28 @@ export default function ExecutionBoard() {
   });
 
   const isTeamMemberContext = Boolean(teamId) && (role === 'STUDENT' || role === 'USER');
-  const canCreateTeamTask = isPrivileged || isTeamMemberContext;
-  const canUpdateStatus = isPrivileged || isTeamMemberContext;
+  const accessMode = workspaceContextQuery.data?.accessMode || workspaceContextQuery.data?.selectedWorkspace?.accessMode || null;
+  const isReadOnly = accessMode === 'READ_ONLY';
+  const canCreateTeamTask = !isReadOnly && (isPrivileged || isTeamMemberContext);
+  const canUpdateStatus = !isReadOnly && (isPrivileged || isTeamMemberContext);
 
   const permissions = useMemo(() => ({
     canUpdateStatus,
     canEditTask: (task) => {
+      if (isReadOnly) return false;
       if (isPrivileged) return true;
       if (!isTeamMemberContext) return false;
       const createdById = String(task?.createdBy?._id || task?.createdBy || '');
       return createdById === String(user?._id || '');
     },
     canDeleteTask: (task) => {
+      if (isReadOnly) return false;
       if (isPrivileged) return true;
       if (!isTeamMemberContext) return false;
       const createdById = String(task?.createdBy?._id || task?.createdBy || '');
       return createdById === String(user?._id || '');
     },
-  }), [canUpdateStatus, isPrivileged, isTeamMemberContext, user?._id]);
+  }), [canUpdateStatus, isPrivileged, isReadOnly, isTeamMemberContext, user?._id]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -167,12 +182,14 @@ export default function ExecutionBoard() {
   }, []);
 
   const handleSave = useCallback((payload) => {
+    if (isReadOnly) return;
     mutations.saveTask.mutate({ task: editingTask, payload });
-  }, [editingTask, mutations.saveTask]);
+  }, [editingTask, isReadOnly, mutations.saveTask]);
 
   const handleStatusChange = useCallback((taskId, status) => {
+    if (isReadOnly) return;
     mutations.changeStatus.mutate({ taskId, status });
-  }, [mutations.changeStatus]);
+  }, [isReadOnly, mutations.changeStatus]);
 
   const getStatusFromOver = useCallback((over) => {
     if (!over?.id) return null;
@@ -193,6 +210,11 @@ export default function ExecutionBoard() {
   }, [getStatusFromOver]);
 
   const handleDragEnd = useCallback((event) => {
+    if (isReadOnly) {
+      setActiveTask(null);
+      setActiveOverStatus(null);
+      return;
+    }
     const taskId = event.active.id;
     const nextStatus = getStatusFromOver(event.over);
     const currentStatus = taskStatusById.get(taskId);
@@ -203,7 +225,7 @@ export default function ExecutionBoard() {
     if (!nextStatus || !currentStatus || nextStatus === currentStatus) return;
     setActiveMobileStatus(nextStatus);
     mutations.changeStatus.mutate({ taskId, status: nextStatus });
-  }, [getStatusFromOver, mutations.changeStatus, taskStatusById]);
+  }, [getStatusFromOver, isReadOnly, mutations.changeStatus, taskStatusById]);
 
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);
@@ -211,13 +233,13 @@ export default function ExecutionBoard() {
   }, []);
 
   const handleDeleteConfirm = useCallback(() => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isReadOnly) return;
     mutations.removeTask.mutate(deleteTarget, {
       onSettled: () => setDeleteTarget(null),
     });
-  }, [deleteTarget, mutations.removeTask]);
+  }, [deleteTarget, isReadOnly, mutations.removeTask]);
 
-  const initialLoading = teamContextQuery.isLoading || (Boolean(teamId) && boardQuery.isLoading);
+  const initialLoading = teamContextQuery.isLoading || (Boolean(teamId) && (boardQuery.isLoading || workspaceContextQuery.isLoading));
 
   if (initialLoading) {
     return <BoardSkeleton />;
@@ -256,6 +278,11 @@ export default function ExecutionBoard() {
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <BoardHeader canCreate={canCreateTeamTask} onCreate={handleCreate} />
+        {isReadOnly && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+            This execution board is read-only because you are viewing an archived workspace.
+          </div>
+        )}
         <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-5">
           <div>
             <p className="text-sm font-semibold text-slate-800">

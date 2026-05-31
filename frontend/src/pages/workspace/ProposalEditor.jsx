@@ -1,11 +1,10 @@
 // frontend/src/pages/workspace/ProposalEditor.jsx
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  FileText, ArrowLeft, Loader2, Save, Send, AlertCircle, RefreshCw 
-} from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
+import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import { useAuth } from '../../hooks/useAuth';
 import Button from '../../components/ui/Button';
 import ProposalPreview from './ProposalPreview';
@@ -20,6 +19,7 @@ export default function ProposalEditor() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [workspaceData, setWorkspaceData] = useState(null);
+  const [accessMode, setAccessMode] = useState(null);
   
   const [form, setForm] = useState({
     title: '',
@@ -43,15 +43,22 @@ export default function ProposalEditor() {
 
   const isPreviewMode = searchParams.get('preview') === 'true';
 
-  const fetchWorkspaceAndProposal = async () => {
+  const fetchWorkspaceAndProposal = useCallback(async () => {
     try {
       setLoading(true);
-      let res;
+      let contextRes;
       if (teamId) {
-        res = await workspaceApi.getTeamWorkspace(teamId);
+        contextRes = await teamWorkspaceApi.getWorkspaceContext(teamId);
       } else {
-        res = await workspaceApi.getMyWorkspace();
+        contextRes = await teamWorkspaceApi.getCurrentWorkspace();
       }
+
+      const context = contextRes?.data || null;
+      setAccessMode(context?.accessMode || context?.selectedWorkspace?.accessMode || null);
+      const resolvedTeamId = context?.selectedWorkspace?.teamId || teamId;
+      const res = resolvedTeamId
+        ? await workspaceApi.getTeamWorkspace(resolvedTeamId)
+        : await workspaceApi.getMyWorkspace();
 
       if (res.data) {
         setWorkspaceData(res.data);
@@ -84,11 +91,13 @@ export default function ProposalEditor() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId]);
 
   useEffect(() => {
+    // Fetching proposal/workspace context is the side effect owned by this page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWorkspaceAndProposal();
-  }, [teamId]);
+  }, [fetchWorkspaceAndProposal]);
 
   const handleBack = () => {
     if (teamId) {
@@ -112,7 +121,7 @@ export default function ProposalEditor() {
   
   // Only students of the team or Admin can edit/create
   const isStudentMember = members.some(m => m.userId?._id === user?._id);
-  const isReadOnly = !user || (user.role !== 'ADMIN' && !isStudentMember);
+  const isReadOnly = accessMode === 'READ_ONLY' || !user || (user.role !== 'ADMIN' && !isStudentMember);
 
   // If preview mode or read-only, render ProposalPreview
   if (isPreviewMode || isReadOnly) {
@@ -131,14 +140,14 @@ export default function ProposalEditor() {
       if (!proposal) {
         // Create
         const targetTeamId = teamId || workspaceData?.team?._id;
-        const res = await workspaceApi.createProposal(targetTeamId, {
+        await workspaceApi.createProposal(targetTeamId, {
           ...form,
           changeNote: form.changeNote || 'Initial proposal draft'
         });
         toast.success('Proposal draft created!');
       } else {
         // Update
-        const res = await workspaceApi.updateProposal(proposal._id, {
+        await workspaceApi.updateProposal(proposal._id, {
           ...form,
           changeNote: form.changeNote || 'Updated proposal draft'
         });

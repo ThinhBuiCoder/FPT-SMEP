@@ -507,6 +507,7 @@ export default function WeeklyRoadmapPlanner({
   currentUser,
   roleInTeam = '',
   teamMembers = [],
+  isReadOnly = false,
 }) {
   // ── Permissions ────────────────────────────────────────────
   const role = currentUser?.role?.toUpperCase() || '';
@@ -516,10 +517,11 @@ export default function WeeklyRoadmapPlanner({
   const isMentor   = role === 'MENTOR';
   const isTeamMemberContext = !!teamId && (role === 'STUDENT' || role === 'USER');
 
-  const canCreateTeamTask  = isAdmin || isLecturer || isMentor || isTeamMemberContext;
-  const canCreateClassTask = isAdmin || isLecturer;
+  const canCreateTeamTask  = !isReadOnly && (isAdmin || isLecturer || isMentor || isTeamMemberContext);
+  const canCreateClassTask = !isReadOnly && (isAdmin || isLecturer);
 
   const canEditTask = (task) => {
+    if (isReadOnly) return false;
     if (!task) return false;
     if (task.taskType === 'COURSE_TEMPLATE') return isAdmin;
     if (task.taskType === 'CLASS_TASK')      return isAdmin || isLecturer;
@@ -527,6 +529,7 @@ export default function WeeklyRoadmapPlanner({
     return false;
   };
   const canDeleteTask = (task) => {
+    if (isReadOnly) return false;
     if (!task) return false;
     
     const createdById = String(task.createdBy?._id || task.createdBy || '');
@@ -542,6 +545,7 @@ export default function WeeklyRoadmapPlanner({
     return false;
   };
   const canUpdateStatus  = (task) => {
+    if (isReadOnly) return false;
     if (!task) return false;
     if (task.taskType === 'COURSE_TEMPLATE') return isAdmin;
     if (task.taskType === 'CLASS_TASK')      return isAdmin || isLecturer;

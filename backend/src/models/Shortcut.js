@@ -8,6 +8,11 @@ const shortcutSchema = new mongoose.Schema(
       ref: 'Team',
       required: true,
     },
+    lineageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StartupLineage',
+      default: null,
+    },
     name: {
       type: String,
       required: true,
@@ -31,6 +36,7 @@ const shortcutSchema = new mongoose.Schema(
 
 // Fast lookup: all shortcuts for a team, newest first
 shortcutSchema.index({ teamId: 1, createdAt: -1 });
+shortcutSchema.index({ lineageId: 1, createdAt: -1 });
 shortcutSchema.index({ teamId: 1, url: 1 }, { unique: true });
 
 module.exports = mongoose.model('Shortcut', shortcutSchema);

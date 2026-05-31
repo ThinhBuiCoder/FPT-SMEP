@@ -510,47 +510,47 @@ exports.getMyClasses = async (req, res) => {
 // ─── GET /api/classes/my-team ─────────────────────────────────────────────────
 exports.getMyTeam = async (req, res) => {
   try {
+    const semesterRank = { SP: 1, SU: 2, FA: 3 };
     const students = await Student.find({
       $or: [
         { userId: req.user._id },
         { email: req.user.email.toLowerCase() }
       ]
+    }).populate({
+      path: 'classId',
+      match: { status: { $ne: 'disabled' } },
+      select: 'classCode subjectCode semester year status'
     });
 
     if (!students || students.length === 0) {
       return successResponse(res, null, 'Student record not found');
     }
 
-    let student = null;
-    for (const s of students) {
-      const cls = await Class.findOne({ _id: s.classId, status: { $ne: 'disabled' } });
-      if (cls) {
-        // Prefer student record with teamId
-        if (s.teamId) {
-          student = s;
-          break;
-        }
-        if (!student) {
-          student = s; // fallback to active student without team
-        }
-      }
-    }
+    const activeStudents = students
+      .filter((s) => s.classId)
+      .sort((a, b) => {
+        const yearDiff = Number(b.classId.year || 0) - Number(a.classId.year || 0);
+        if (yearDiff) return yearDiff;
+        return (semesterRank[b.classId.semester] || 0) - (semesterRank[a.classId.semester] || 0);
+      });
+
+    const student = activeStudents[0] || null;
 
     if (!student) {
       return successResponse(res, null, 'Student record not found or class is disabled');
     }
 
     if (!student.teamId) {
-      return successResponse(res, null, 'You have not been assigned to a team yet.');
+      return successResponse(res, null, 'You have joined this class but have not been assigned to a team yet.');
     }
 
-    const team = await Team.findById(student.teamId)
+    const team = await Team.findOne({ _id: student.teamId, classId: student.classId._id || student.classId })
       .populate('lectureId', 'name email avatar')
       .populate('mentorId', 'name email avatar')
       .populate('chatGroupId');
 
     if (!team) {
-      return successResponse(res, null, 'You have not been assigned to a team yet.');
+      return successResponse(res, null, 'Your saved team no longer matches your current class. Please contact your lecturer or administrator.');
     }
 
     const cls = await Class.findById(team.classId);

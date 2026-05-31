@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Calendar, ClipboardCheck, Loader2, ShieldCheck, Sparkles, History, Layers3 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ClipboardCheck, Loader2, ShieldCheck, Sparkles, History, Layers3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { evaluationApi } from '../../api/evaluationApi';
 import RubricForm from './RubricForm';
@@ -17,7 +17,7 @@ const roleLabel = (role) => ({
   USER: 'Student',
 }[role] || role || 'User');
 
-export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
+export default function EvaluationPanel({ teamId, proposalId, pitchDeckId, isReadOnly = false }) {
   const { user } = useAuth();
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(1);
   const [checkpointData, setCheckpointData] = useState(null);
@@ -30,17 +30,13 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
 
   const isStudent = user?.role === 'STUDENT' || user?.role === 'USER';
   const isMentor = user?.role === 'MENTOR';
-  const canEdit = user?.role === 'LECTURER';
+  const canEdit = !isReadOnly && user?.role === 'LECTURER';
   const activeEvaluation = useMemo(
     () => evaluations.find((ev) => ev.lecturerId?._id === user?._id) || null,
     [evaluations, user?._id]
   );
 
-  useEffect(() => {
-    fetchCheckpointData();
-  }, [teamId, selectedCheckpoint]);
-
-  const fetchCheckpointData = async () => {
+  const fetchCheckpointData = useCallback(async () => {
     if (!teamId) return;
     try {
       setLoading(true);
@@ -59,7 +55,13 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCheckpoint, teamId]);
+
+  useEffect(() => {
+    // Fetching checkpoint data is the side effect owned by this panel.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCheckpointData();
+  }, [fetchCheckpointData]);
 
   const saveEvaluation = async (formData) => {
     try {

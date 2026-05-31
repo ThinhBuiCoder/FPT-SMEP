@@ -1,5 +1,7 @@
 const Shortcut = require('../models/Shortcut');
+const Team = require('../models/Team');
 const { normalizeUrl } = require('../utils/shortcutUrl');
+const workspaceAccess = require('../services/workspaceAccess.service');
 
 const ok = (res, data, message = 'OK', status = 200) =>
   res.status(status).json({ success: true, message, data });
@@ -39,7 +41,9 @@ const handleShortcutError = (res, err) => {
 
 exports.getShortcuts = async (req, res) => {
   try {
-    const shortcuts = await Shortcut.find({ teamId: req.params.teamId })
+    const team = await Team.findById(req.params.teamId).select('lineageId');
+    const query = team?.lineageId ? { lineageId: team.lineageId } : { teamId: req.params.teamId };
+    const shortcuts = await Shortcut.find(query)
       .populate('createdBy', 'name avatar')
       .sort({ createdAt: -1 })
       .lean();
@@ -52,11 +56,14 @@ exports.getShortcuts = async (req, res) => {
 
 exports.createShortcut = async (req, res) => {
   try {
+    await workspaceAccess.assertCanMutateWorkspace(req.user, req.params.teamId);
     const name = validateName(req.body.name);
     const url = normalizeUrl(req.body.url);
+    const team = await Team.findById(req.params.teamId).select('lineageId');
 
     const shortcut = await Shortcut.create({
       teamId: req.params.teamId,
+      lineageId: team?.lineageId || null,
       name,
       url,
       createdBy: req.user._id,
@@ -71,6 +78,7 @@ exports.createShortcut = async (req, res) => {
 
 exports.updateShortcut = async (req, res) => {
   try {
+    await workspaceAccess.assertCanMutateWorkspace(req.user, req.params.teamId);
     const shortcut = req.shortcut;
 
     if (req.body.name !== undefined) {
@@ -91,6 +99,7 @@ exports.updateShortcut = async (req, res) => {
 
 exports.deleteShortcut = async (req, res) => {
   try {
+    await workspaceAccess.assertCanMutateWorkspace(req.user, req.params.teamId);
     await req.shortcut.deleteOne();
     return ok(res, null, 'Shortcut deleted.');
   } catch (err) {
