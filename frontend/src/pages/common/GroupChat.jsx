@@ -10,8 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
+const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
 // ─── Role helpers ────────────────────────────────────────────────────────────
 const roleConfig = {
   ADMIN:    { color: 'bg-red-50 text-red-700 border-red-200',     icon: <Shield       className="w-3 h-3 text-red-500 shrink-0" />,     label: 'Admin' },
@@ -237,9 +236,10 @@ export default function GroupChat() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading]       = useState(false);
 
-  const socketRef   = useRef(null);
-  const chatEndRef  = useRef(null);
-  const fileInputRef = useRef(null);
+  const socketRef        = useRef(null);
+  const chatEndRef       = useRef(null);
+  const fileInputRef     = useRef(null);
+  const selectedChannelRef = useRef(null); // track current channel for reconnect
 
   // ─── Socket.io ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -249,7 +249,12 @@ export default function GroupChat() {
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => console.log('🔌 Socket connected:', socket.id));
+    socket.on('connect', () => {
+      // Re-join room after connect/reconnect
+      if (selectedChannelRef.current) {
+        socket.emit('join_room', selectedChannelRef.current._id);
+      }
+    });
 
     socket.on('receive_message', (msg) => {
       setMessages(prev => {
@@ -285,13 +290,17 @@ export default function GroupChat() {
   // ─── Join Room, Load History & build Nickname Map ───────────────────────────
   useEffect(() => {
     if (!selectedChannel || !socketRef.current) return;
+    selectedChannelRef.current = selectedChannel; // track for reconnect
     const joinAndLoad = async () => {
       setLoadingMessages(true);
       setShowMembers(false);
       setNicknameMap({});
       try {
         socketRef.current.emit('leave_room', selectedChannel._id);
-        socketRef.current.emit('join_room', selectedChannel._id);
+        // Only join if socket is already connected; connect handler handles the rest
+        if (socketRef.current.connected) {
+          socketRef.current.emit('join_room', selectedChannel._id);
+        }
 
         // Load messages & members concurrently
         const [msgRes, memberRes] = await Promise.allSettled([
@@ -358,11 +367,27 @@ export default function GroupChat() {
 
     const myId = (user?._id || user?.id || '').toString();
     const myNickname = nicknameMap[myId] || null;
+
+    // Normalize role to uppercase ENUM value expected by backend schema
+    const validRoles = ['ADMIN', 'LECTURER', 'STUDENT', 'MENTOR'];
+    const rawRole = (user?.role || 'STUDENT').toUpperCase();
+    const senderRole = validRoles.includes(rawRole) ? rawRole : 'STUDENT';
+
+    if (!myId) {
+      toast.error('Không thể gửi tin nhắn: chưa xác thực người dùng.');
+      return;
+    }
+
+    if (!socketRef.current?.connected) {
+      toast.error('Mất kết nối real-time. Đang thử kết nối lại...');
+      return;
+    }
+
     socketRef.current.emit('send_message', {
       chatGroupId: selectedChannel._id,
       senderId:    user?._id || user?.id,
       senderName:  myNickname || user?.name || 'Anonymous',
-      senderRole:  user?.role || 'STUDENT',
+      senderRole,
       text:        inputText.trim(),
       attachment:  attachmentPayload,
     });
