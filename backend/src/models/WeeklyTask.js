@@ -1,12 +1,20 @@
 // src/models/WeeklyTask.js
 const mongoose = require('mongoose');
 
+const normalizeTaskTitle = (title) =>
+  title?.trim().toLowerCase().replace(/\s+/g, ' ');
+
 const weeklyTaskSchema = new mongoose.Schema(
   {
     title: {
       type: String,
       required: true,
       trim: true,
+    },
+    titleNormalized: {
+      type: String,
+      trim: true,
+      index: true,
     },
     description: {
       type: String,
@@ -130,6 +138,8 @@ const weeklyTaskSchema = new mongoose.Schema(
 
 // Pre-save hook to calculate completion percentage and status
 weeklyTaskSchema.pre('save', function (next) {
+  this.titleNormalized = normalizeTaskTitle(this.title);
+
   // If status is marked as COMPLETED, make sure percentage is 100
   if (this.status === 'COMPLETED') {
     this.completionPercentage = 100;
@@ -173,5 +183,17 @@ weeklyTaskSchema.index({ teamId: 1, taskType: 1, priority: 1, weekNumber: 1, cre
 weeklyTaskSchema.index({ teamId: 1, taskType: 1, assigneeStudentId: 1, createdAt: -1 });
 weeklyTaskSchema.index({ teamId: 1, taskType: 1, dueDate: 1, status: 1 });
 weeklyTaskSchema.index({ title: 'text', description: 'text' });
+weeklyTaskSchema.index(
+  { taskType: 1, teamId: 1, weekNumber: 1, titleNormalized: 1 },
+  { unique: true, partialFilterExpression: { taskType: 'TEAM_TASK', titleNormalized: { $type: 'string' } } }
+);
+weeklyTaskSchema.index(
+  { taskType: 1, classId: 1, weekNumber: 1, titleNormalized: 1 },
+  { unique: true, partialFilterExpression: { taskType: 'CLASS_TASK', titleNormalized: { $type: 'string' } } }
+);
+weeklyTaskSchema.index(
+  { taskType: 1, courseCode: 1, weekNumber: 1, titleNormalized: 1 },
+  { unique: true, partialFilterExpression: { taskType: 'COURSE_TEMPLATE', titleNormalized: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('WeeklyTask', weeklyTaskSchema);

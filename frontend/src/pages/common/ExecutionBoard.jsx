@@ -20,8 +20,10 @@ import BoardFilters from '../../features/execution-board/components/BoardFilters
 import BoardHeader from '../../features/execution-board/components/BoardHeader';
 import BoardSkeleton from '../../features/execution-board/components/BoardSkeleton';
 import BoardSummary from '../../features/execution-board/components/BoardSummary';
+import BoardViewToggle from '../../features/execution-board/components/BoardViewToggle';
 import MobileStatusTabs from '../../features/execution-board/components/MobileStatusTabs';
 import TaskCard from '../../features/execution-board/components/TaskCard';
+import TaskTableView from '../../features/execution-board/components/TaskTableView';
 import TaskModal from '../../features/execution-board/components/TaskModal';
 import { EMPTY_GROUPED, STATUSES } from '../../features/execution-board/constants';
 import { getTaskStatus, normalizeFilters } from '../../features/execution-board/boardUtils';
@@ -40,6 +42,12 @@ const DEFAULT_FILTERS = {
   search: '',
 };
 
+const getInitialView = () => {
+  if (typeof window === 'undefined') return 'kanban';
+  const stored = window.localStorage.getItem('executionBoardView');
+  return stored === 'table' || stored === 'kanban' ? stored : 'kanban';
+};
+
 export default function ExecutionBoard() {
   const { user } = useAuth();
   const location = useLocation();
@@ -52,6 +60,7 @@ export default function ExecutionBoard() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
   const [activeOverStatus, setActiveOverStatus] = useState(null);
+  const [view, setView] = useState(getInitialView);
 
   const debouncedSearch = useDebounce(filters.search, 180);
   const queryFilters = useMemo(() => ({
@@ -86,6 +95,9 @@ export default function ExecutionBoard() {
     () => ['execution-board', 'task-board', teamId, boardParams],
     [teamId, boardParams]
   );
+  const tableTasks = useMemo(() => (
+    STATUSES.flatMap((status) => board.grouped?.[status] || [])
+  ), [board.grouped]);
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
@@ -95,8 +107,6 @@ export default function ExecutionBoard() {
   const mutations = useTaskMutations({
     boardKey,
     teamId,
-    user,
-    teamMembers,
     filters: queryFilters,
     onCloseModal: closeModal,
   });
@@ -139,6 +149,11 @@ export default function ExecutionBoard() {
 
   const clearFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  const handleViewChange = useCallback((nextView) => {
+    setView(nextView);
+    window.localStorage.setItem('executionBoardView', nextView);
   }, []);
 
   const handleCreate = useCallback(() => {
@@ -241,6 +256,19 @@ export default function ExecutionBoard() {
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <BoardHeader canCreate={canCreateTeamTask} onCreate={handleCreate} />
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-5">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">
+              {view === 'kanban' ? 'Kanban View' : 'Table View'}
+            </p>
+            <p className="text-xs text-slate-500">
+              {view === 'kanban'
+                ? 'Drag tasks across statuses for execution.'
+                : 'Review task details, deadlines, progress, and notes.'}
+            </p>
+          </div>
+          <BoardViewToggle view={view} onChange={handleViewChange} />
+        </div>
         <BoardSummary summary={board.summary} />
         <BoardFilters
           filters={filters}
@@ -251,64 +279,74 @@ export default function ExecutionBoard() {
         />
       </section>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        <MobileStatusTabs
-          activeStatus={activeMobileStatus}
-          onChange={setActiveMobileStatus}
-          grouped={board.grouped}
-        />
-
-        <div className="grid grid-cols-1 gap-4 md:hidden">
-          <BoardColumn
-            status={activeMobileStatus}
-            tasks={board.grouped?.[activeMobileStatus] || []}
-            permissions={permissions}
-            onEditTask={handleEdit}
-            onDeleteTask={setDeleteTarget}
-            onStatusChange={handleStatusChange}
-            activeOverStatus={activeOverStatus}
+      {view === 'kanban' ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          <MobileStatusTabs
+            activeStatus={activeMobileStatus}
+            onChange={setActiveMobileStatus}
+            grouped={board.grouped}
           />
-        </div>
 
-        <div className="hidden gap-4 md:grid md:grid-cols-5">
-          {STATUSES.map((status) => (
+          <div className="grid grid-cols-1 gap-4 md:hidden">
             <BoardColumn
-              key={status}
-              status={status}
-              tasks={board.grouped?.[status] || []}
+              status={activeMobileStatus}
+              tasks={board.grouped?.[activeMobileStatus] || []}
               permissions={permissions}
               onEditTask={handleEdit}
               onDeleteTask={setDeleteTarget}
               onStatusChange={handleStatusChange}
               activeOverStatus={activeOverStatus}
-            />
-          ))}
-        </div>
-
-        <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
-          {activeTask ? (
-            <div className="w-[300px]">
-              <TaskCard
-                task={activeTask}
-                canEdit={false}
-                canDelete={false}
-                canUpdateStatus={false}
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onStatusChange={() => {}}
-                isOverlay
               />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          </div>
+
+          <div className="hidden gap-4 md:grid md:grid-cols-5">
+            {STATUSES.map((status) => (
+              <BoardColumn
+                key={status}
+                status={status}
+                tasks={board.grouped?.[status] || []}
+                permissions={permissions}
+                onEditTask={handleEdit}
+                onDeleteTask={setDeleteTarget}
+                onStatusChange={handleStatusChange}
+                activeOverStatus={activeOverStatus}
+              />
+            ))}
+          </div>
+
+          <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
+            {activeTask ? (
+              <div className="w-[300px]">
+                <TaskCard
+                  task={activeTask}
+                  canEdit={false}
+                  canDelete={false}
+                  canUpdateStatus={false}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  onStatusChange={() => {}}
+                  isOverlay
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        <TaskTableView
+          tasks={tableTasks}
+          permissions={permissions}
+          onEditTask={handleEdit}
+          onDeleteTask={setDeleteTarget}
+          onStatusChange={handleStatusChange}
+        />
+      )}
 
       <TaskModal
         isOpen={modalOpen}
@@ -324,7 +362,12 @@ export default function ExecutionBoard() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
         title="Delete Task"
-        description="Are you sure you want to delete this task? This action cannot be undone."
+        description={
+          deleteTarget?.title
+            ? `Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`
+            : 'Are you sure you want to delete this task? This action cannot be undone.'
+        }
+        confirmText="Delete Task"
         isSubmitting={mutations.removeTask.isPending}
       />
     </div>

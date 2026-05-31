@@ -70,6 +70,32 @@ const normalizeDateOnly = (date) => {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const normalizeTaskTitle = (title) =>
+  title?.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const duplicateTaskResponse = (res) =>
+  errorResponse(res, 'Duplicate task', 409);
+
+const buildDuplicateTaskQuery = ({ taskType, teamId, classId, courseCode, weekNumber, titleNormalized, excludeId }) => {
+  const query = {
+    taskType,
+    weekNumber,
+    titleNormalized,
+  };
+
+  if (taskType === 'TEAM_TASK') query.teamId = teamId;
+  if (taskType === 'CLASS_TASK') query.classId = classId;
+  if (taskType === 'COURSE_TEMPLATE') query.courseCode = courseCode;
+  if (excludeId) query._id = { $ne: excludeId };
+
+  return query;
+};
+
+const assertNoDuplicateTask = async (params) => {
+  const existingTask = await WeeklyTask.findOne(buildDuplicateTaskQuery(params)).select('_id').lean();
+  return !existingTask;
+};
+
 const computeTaskStatus = (task, today) => {
   const baseStatus =
     task.status === 'DONE'
@@ -355,7 +381,9 @@ const createWeeklyTask = async (req, res) => {
       estimatedHours,
     } = req.body;
 
-    if (!title) return errorResponse(res, 'Task title is required.', 400);
+    const titleNormalized = normalizeTaskTitle(title);
+
+    if (!titleNormalized) return errorResponse(res, 'Task title is required.', 400);
     if (!taskType) return errorResponse(res, 'Task type is required.', 400);
     if (!weekNumber) return errorResponse(res, 'Week number is required.', 400);
 
@@ -429,8 +457,20 @@ const createWeeklyTask = async (req, res) => {
     if (taskType === 'CLASS_TASK') scope = 'CLASS';
     if (taskType === 'TEAM_TASK') scope = 'TEAM';
 
+    const isUnique = await assertNoDuplicateTask({
+      taskType,
+      teamId: taskType === 'TEAM_TASK' ? teamId : null,
+      classId: taskType === 'CLASS_TASK' ? classId : null,
+      courseCode: resolvedCourseCode,
+      weekNumber: weekNum,
+      titleNormalized,
+    });
+
+    if (!isUnique) return duplicateTaskResponse(res);
+
     const task = await WeeklyTask.create({
-      title,
+      title: title.trim(),
+      titleNormalized,
       description: description || '',
       taskType,
       scope,
@@ -454,6 +494,7 @@ const createWeeklyTask = async (req, res) => {
 
     return successResponse(res, { task }, 'Weekly task created successfully!', 201);
   } catch (err) {
+    if (err.code === 11000) return duplicateTaskResponse(res);
     console.error('createWeeklyTask error:', err);
     return errorResponse(res, 'Server error.', 500);
   }
@@ -511,13 +552,43 @@ const updateWeeklyTask = async (req, res) => {
     const dateError = validateTaskDates({ startDate, dueDate }, task);
     if (dateError) return errorResponse(res, dateError, 400);
 
-    if (title !== undefined) task.title = title;
-    if (description !== undefined) task.description = description;
+    let nextWeekNumber = task.weekNumber;
     if (weekNumber !== undefined) {
       const weekNum = parseInt(weekNumber, 10);
       if (!isNaN(weekNum) && weekNum >= 1 && weekNum <= 10) {
-        task.weekNumber = weekNum;
+        nextWeekNumber = weekNum;
       }
+    }
+
+    const nextTitle = title !== undefined ? title : task.title;
+    const nextTitleNormalized = normalizeTaskTitle(nextTitle);
+    if (!nextTitleNormalized) return errorResponse(res, 'Task title is required.', 400);
+
+    const duplicateCheckNeeded =
+      nextTitleNormalized !== task.titleNormalized ||
+      Number(nextWeekNumber) !== Number(task.weekNumber);
+
+    if (duplicateCheckNeeded) {
+      const isUnique = await assertNoDuplicateTask({
+        taskType: task.taskType,
+        teamId: task.teamId,
+        classId: task.classId,
+        courseCode: task.courseCode,
+        weekNumber: nextWeekNumber,
+        titleNormalized: nextTitleNormalized,
+        excludeId: task._id,
+      });
+
+      if (!isUnique) return duplicateTaskResponse(res);
+    }
+
+    if (title !== undefined) {
+      task.title = title.trim();
+      task.titleNormalized = nextTitleNormalized;
+    }
+    if (description !== undefined) task.description = description;
+    if (weekNumber !== undefined) {
+      task.weekNumber = nextWeekNumber;
     }
     if (priority !== undefined) {
       const allowedPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -551,6 +622,7 @@ const updateWeeklyTask = async (req, res) => {
 
     return successResponse(res, { task }, 'Weekly task updated successfully!');
   } catch (err) {
+    if (err.code === 11000) return duplicateTaskResponse(res);
     console.error('updateWeeklyTask error:', err);
     return errorResponse(res, 'Server error.', 500);
   }

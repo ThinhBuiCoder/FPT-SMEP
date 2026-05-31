@@ -13,6 +13,7 @@ import {
   deleteWeeklyTask,
   updateWeeklyTaskStatus,
 } from '../../api/weeklyTaskApi';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,17 @@ const PRIORITY_CFG = {
 };
 
 const LEADER_ROLE_KEYS = ['CEO', 'LEADER', 'TEAM LEADER', 'TEAM_LEADER'];
+const DUPLICATE_TASK_MESSAGE = 'Duplicate task: A task with this title already exists in this week.';
+
+const normalizeTaskTitle = (title) =>
+  title?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+
+const getTaskSaveErrorMessage = (error) => {
+  if (error?.status === 409 || error?.message === 'Duplicate task') {
+    return DUPLICATE_TASK_MESSAGE;
+  }
+  return error?.message || 'Failed to save task';
+};
 
 // ─── Tiny helpers ─────────────────────────────────────────────────────────────
 
@@ -108,7 +120,7 @@ function TaskCard({ task, canEdit, canDelete, canUpdateSts, onEdit, onDelete, on
               </button>
             )}
             {canDelete && (
-              <button onClick={() => onDelete(task._id)} title="Delete"
+              <button onClick={() => onDelete(task)} title="Delete"
                 className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -558,6 +570,7 @@ export default function WeeklyRoadmapPlanner({
   const [modalOpen,    setModalOpen]    = useState(false);
   const [editingTask,  setEditingTask]  = useState(null);
   const [modalType,    setModalType]    = useState('TEAM_TASK');
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────
   const fetchTasks = useCallback(async () => {
@@ -600,19 +613,42 @@ export default function WeeklyRoadmapPlanner({
   const openEdit   = (task)  => { setEditingTask(task); setModalType(task.taskType); setModalOpen(true); };
   const closeModal = ()      => { setModalOpen(false); setEditingTask(null); };
 
+  const getTasksByType = useCallback((taskType) => {
+    if (taskType === 'TEAM_TASK') return teamTasks;
+    if (taskType === 'CLASS_TASK') return classTasks;
+    return courseTasks;
+  }, [classTasks, courseTasks, teamTasks]);
+
+  const hasDuplicateTaskInSelectedWeek = useCallback((payload, excludeTaskId) => {
+    const titleNormalized = normalizeTaskTitle(payload.title);
+    if (!titleNormalized) return false;
+
+    return getTasksByType(payload.taskType).some((task) => {
+      if (excludeTaskId && String(task._id) === String(excludeTaskId)) return false;
+      return Number(task.weekNumber) === Number(selectedWeek)
+        && normalizeTaskTitle(task.title) === titleNormalized;
+    });
+  }, [getTasksByType, selectedWeek]);
+
   const handleSave = async (formData) => {
+    const scope = formData.taskType === 'TEAM_TASK' ? 'TEAM'
+                : formData.taskType === 'CLASS_TASK' ? 'CLASS' : 'COURSE';
+    const payload = {
+      ...formData,
+      scope,
+      courseCode,
+      weekNumber: selectedWeek,
+      classId: formData.taskType !== 'COURSE_TEMPLATE' ? classId : undefined,
+      teamId:  formData.taskType === 'TEAM_TASK'       ? teamId  : undefined,
+    };
+
+    if (hasDuplicateTaskInSelectedWeek(payload, editingTask?._id)) {
+      toast.error(DUPLICATE_TASK_MESSAGE);
+      return;
+    }
+
     try {
       setActionLoading(true);
-      const scope = formData.taskType === 'TEAM_TASK' ? 'TEAM'
-                  : formData.taskType === 'CLASS_TASK' ? 'CLASS' : 'COURSE';
-      const payload = {
-        ...formData,
-        scope,
-        courseCode,
-        weekNumber: selectedWeek,
-        classId: formData.taskType !== 'COURSE_TEMPLATE' ? classId : undefined,
-        teamId:  formData.taskType === 'TEAM_TASK'       ? teamId  : undefined,
-      };
       if (editingTask) {
         await updateWeeklyTask(editingTask._id, payload);
         toast.success('Task updated successfully');
@@ -623,18 +659,23 @@ export default function WeeklyRoadmapPlanner({
       closeModal();
       await fetchTasks();
     } catch (err) {
-      toast.error(err?.message || 'Failed to save task');
+      toast.error(getTaskSaveErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleDelete = async (taskId) => {
-    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+  const handleDelete = (task) => {
+    setDeleteTarget(task);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?._id) return;
     try {
       setActionLoading(true);
-      await deleteWeeklyTask(taskId);
+      await deleteWeeklyTask(deleteTarget._id);
       toast.success('Task deleted');
+      setDeleteTarget(null);
       await fetchTasks();
     } catch (err) {
       toast.error(err?.message || 'Failed to delete task');
@@ -887,6 +928,20 @@ export default function WeeklyRoadmapPlanner({
         selectedWeek={selectedWeek}
         teamMembers={teamMembers}
         loading={actionLoading}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Task"
+        description={
+          deleteTarget?.title
+            ? `Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`
+            : 'Are you sure you want to delete this task? This action cannot be undone.'
+        }
+        confirmText="Delete Task"
+        isSubmitting={actionLoading}
       />
     </div>
   );

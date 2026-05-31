@@ -2,7 +2,16 @@ import Modal from './Modal';
 import Button from './Button';
 import { AlertTriangle } from 'lucide-react';
 
-const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, description, isSubmitting, confirmText = 'Delete' }) => {
+const ConfirmDialog = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  isSubmitting,
+  confirmText = 'Delete',
+  cancelText = 'Cancel',
+}) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="">
       <div className="flex flex-col items-center text-center space-y-4 pt-4">
@@ -14,7 +23,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, description, isSubmi
         
         <div className="flex gap-3 w-full pt-4">
           <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>
-            No
+            {cancelText}
           </Button>
           <Button
             variant="primary"
@@ -22,7 +31,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, description, isSubmi
             onClick={onConfirm}
             isLoading={isSubmitting}
           >
-            Yes
+            {confirmText}
           </Button>
         </div>
       </div>
