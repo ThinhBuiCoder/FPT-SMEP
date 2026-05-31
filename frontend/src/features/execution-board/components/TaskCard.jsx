@@ -39,7 +39,7 @@ function TaskCard({
       task,
       status: task.computedStatus || task.status || 'TODO',
     },
-    disabled: isOverlay,
+    disabled: isOverlay || !canUpdateStatus,
   });
 
   const currentStatus = task.computedStatus || task.status || 'TODO';

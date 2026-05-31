@@ -1,14 +1,13 @@
 // frontend/src/pages/workspace/TeamWorkspace.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Users, Calendar, Mail, Loader2, FileText, UploadCloud, History,
-  ChevronRight, Award, Plus, User, ArrowLeft, Download, Trash2, Shield, MapPin
+  Users, Mail, Loader2, FileText,
+  Award, Plus, ArrowLeft, Shield
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
+import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import { useAuth } from '../../hooks/useAuth';
-import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import PitchDeckUpload from './PitchDeckUpload';
 import VersionHistory from './VersionHistory';
@@ -18,6 +17,7 @@ import SprintPanel from '../../components/workspace/SprintPanel';
 import WeeklyRoadmapPlanner from '../../components/workspace/WeeklyRoadmapPlanner';
 import QuickShortcuts from '../../components/workspace/shortcuts/QuickShortcuts';
 import CheckpointSection from '../../components/workspace/checkpoints/CheckpointSection';
+import WorkspaceSelector from '../../components/workspace/WorkspaceSelector';
 
 const statusColors = {
   DRAFT: 'bg-slate-100 text-slate-600 border border-slate-200',
@@ -25,6 +25,20 @@ const statusColors = {
   REVIEWED: 'bg-purple-50 text-purple-600 border border-purple-200',
   APPROVED: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
   REJECTED: 'bg-red-50 text-red-600 border border-red-200'
+};
+
+const clearWorkspaceSelectionCache = () => {
+  [
+    'selectedClassId',
+    'selectedTeamId',
+    'currentClass',
+    'currentTeam',
+    'studentClass',
+    'teamId',
+    'classId',
+    'courseCode',
+    'semester',
+  ].forEach((key) => localStorage.removeItem(key));
 };
 
 export default function TeamWorkspace() {
@@ -35,6 +49,8 @@ export default function TeamWorkspace() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [emptyMessage, setEmptyMessage] = useState(null);
+  const [workspaceContext, setWorkspaceContext] = useState(null);
 
   // Initialise active tab from URL query param (?tab=roadmap)
   const [activeTab, setActiveTab] = useState(() => {
@@ -46,37 +62,61 @@ export default function TeamWorkspace() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab) setActiveTab(tab);
   }, [location.search]);
 
-  const fetchWorkspaceData = async () => {
+  const fetchWorkspaceData = useCallback(async (targetTeamId = teamId || null) => {
     try {
       setLoading(true);
       setErrorMsg(null);
-      let res;
-      if (teamId) {
-        res = await workspaceApi.getTeamWorkspace(teamId);
+      setEmptyMessage(null);
+
+      let contextRes;
+      if (targetTeamId) {
+        contextRes = await teamWorkspaceApi.getWorkspaceContext(targetTeamId);
       } else {
-        res = await workspaceApi.getMyWorkspace();
+        contextRes = await teamWorkspaceApi.getCurrentWorkspace();
       }
+
+      const context = contextRes?.data || null;
+      if (!context) {
+        clearWorkspaceSelectionCache();
+        setWorkspaceContext(null);
+        setData(null);
+        setEmptyMessage(contextRes?.message || 'You have joined this class but have not been assigned to a team yet.');
+        return;
+      }
+
+      setWorkspaceContext(context);
+      const resolvedTeamId = context.selectedWorkspace?.teamId;
+      const res = await workspaceApi.getTeamWorkspace(resolvedTeamId);
 
       if (res.data === null) {
         // Not assigned to team yet
+        clearWorkspaceSelectionCache();
         setData(null);
+        setEmptyMessage(res.message || 'You have joined this class but have not been assigned to a team yet.');
       } else {
         setData(res.data);
       }
     } catch (err) {
       console.error(err);
+      if (err.status === 403) clearWorkspaceSelectionCache();
       setErrorMsg(err.response?.data?.error || err.message || 'Failed to load workspace');
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWorkspaceData();
-  }, [teamId]);
+  }, [fetchWorkspaceData]);
+
+  const handleWorkspaceChange = (nextTeamId) => {
+    fetchWorkspaceData(nextTeamId);
+  };
 
   if (loading) {
     return (
@@ -113,7 +153,7 @@ export default function TeamWorkspace() {
         </div>
         <h2 className="text-xl font-bold text-slate-800">No Team Assigned</h2>
         <p className="text-slate-500 mt-2 max-w-md mx-auto">
-          You are currently not assigned to any startup team. Ask your lecturer or administrator to add you to a team to access the workspace.
+          {emptyMessage || 'You have joined this class but have not been assigned to a team yet.'}
         </p>
       </div>
     );
@@ -122,12 +162,14 @@ export default function TeamWorkspace() {
   const { team, class: cls, members, lecturer, mentor, proposal, latestDeck, pitchDecks, versions } = data;
   const privilegedRoles = ['ADMIN', 'LECTURER', 'MENTOR'];
   const isTeamMember = members && members.some(m => m.userId?._id === user?._id);
-  const isEditable = privilegedRoles.includes(user?.role) || isTeamMember;
+  const accessMode = workspaceContext?.accessMode || workspaceContext?.selectedWorkspace?.accessMode || null;
+  const isReadOnly = accessMode === 'READ_ONLY';
+  const isEditable = !isReadOnly && (privilegedRoles.includes(user?.role) || isTeamMember);
 
   // Build target proposal link
   const getProposalLink = () => {
-    if (teamId) {
-      return `/workspace/teams/${teamId}/proposal`;
+    if (team?._id) {
+      return `/workspace/teams/${team._id}/proposal`;
     }
     return `/student/workspace/proposal`;
   };
@@ -162,7 +204,21 @@ export default function TeamWorkspace() {
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
         )}
+        <WorkspaceSelector
+          selectedWorkspace={workspaceContext?.selectedWorkspace}
+          availableWorkspaces={workspaceContext?.availableWorkspaces || []}
+          onChangeWorkspace={handleWorkspaceChange}
+          disabled={loading}
+        />
       </div>
+
+      {isReadOnly && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {workspaceContext?.selectedWorkspace?.isArchived
+            ? 'This is an archived workspace. Editing actions are disabled.'
+            : 'You are viewing this previous course workspace in read-only mode.'}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto">
@@ -354,11 +410,11 @@ export default function TeamWorkspace() {
             </div>
 
             {/* Proposal Version History */}
-            {proposal && (
+            {(proposal || versions?.length > 0) && (
               <VersionHistory
-                proposalId={proposal._id}
+                proposalId={proposal?._id}
                 versions={versions}
-                isEditable={isEditable}
+                isEditable={isEditable && Boolean(proposal)}
                 onRefresh={fetchWorkspaceData}
               />
             )}
@@ -384,6 +440,8 @@ export default function TeamWorkspace() {
             currentUser={user}
             roleInTeam={roleInTeam}
             teamMembers={members || []}
+            isReadOnly={isReadOnly}
+            accessMode={accessMode}
           />
         );
       })()}
@@ -393,19 +451,20 @@ export default function TeamWorkspace() {
           teamId={team._id}
           proposalId={proposal?._id}
           pitchDeckId={latestDeck?._id}
+          isReadOnly={isReadOnly}
         />
       )}
 
       {activeTab === 'mentoring' && (
-        <MentoringPanel teamId={team._id} />
+        <MentoringPanel teamId={team._id} isReadOnly={isReadOnly} />
       )}
 
       {activeTab === 'sprint' && (
-        <SprintPanel teamId={team._id} members={members} isEditable={isEditable} />
+        <SprintPanel teamId={team._id} members={members} isEditable={isEditable} isReadOnly={isReadOnly} />
       )}
 
       {activeTab === 'shortcut' && (
-        <QuickShortcuts teamId={team._id} isEditable={isEditable} />
+        <QuickShortcuts teamId={team._id} isEditable={isEditable && !isReadOnly} isReadOnly={isReadOnly} />
       )}
     </div>
   );

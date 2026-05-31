@@ -24,7 +24,7 @@ const canAccessTeamWorkspace = async (req, res, next) => {
 const canManageShortcut = async (req, res, next) => {
   try {
     const { teamId, shortcutId } = req.params;
-    const shortcut = await Shortcut.findOne({ _id: shortcutId, teamId });
+    const shortcut = await Shortcut.findById(shortcutId);
 
     if (!shortcut) {
       return errorResponse(res, 'Shortcut not found.', 404);

@@ -7,6 +7,7 @@ const CheckpointSubmission = require('../models/CheckpointSubmission');
 const CheckpointFile       = require('../models/CheckpointFile');
 const CheckpointFeedback   = require('../models/CheckpointFeedback');
 const workspacePerm        = require('../utils/workspacePermission');
+const workspaceAccess      = require('../services/workspaceAccess.service');
 const { CHECKPOINTS, getCheckpointConfig } = require('../config/checkpointConfig');
 
 const MAX_FILE_BYTES = CheckpointFile.MAX_FILE_BYTES;
@@ -199,6 +200,7 @@ exports.uploadCheckpointFile = (req, res) => {
       const cpNum = parseInt(checkpointNumber, 10);
 
       await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+      await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
       const team = await Team.findById(teamId);
       if (!team) return err(res, 'Team not found.', 404);
@@ -256,6 +258,7 @@ exports.deleteCheckpointFile = async (req, res) => {
     const cpNum = parseInt(checkpointNumber, 10);
 
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const checkpointFile = await CheckpointFile.findOne({
       _id: fileId,
@@ -346,6 +349,7 @@ exports.updateRequirementContents = async (req, res) => {
     }
 
     await workspacePerm.assertCanEditTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const team = await Team.findById(teamId);
     if (!team) return err(res, 'Team not found.', 404);
@@ -431,6 +435,7 @@ exports.addFeedback = async (req, res) => {
     }
 
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     const feedback = await CheckpointFeedback.create({
       teamId,

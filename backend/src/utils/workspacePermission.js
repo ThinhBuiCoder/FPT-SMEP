@@ -2,58 +2,92 @@
 const Student = require("../models/Student");
 const Team = require("../models/Team");
 const Class = require("../models/Class");
+const workspaceAccess = require("../services/workspaceAccess.service");
+
+const semesterRank = { SP: 1, SU: 2, FA: 3 };
+
+const getUserIdentityFilter = (user) => {
+  const or = [];
+  if (user?._id) or.push({ userId: user._id });
+  if (user?.email) or.push({ email: String(user.email).toLowerCase().trim() });
+  return or.length ? { $or: or } : null;
+};
+
+const sortStudentsByClassRecency = (students) => {
+  return [...students].sort((a, b) => {
+    const classA = a.classId || {};
+    const classB = b.classId || {};
+    const yearDiff = Number(classB.year || 0) - Number(classA.year || 0);
+    if (yearDiff) return yearDiff;
+    return (semesterRank[classB.semester] || 0) - (semesterRank[classA.semester] || 0);
+  });
+};
+
+exports.getStudentsByUser = async (user) => {
+  const identityFilter = getUserIdentityFilter(user);
+  if (!identityFilter) return [];
+
+  return Student.find(identityFilter)
+    .populate("classId", "classCode subjectCode semester year status")
+    .sort({ updatedAt: -1 });
+};
 
 exports.getCurrentStudentByUser = async (user) => {
-  if (!user) return null;
-  return await Student.findOne({
+  const students = await exports.getStudentsByUser(user);
+  return sortStudentsByClassRecency(students.filter((student) => student.classId?.status !== "disabled"))[0] || null;
+};
+
+exports.getCurrentStudentWorkspaceContext = async (user) => {
+  const students = sortStudentsByClassRecency(
+    (await exports.getStudentsByUser(user)).filter((student) => student.classId?.status !== "disabled")
+  );
+  if (!students.length) return { student: null, team: null, reason: "NO_CLASS" };
+
+  const currentStudent = students[0];
+  if (!currentStudent.teamId) {
+    return { student: currentStudent, team: null, reason: "NO_TEAM_IN_CURRENT_CLASS" };
+  }
+
+  const team = await Team.findOne({
+    _id: currentStudent.teamId,
+    classId: currentStudent.classId?._id || currentStudent.classId,
+  });
+
+  if (!team) {
+    return { student: currentStudent, team: null, reason: "STALE_TEAM_CACHE" };
+  }
+
+  return { student: currentStudent, team, reason: null };
+};
+
+exports.getStudentForTeam = async (user, team) => {
+  const identityFilter = getUserIdentityFilter(user);
+  if (!identityFilter || !team?._id || !team?.classId) return null;
+
+  const memberStudentIds = (team.members || []).map((member) => member.studentId).filter(Boolean);
+  return Student.findOne({
+    ...identityFilter,
+    classId: team.classId,
     $or: [
-      { userId: user._id },
-      { email: user.email.toLowerCase() }
-    ]
+      { teamId: team._id },
+      { _id: { $in: memberStudentIds } },
+    ],
   });
 };
 
 exports.canAccessTeamWorkspace = async (user, teamId) => {
-  const role = user.role.toUpperCase();
-  if (role === "ADMIN") return true;
-
-  const team = await Team.findById(teamId);
-  if (!team) return false;
-
-  if (role === "STUDENT" || role === "USER") {
-    const student = await exports.getCurrentStudentByUser(user);
-    return student && student.teamId && student.teamId.toString() === teamId.toString();
-  }
-
-  if (role === "LECTURER" || role === "LECTURE") {
-    if (team.lectureId && team.lectureId.toString() === user._id.toString()) return true;
-    const cls = await Class.findById(team.classId);
-    return cls && cls.lectureId && cls.lectureId.toString() === user._id.toString();
-  }
-
-  if (role === "MENTOR") {
-    if (team.mentorId && team.mentorId.toString() === user._id.toString()) return true;
-    const cls = await Class.findById(team.classId);
-    return cls && cls.mentorIds && cls.mentorIds.some(id => id.toString() === user._id.toString());
-  }
-
-  return false;
+  const { accessMode } = await workspaceAccess.resolveWorkspaceAccess(user, teamId);
+  return accessMode !== workspaceAccess.ACCESS.DENIED;
 };
 
 exports.canEditTeamWorkspace = async (user, teamId) => {
-  const role = user.role.toUpperCase();
-  if (role === "ADMIN") return true;
-  if (role === "STUDENT" || role === "USER") {
-    const student = await exports.getCurrentStudentByUser(user);
-    return student && student.teamId && student.teamId.toString() === teamId.toString();
-  }
-  return false;
+  return workspaceAccess.canMutateWorkspace(user, teamId);
 };
 
 exports.assertCanAccessTeamWorkspace = async (user, teamId) => {
   const hasAccess = await exports.canAccessTeamWorkspace(user, teamId);
   if (!hasAccess) {
-    const error = new Error("Access Denied: You do not have permission to access this workspace.");
+    const error = new Error("You do not have permission to view this team workspace.");
     error.statusCode = 403;
     throw error;
   }

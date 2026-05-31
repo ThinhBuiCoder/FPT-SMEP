@@ -17,6 +17,13 @@ const teamSchema = new mongoose.Schema(
     mentorId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     lectureId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     createdBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    lineageId:  { type: mongoose.Schema.Types.ObjectId, ref: 'StartupLineage', default: null },
+    courseCode: { type: String, trim: true, uppercase: true, default: null },
+    semester:   { type: String, trim: true, uppercase: true, default: null },
+    previousTeamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
+    nextTeamId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
+    isArchived: { type: Boolean, default: false },
+    archivedAt: { type: Date, default: null },
     members:    [teamMemberSchema],
     // Auto-created chat group reference
     chatGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatGroup', default: null },
@@ -30,5 +37,8 @@ const teamSchema = new mongoose.Schema(
 
 // teamCode must be unique within a class
 teamSchema.index({ teamCode: 1, classId: 1 }, { unique: true });
+teamSchema.index({ lineageId: 1 });
+teamSchema.index({ previousTeamId: 1 });
+teamSchema.index({ nextTeamId: 1 });
 
 module.exports = mongoose.model('Team', teamSchema);

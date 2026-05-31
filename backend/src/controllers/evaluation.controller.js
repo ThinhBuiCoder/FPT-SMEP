@@ -5,6 +5,7 @@ const StartupIdea = require('../models/StartupIdea');
 const Team = require('../models/Team');
 const Class = require('../models/Class');
 const workspacePerm = require('../utils/workspacePermission');
+const workspaceAccess = require('../services/workspaceAccess.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { getCheckpointConfig } = require('../config/checkpointConfig');
 const { normalizeRubricScores, assertValidRubric } = require('../services/evaluationScoring.service');
@@ -263,6 +264,7 @@ const createTeamEvaluation = async (req, res) => {
 
     // Must be evaluator (Lecturer/Mentor/Admin assigned to team/class)
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
     if (req.user.role === 'STUDENT' || req.user.role === 'USER') {
       return errorResponse(res, "Students cannot create evaluations.", 403);
     }
@@ -317,6 +319,7 @@ const updateTeamEvaluation = async (req, res) => {
     const { id } = req.params;
     const ev = await Evaluation.findById(id);
     if (!ev) return errorResponse(res, "Evaluation not found.", 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, ev.teamId);
 
     // Only owner or admin can update, and submitted evaluations are locked.
     if (ev.lecturerId.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
@@ -350,6 +353,7 @@ const updateTeamEvaluation = async (req, res) => {
 
     return successResponse(res, { evaluation: ev }, "Evaluation updated successfully.");
   } catch (err) {
+    if (err.statusCode === 403) return errorResponse(res, err.message, 403);
     if (err.statusCode === 400 || err.statusCode === 409) return errorResponse(res, err.message, err.statusCode);
     return errorResponse(res, "Server error: " + err.message);
   }
@@ -360,6 +364,7 @@ const submitTeamEvaluation = async (req, res) => {
     const { id } = req.params;
     const ev = await Evaluation.findById(id);
     if (!ev) return errorResponse(res, "Evaluation not found.", 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, ev.teamId);
 
     if (ev.lecturerId.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
       return errorResponse(res, "You do not have permission to submit this evaluation.", 403);
@@ -376,6 +381,7 @@ const submitTeamEvaluation = async (req, res) => {
 
     return successResponse(res, { evaluation: ev }, "Evaluation submitted successfully.");
   } catch (err) {
+    if (err.statusCode === 403) return errorResponse(res, err.message, 403);
     if (err.statusCode === 400 || err.statusCode === 409) return errorResponse(res, err.message, err.statusCode);
     return errorResponse(res, "Server error: " + err.message);
   }

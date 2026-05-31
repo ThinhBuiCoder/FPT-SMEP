@@ -2,6 +2,7 @@
 const MentoringSession = require('../models/MentoringSession');
 const Team = require('../models/Team');
 const workspacePerm = require('../utils/workspacePermission');
+const workspaceAccess = require('../services/workspaceAccess.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const notificationService = require('../services/notification.service');
 const emailService = require('../services/email.service');
@@ -42,6 +43,8 @@ const createSession = async (req, res) => {
     if (req.user.role === 'STUDENT' || req.user.role === 'USER') {
       return errorResponse(res, 'You do not have permission to create mentoring sessions. Only lecturers and mentors can create sessions.', 403);
     }
+
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
 
     // Check team exists
     const team = await Team.findById(teamId);
@@ -245,6 +248,7 @@ const updateSession = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     // Permission check: Only creator, assigned lecturer/mentor, or admin can update
     const isOwner = session.lecturerId.toString() === req.user._id.toString() || 
@@ -431,6 +435,7 @@ const cancelSession = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     if (session.status === 'CANCELLED') {
       return errorResponse(res, 'This session is already cancelled.', 400);
@@ -505,6 +510,7 @@ const deleteSession = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     // Admin only for hard delete
     if (req.user.role !== 'ADMIN') {
@@ -567,6 +573,7 @@ const addSessionNote = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     // Disallow notes on cancelled sessions
     if (session.status === 'CANCELLED') {
@@ -608,6 +615,7 @@ const addActionItem = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     // Permission check
     const isOwner = session.lecturerId.toString() === req.user._id.toString() || 
@@ -654,6 +662,7 @@ const updateActionItem = async (req, res) => {
   try {
     const session = await MentoringSession.findById(req.params.id);
     if (!session) return errorResponse(res, 'Session not found.', 404);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, session.teamId);
 
     const actionItem = session.actionItems.id(itemId);
     if (!actionItem) return errorResponse(res, 'Action item not found.', 404);

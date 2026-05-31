@@ -3,12 +3,15 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Kanban, Search, Loader2, Users, ChevronRight, FileText, Flag,
-  GraduationCap, Award,
+  GraduationCap, Award, Link2, Archive,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceApi } from '../../api/workspaceApi';
+import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import { useAuth } from '../../hooks/useAuth';
 import EmptyState from '../../components/ui/EmptyState';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
 
 const roleHint = {
   ADMIN: 'All startup teams in the system',
@@ -22,11 +25,14 @@ export default function StartupWorkspaceHub() {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [previousTeamId, setPreviousTeamId] = useState('');
+  const [nextTeamId, setNextTeamId] = useState('');
+  const [linking, setLinking] = useState(false);
 
   const role = (user?.role || 'STUDENT').toUpperCase();
 
-  useEffect(() => {
-    const load = async () => {
+  const loadTeams = async () => {
       try {
         setLoading(true);
         const res = await workspaceApi.getAccessibleTeams();
@@ -39,8 +45,50 @@ export default function StartupWorkspaceHub() {
         setLoading(false);
       }
     };
-    load();
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadTeams();
   }, []);
+
+  const canLinkContinuity = role === 'ADMIN' || role === 'LECTURER' || role === 'LECTURE';
+
+  const teamLabel = (team) => {
+    const classCode = team.class?.classCode || 'Class';
+    const course = team.courseCode || team.class?.subjectCode || '';
+    const semester = team.semester || [team.class?.semester, team.class?.year].filter(Boolean).join('');
+    return `${team.teamName} (${classCode}${course ? ` - ${course}` : ''}${semester ? ` - ${semester}` : ''})`;
+  };
+
+  const openLinkModal = () => {
+    const activeTeams = teams.filter((team) => !team.nextTeamId);
+    setPreviousTeamId(activeTeams[0]?._id || teams[0]?._id || '');
+    setNextTeamId(activeTeams.find((team) => team._id !== (activeTeams[0]?._id || teams[0]?._id))?._id || '');
+    setLinkModalOpen(true);
+  };
+
+  const handleLinkWorkspaces = async () => {
+    if (!previousTeamId || !nextTeamId) {
+      toast.error('Please select both previous and current workspaces.');
+      return;
+    }
+    if (previousTeamId === nextTeamId) {
+      toast.error('Previous and current workspace must be different.');
+      return;
+    }
+
+    setLinking(true);
+    try {
+      await teamWorkspaceApi.linkWorkspaces({ previousTeamId, nextTeamId });
+      toast.success('Workspace continuity linked successfully.');
+      setLinkModalOpen(false);
+      await loadTeams();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || e?.message || 'Failed to link workspaces');
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -81,9 +129,16 @@ export default function StartupWorkspaceHub() {
             </div>
           </div>
         </div>
-        <p className="text-sm font-semibold text-slate-600 bg-white border border-slate-200/80 px-4 py-2 rounded-xl shadow-sm">
-          {teams.length} team{teams.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {canLinkContinuity && teams.length >= 2 && (
+            <Button variant="outline" size="sm" icon={Link2} onClick={openLinkModal}>
+              Link Continuity
+            </Button>
+          )}
+          <p className="text-sm font-semibold text-slate-600 bg-white border border-slate-200/80 px-4 py-2 rounded-xl shadow-sm">
+            {teams.length} team{teams.length !== 1 ? 's' : ''}
+          </p>
+        </div>
       </div>
 
       <div className="relative max-w-md">
@@ -118,9 +173,14 @@ export default function StartupWorkspaceHub() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary-50 px-2 py-0.5 rounded-md">
-                    {team.class?.classCode || 'Class'}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary-50 px-2 py-0.5 rounded-md">
+                  {team.class?.classCode || 'Class'}
+                </span>
+                {team.isArchived && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                    <Archive className="w-3 h-3" /> Archived
                   </span>
+                )}
                   <h2 className="text-lg font-bold text-slate-900 mt-2 group-hover:text-primary transition-colors truncate">
                     {team.teamName}
                   </h2>
@@ -168,6 +228,61 @@ export default function StartupWorkspaceHub() {
       <p className="text-xs text-slate-400 text-center pb-4">
         View-only for your role: you can review proposals, pitch decks, and checkpoint submissions. Upload is reserved for students.
       </p>
+
+      <Modal
+        isOpen={linkModalOpen}
+        onClose={() => !linking && setLinkModalOpen(false)}
+        title="Link Startup Continuity"
+        submitText="Link Workspaces"
+        isSubmitting={linking}
+        onSubmit={handleLinkWorkspaces}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Link an earlier course workspace to the current startup workspace. The previous workspace will become archived/read-only.
+          </p>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">
+              Previous workspace
+            </label>
+            <select
+              value={previousTeamId}
+              onChange={(event) => setPreviousTeamId(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Select previous team</option>
+              {teams.map((team) => (
+                <option key={team._id} value={team._id}>
+                  {teamLabel(team)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">
+              Current workspace
+            </label>
+            <select
+              value={nextTeamId}
+              onChange={(event) => setNextTeamId(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Select current team</option>
+              {teams.map((team) => (
+                <option key={team._id} value={team._id} disabled={team._id === previousTeamId}>
+                  {teamLabel(team)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            After linking, shared shortcuts, pitch deck history, and proposal version history can be viewed across the startup lineage.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
