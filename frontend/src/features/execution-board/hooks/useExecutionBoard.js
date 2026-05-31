@@ -11,19 +11,21 @@ import {
   updateWeeklyTaskStatus,
 } from '../../../api/weeklyTaskApi';
 import {
-  createOptimisticTask,
   moveTaskStatusInBoard,
   normalizeBoardResponse,
   normalizeFilters,
   patchTaskInBoard,
-  prependTaskToBoard,
   removeTaskFromBoard,
   replaceTaskInBoard,
-  taskMatchesFilters,
   upsertTaskForFilters,
 } from '../boardUtils';
 
 const extractTeam = (response) => response?.data?.team || response?.team || response?.data || null;
+const duplicateTaskMessage = 'Duplicate task: A task with this title already exists in this week.';
+const getTaskErrorMessage = (error, fallback) => {
+  if (error?.status === 409 || error?.message === 'Duplicate task') return duplicateTaskMessage;
+  return error?.message || fallback;
+};
 
 export function useTeamContext({ user, queryTeamId }) {
   const role = user?.role?.toUpperCase() || '';
@@ -72,7 +74,7 @@ export function useTaskBoard({ teamId, filters }) {
   });
 }
 
-export function useTaskMutations({ boardKey, teamId, user, teamMembers, filters, onCloseModal }) {
+export function useTaskMutations({ boardKey, teamId, filters, onCloseModal }) {
   const queryClient = useQueryClient();
 
   const saveTask = useMutation({
@@ -87,20 +89,14 @@ export function useTaskMutations({ boardKey, teamId, user, teamMembers, filters,
         queryClient.setQueryData(boardKey, (board) =>
           upsertTaskForFilters(board, { ...task, ...payload }, filters)
         );
-      } else {
-        const optimistic = createOptimisticTask({ payload, teamId, user, teamMembers });
-        if (taskMatchesFilters(optimistic, filters)) {
-          queryClient.setQueryData(boardKey, (board) => prependTaskToBoard(board, optimistic));
-        }
-        return { previous, optimisticId: optimistic._id };
       }
 
       return { previous };
     },
-    onSuccess: (response, variables, context) => {
+    onSuccess: (response, variables) => {
       const savedTask = response?.data?.task || response?.task || response?.data;
       if (savedTask) {
-        const idToReplace = variables.task?._id || context?.optimisticId;
+        const idToReplace = variables.task?._id;
         queryClient.setQueryData(boardKey, (board) => (
           idToReplace
             ? upsertTaskForFilters(replaceTaskInBoard(board, idToReplace, savedTask), savedTask, filters)
@@ -112,7 +108,7 @@ export function useTaskMutations({ boardKey, teamId, user, teamMembers, filters,
     },
     onError: (error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(boardKey, context.previous);
-      toast.error(error.message || 'Failed to save task');
+      toast.error(getTaskErrorMessage(error, 'Failed to save task'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: boardKey, exact: true, refetchType: 'inactive' });
