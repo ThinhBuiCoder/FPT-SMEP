@@ -9,6 +9,8 @@ const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
 const { autoGenerateSchedule, validateScheduleConflict } = require('../services/schedule.service');
 const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
+const { verifyMajors } = require('../services/majorVerify.service');
+const { getProgramGroupFromMajor } = require('../constants/majors');
 const multer  = require('multer');
 const ExcelJS = require('exceljs');
 // ─── Multer: memory storage for Excel parsing ─────────────────────────────────
@@ -52,6 +54,7 @@ const getLecturerSemesterFilter = async (lecturerId) => {
 // ─── POST /api/classes/bulk-create ────────────────────────────────────────────
 exports.bulkCreateClasses = async (req, res) => {
   const { subjectCode, count, numberOfClasses, semester, year, lecturerIds, lectureId, mentorIds } = req.body;
+  const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'LECTURE';
 
   // --- Validate inputs ---
   if (!subjectCode) return errorResponse(res, 'subjectCode is required', 400);
@@ -69,20 +72,25 @@ exports.bulkCreateClasses = async (req, res) => {
   const semUpper = semester.toUpperCase();
   const subjectUpper = subjectCode.toUpperCase();
 
-  // Validate lecturers (support both singular lectureId for backward compatibility and array lecturerIds)
+  // Validate lecturers
+  // If the requester IS a LECTURER, ignore body lecturerIds and auto-assign to themselves.
   const validLecturerIds = [];
-  const incomingLecturers = Array.isArray(lecturerIds) ? lecturerIds : (lectureId ? [lectureId] : []);
-  if (incomingLecturers.length > 0) {
-    const uniqueLecturerIds = [...new Set(incomingLecturers.filter(Boolean))];
-    const lecturers = await User.find({ _id: { $in: uniqueLecturerIds } });
-    if (lecturers.length !== uniqueLecturerIds.length) {
-      return errorResponse(res, 'One or more lecturer IDs are invalid', 400);
-    }
-    for (const lect of lecturers) {
-      if (lect.role !== 'LECTURER' && lect.role !== 'LECTURE') {
-        return errorResponse(res, `User ${lect.name} is not a LECTURER`, 400);
+  if (isLecturer) {
+    validLecturerIds.push(req.user._id.toString());
+  } else {
+    const incomingLecturers = Array.isArray(lecturerIds) ? lecturerIds : (lectureId ? [lectureId] : []);
+    if (incomingLecturers.length > 0) {
+      const uniqueLecturerIds = [...new Set(incomingLecturers.filter(Boolean))];
+      const lecturers = await User.find({ _id: { $in: uniqueLecturerIds } });
+      if (lecturers.length !== uniqueLecturerIds.length) {
+        return errorResponse(res, 'One or more lecturer IDs are invalid', 400);
       }
-      validLecturerIds.push(lect._id.toString());
+      for (const lect of lecturers) {
+        if (lect.role !== 'LECTURER' && lect.role !== 'LECTURE') {
+          return errorResponse(res, `User ${lect.name} is not a LECTURER`, 400);
+        }
+        validLecturerIds.push(lect._id.toString());
+      }
     }
   }
 
@@ -826,3 +834,145 @@ exports.exportClassExcel = async (req, res) => {
   }
 };
 
+// ─── PUT /api/classes/:id/rename ─────────────────────────────────────────────
+exports.renameClass = async (req, res) => {
+  const { classCode } = req.body;
+  if (!classCode || !classCode.trim())
+    return errorResponse(res, 'classCode is required', 400);
+
+  const newCode = classCode.trim().toUpperCase();
+
+  try {
+    const cls = await Class.findById(req.params.id);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only rename their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'You do not have permission to rename this class', 403);
+    }
+
+    // Check uniqueness: (classCode, semester, year)
+    if (newCode !== cls.classCode) {
+      const conflict = await Class.findOne({
+        classCode: newCode,
+        semester: cls.semester,
+        year: cls.year,
+        _id: { $ne: cls._id },
+      });
+      if (conflict) {
+        return errorResponse(res, `Class code "${newCode}" already exists for ${cls.semester} ${cls.year}`, 409);
+      }
+    }
+
+    cls.classCode = newCode;
+    await cls.save();
+
+    // Sync chat group name if exists
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group after rename ${cls.classCode}:`, chatErr.message);
+    }
+
+    await cls.populate([
+      { path: 'lectureId', select: 'name email avatar role' },
+      { path: 'mentorIds', select: 'name email avatar role' },
+    ]);
+
+    return successResponse(res, { class: cls }, 'Class renamed successfully');
+  } catch (err) {
+    if (err.code === 11000) {
+      return errorResponse(res, 'Class code already exists for this semester/year', 409);
+    }
+    console.error('renameClass error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── POST /api/classes/:classId/verify-majors ─────────────────────────────────
+exports.verifyMajors = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only verify their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'You do not have permission to verify this class', 403);
+    }
+
+    if (!req.file) return errorResponse(res, 'Please upload an Excel file', 400);
+
+    const report = await verifyMajors(req.file.buffer, cls._id);
+    return successResponse(res, report, 'Major verification complete');
+  } catch (err) {
+    console.error('verifyMajors error:', err);
+    return errorResponse(res, err.message || 'Verification failed', 400);
+  }
+};
+
+// ─── PATCH /api/classes/:classId/students/:studentId/major ────────────────────
+exports.updateStudentMajor = async (req, res) => {
+  const { major } = req.body;
+  if (!major || !major.trim())
+    return errorResponse(res, 'major is required', 400);
+
+  const newMajor = major.trim().toUpperCase();
+
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only update their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'No permission', 403);
+    }
+
+    const student = await Student.findOne({ _id: req.params.studentId, classId: cls._id });
+    if (!student) return errorResponse(res, 'Student not found in this class', 404);
+
+    const programGroup = getProgramGroupFromMajor(newMajor) || null;
+    student.major = newMajor;
+    student.programGroup = programGroup;
+    await student.save();
+
+    // Also sync linked User's major if they have one
+    if (student.userId) {
+      await User.findByIdAndUpdate(student.userId, { major: newMajor, programGroup });
+    }
+
+    return successResponse(res, { student }, 'Student major updated');
+  } catch (err) {
+    console.error('updateStudentMajor error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PATCH /api/classes/:classId/toggle-major-lock ────────────────────────────
+exports.toggleMajorLock = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only toggle their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'No permission', 403);
+    }
+
+    // Toggle
+    cls.isMajorLocked = !cls.isMajorLocked;
+    await cls.save();
+
+    const msg = cls.isMajorLocked
+      ? 'Major change is now LOCKED for students in this class'
+      : 'Major change is now UNLOCKED for students in this class';
+
+    return successResponse(res, { isMajorLocked: cls.isMajorLocked }, msg);
+  } catch (err) {
+    console.error('toggleMajorLock error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};

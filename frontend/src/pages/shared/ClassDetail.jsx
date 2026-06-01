@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar
+  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -15,6 +15,8 @@ import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 import TeamGeneratePanel from '../../components/class/TeamGeneratePanel';
 import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
+import RenameClassModal from '../../components/class/RenameClassModal';
+import VerifyMajorModal from '../../components/class/VerifyMajorModal';
 
 export default function ClassDetail() {
   const { id }    = useParams();
@@ -34,8 +36,11 @@ export default function ClassDetail() {
   const [showImport, setShowImport] = useState(false);
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [showAssignMentors, setShowAssignMentors] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [togglingLock, setTogglingLock] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -83,6 +88,19 @@ export default function ClassDetail() {
     }
   };
 
+  const handleToggleMajorLock = async () => {
+    setTogglingLock(true);
+    try {
+      const res = await classApi.toggleMajorLock(id);
+      setCls(prev => ({ ...prev, isMajorLocked: res.data.isMajorLocked }));
+      toast.success(res.message || 'Đã thay đổi trạng thái cập nhật chuyên ngành');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi khi thay đổi trạng thái');
+    } finally {
+      setTogglingLock(false);
+    }
+  };
+
   const handleExportExcel = async () => {
     setExporting(true);
     try {
@@ -124,7 +142,20 @@ export default function ClassDetail() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{cls.classCode}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900">{cls.classCode}</h1>
+              {(user?.role === 'ADMIN' ||
+                (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id)) && (
+                <button
+                  id="btn-rename-class"
+                  onClick={() => setShowRename(true)}
+                  title="Đổi tên lớp"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary-50 transition-all"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <p className="text-sm text-slate-500">{cls.subjectCode || '—'} · {cls.semester || '—'} {cls.year || ''}</p>
           </div>
         </div>
@@ -159,6 +190,31 @@ export default function ClassDetail() {
               className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
             >
               <Upload className="w-4 h-4" /> Import Students
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
+              id="btn-verify-majors"
+              onClick={() => setShowVerify(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-600 rounded-xl text-sm hover:bg-indigo-50 transition-all font-medium"
+            >
+              <ShieldCheck className="w-4 h-4" /> Kiểm tra Chuyên ngành
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
+              onClick={handleToggleMajorLock}
+              disabled={togglingLock}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-sm transition-all font-medium disabled:opacity-50 ${
+                cls.isMajorLocked 
+                  ? 'border-red-300 text-red-600 hover:bg-red-50' 
+                  : 'border-green-300 text-green-600 hover:bg-green-50'
+              }`}
+            >
+              {togglingLock ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                cls.isMajorLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />
+              )}
+              {cls.isMajorLocked ? 'Mở khóa cập nhật' : 'Khóa cập nhật CN'}
             </button>
           )}
         </div>
@@ -340,6 +396,27 @@ export default function ClassDetail() {
             setShowAssignMentors(false);
             await fetchData();
           }}
+        />
+      )}
+
+      {/* ── Rename Class Modal ── */}
+      {showRename && (
+        <RenameClassModal
+          classId={id}
+          currentCode={cls.classCode}
+          onClose={() => setShowRename(false)}
+          onRenamed={(updated) => {
+            if (updated) setCls(prev => ({ ...prev, classCode: updated.classCode }));
+            setShowRename(false);
+          }}
+        />
+      )}
+
+      {/* ── Verify Majors Modal ── */}
+      {showVerify && (
+        <VerifyMajorModal
+          classId={id}
+          onClose={() => setShowVerify(false)}
         />
       )}
     </div>

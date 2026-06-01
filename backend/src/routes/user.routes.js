@@ -9,7 +9,7 @@ const router = express.Router();
 // All routes require authentication
 router.use(protect);
 
-router.get('/', authorize('ADMIN'), getUsers);
+router.get('/', authorize('ADMIN', 'LECTURER'), getUsers);
 router.post('/', authorize('ADMIN'), createUser);
 router.get('/:id', authorize('ADMIN'), getUserById);
 router.put('/:id', authorize('ADMIN'), updateUser);

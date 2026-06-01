@@ -9,8 +9,8 @@ const router = express.Router();
 router.use(protect);
 
 // ─── Class CRUD ─────────────────────────────────────────────────────────────
-// Bulk-create multiple classes at once (Admin only)
-router.post('/bulk-create',  authorize('ADMIN'), ctrl.bulkCreateClasses);
+// Bulk-create multiple classes at once (Admin and Lecturer)
+router.post('/bulk-create',  authorize('ADMIN', 'LECTURER'), ctrl.bulkCreateClasses);
 // List classes (Admin = all, Lecturer = assigned + 3-semester window)
 router.get('/',              ctrl.getClasses);
 // Student specific endpoints (must be above dynamic parameter routes)
@@ -25,6 +25,8 @@ router.get('/:classId/export-excel', authorize('ADMIN', 'LECTURER', 'MENTOR'), c
 router.get('/:id',           ctrl.getClassById);
 // Update class metadata
 router.put('/:id',           authorize('ADMIN', 'LECTURER'), ctrl.updateClass);
+// Rename class code (Admin or assigned Lecturer)
+router.put('/:id/rename',    authorize('ADMIN', 'LECTURER'), ctrl.renameClass);
 // Soft-delete (disable) class
 router.delete('/:id',        authorize('ADMIN'), ctrl.deleteClass);
 
@@ -44,5 +46,26 @@ router.post(
   ctrl.importStudents
 );
 router.get('/:classId/students', ctrl.getStudents);
+
+// ─── Major Verification ───────────────────────────────────────────────────────
+// Lecturer uploads their own Excel file to cross-check student majors
+router.post(
+  '/:classId/verify-majors',
+  authorize('ADMIN', 'LECTURER'),
+  ctrl.uploadMiddleware,
+  ctrl.verifyMajors
+);
+// Lecturer manually corrects a single student's major
+router.patch(
+  '/:classId/students/:studentId/major',
+  authorize('ADMIN', 'LECTURER'),
+  ctrl.updateStudentMajor
+);
+// Lecturer locks/unlocks major updates for students in the class
+router.patch(
+  '/:classId/toggle-major-lock',
+  authorize('ADMIN', 'LECTURER'),
+  ctrl.toggleMajorLock
+);
 
 module.exports = router;

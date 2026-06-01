@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Key, User, ShieldCheck, Camera } from 'lucide-react';
+import { Mail, Key, User, ShieldCheck, Camera, Lock } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import axiosClient from '../../api/axiosClient';
@@ -176,11 +176,20 @@ const ProfileSettings = () => {
 
                 {role === 'STUDENT' && (
                   <>
+                    {user?.isMajorLocked && (
+                      <div className="flex items-start gap-2 bg-red-50 p-3 rounded-xl border border-red-100 mb-2">
+                        <Lock className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-red-700">
+                          Chuyên ngành của bạn đã bị khóa bởi giảng viên trong một lớp đang tham gia. Không thể thay đổi lúc này.
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Program Group</label>
                       <select
                         value={programGroup} onChange={e => { setProgramGroup(e.target.value); setMajor(''); }} required
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                        disabled={user?.isMajorLocked}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
                       >
                         <option value="">-- Select Program Group --</option>
                         {PROGRAM_GROUPS.map(g => (
@@ -192,8 +201,8 @@ const ProfileSettings = () => {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Major</label>
                       <select
-                        value={major} onChange={e => setMajor(e.target.value)} required disabled={!programGroup}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                        value={major} onChange={e => setMajor(e.target.value)} required disabled={!programGroup || user?.isMajorLocked}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
                       >
                         <option value="">-- Select Major --</option>
                         {programGroup && PROGRAM_GROUPS.find(g => g.code === programGroup)?.majors.map(m => (
@@ -205,7 +214,7 @@ const ProfileSettings = () => {
                 )}
 
                 <div className="pt-2">
-                  <Button type="submit" variant="gradient" isLoading={isSavingProfile}>Save Changes</Button>
+                  <Button type="submit" variant="gradient" isLoading={isSavingProfile} disabled={isSavingProfile}>Save Changes</Button>
                 </div>
               </form>
             </div>

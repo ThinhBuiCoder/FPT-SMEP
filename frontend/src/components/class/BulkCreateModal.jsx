@@ -9,7 +9,7 @@ const SUBJECTS    = ['EXE101', 'EXE201'];
 const CURRENT_YR  = new Date().getFullYear();
 const YEARS       = Array.from({ length: 6 }, (_, i) => CURRENT_YR - 1 + i);
 
-export default function BulkCreateModal({ lecturers: initialLecturers = [], onClose, onCreated }) {
+export default function BulkCreateModal({ lecturers: initialLecturers = [], isLecturer = false, onClose, onCreated }) {
   const [form, setForm] = useState({
     subjectCode: 'EXE101',
     semester:    'SP',
@@ -100,8 +100,14 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], onCl
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Bulk Create Classes</h2>
-            <p className="text-sm text-slate-400 mt-0.5">Generate multiple classes at once</p>
+            <h2 className="text-xl font-bold text-slate-900">
+              {isLecturer ? 'Tạo lớp học' : 'Bulk Create Classes'}
+            </h2>
+            <p className="text-sm text-slate-400 mt-0.5">
+              {isLecturer
+                ? 'Tạo nhiều lớp cùng lúc — tự động gán cho bạn'
+                : 'Generate multiple classes at once'}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
             <X className="w-5 h-5" />
@@ -164,35 +170,45 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], onCl
             </div>
           ) : (
             <>
-              {/* Lecturers */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Assign Lecturers (optional)</label>
-                <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5">
-                  {allLecturers.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-2">No lecturers found</p>
-                  ) : (
-                    allLecturers.map(l => {
-                      const checked = form.lecturerIds.includes(l._id);
-                      return (
-                        <label key={l._id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              const nextIds = checked
-                                ? form.lecturerIds.filter(id => id !== l._id)
-                                : [...form.lecturerIds, l._id];
-                              handleChange('lecturerIds', nextIds);
-                            }}
-                            className="rounded border-slate-300 text-primary focus:ring-primary h-3.5 w-3.5"
-                          />
-                          <span>{l.name} ({l.email})</span>
-                        </label>
-                      );
-                    })
-                  )}
+              {/* Lecturers — ẩn khi LECTURER tự tạo (tự động gán) */}
+              {!isLecturer && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Assign Lecturers (optional)</label>
+                  <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5">
+                    {allLecturers.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-2">No lecturers found</p>
+                    ) : (
+                      allLecturers.map(l => {
+                        const checked = form.lecturerIds.includes(l._id);
+                        return (
+                          <label key={l._id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const nextIds = checked
+                                  ? form.lecturerIds.filter(id => id !== l._id)
+                                  : [...form.lecturerIds, l._id];
+                                handleChange('lecturerIds', nextIds);
+                              }}
+                              className="rounded border-slate-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                            />
+                            <span>{l.name} ({l.email})</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Lecturers info khi là LECTURER */}
+              {isLecturer && (
+                <div className="flex items-center gap-2 p-3 bg-primary-50 border border-primary-100 rounded-xl">
+                  <span className="text-lg">👤</span>
+                  <p className="text-xs text-primary font-medium">Lớp sẽ được tự động gán cho bạn.</p>
+                </div>
+              )}
 
               {/* Mentors */}
               <div>
