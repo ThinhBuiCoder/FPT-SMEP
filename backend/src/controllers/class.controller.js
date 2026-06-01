@@ -402,29 +402,29 @@ exports.importStudents = async (req, res) => {
 
     const result = await importStudents(req.file.buffer, cls._id);
 
-    // Update class chat group members to include the new students
-    try {
-      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
-    } catch (chatErr) {
-      console.error(`Failed to update chat group members for class ${cls.classCode}:`, chatErr.message);
-    }
+    // ── Trả response ngay lập tức — không chờ email/chat (fire-and-forget) ──
+    const emailNotification = { sent: false, error: "Sending in background" };
+    const msg = `Import complete: ${result.successCount} added, ${result.failedCount} failed. Notification sending in background.`;
+    successResponse(res, { ...result, emailNotification }, msg);
 
-    // Send email to imported students
-    let emailNotification = { sent: false, error: "Not attempted" };
+    // Cập nhật chat group (background — không block response, không crash server)
+    Promise.resolve()
+      .then(() => createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id }))
+      .catch(chatErr =>
+        console.error(`[ImportStudents] Chat group update failed for ${cls.classCode}:`, chatErr.message)
+      );
+
+    // Gửi email thông báo cho sinh viên vừa import (background — không block response)
     if (result.imported && result.imported.length > 0) {
-      try {
-        emailNotification = await sendStudentImportedNotification({
+      Promise.resolve()
+        .then(() => sendStudentImportedNotification({
           importedStudents: result.imported,
           classInfo: cls,
-        });
-      } catch (emailError) {
-        console.error("Failed to send import notification:", emailError.message);
-        emailNotification = { sent: false, error: emailError.message };
-      }
+        }))
+        .catch(emailError =>
+          console.error("[ImportStudents] Email notification failed:", emailError.message)
+        );
     }
-
-    const msg = `Import complete: ${result.successCount} added, ${result.failedCount} failed. ${emailNotification.sent ? 'Notification sent.' : 'Notification skipped/failed.'}`;
-    return successResponse(res, { ...result, emailNotification }, msg);
   } catch (err) {
     return errorResponse(res, err.message || 'Import failed', 400);
   }
