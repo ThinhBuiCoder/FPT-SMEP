@@ -31,7 +31,7 @@ export default function AssignMentorsModal({ classId, currentMentors = [], onClo
         const mentorList = mentorRes?.data?.users || mentorRes?.users || [];
         const teamList = teamRes?.data?.teams || teamRes?.teams || [];
 
-        setMentors(mentorOptions.length > 0 ? mentorOptions : mentorList);
+        setMentors(mentorList);
         setTeams(teamList);
       } catch (err) {
         toast.error('Failed to load mentors or teams');
@@ -40,7 +40,7 @@ export default function AssignMentorsModal({ classId, currentMentors = [], onClo
       }
     };
     fetchData();
-  }, [classId, mentorOptions]);
+  }, [classId]);
 
   const handleMentorChange = async (mentorId) => {
     setSelectedMentorId(mentorId);

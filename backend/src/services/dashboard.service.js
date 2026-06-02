@@ -91,7 +91,12 @@ const getLecturerDashboard = async (lecturerId) => {
     Evaluation.find({ lecturerId })
       .populate({ path: 'teamId', select: 'teamName' })
       .sort({ createdAt: -1 }).limit(5),
-    MentoringSession.find({ lecturerId })
+    MentoringSession.find({
+      $or: [
+        { lecturerId },
+        { teamId: { $in: teamIds } }
+      ]
+    })
       .populate('teamId', 'teamName').sort({ meetingDate: -1 }).limit(5),
     SprintTask.countDocuments({ teamId: { $in: teamIds } }),
     SprintTask.countDocuments({ teamId: { $in: teamIds }, status: 'DONE' }),
@@ -130,17 +135,36 @@ const getLecturerDashboard = async (lecturerId) => {
 
 // ─── MENTOR ───────────────────────────────────────────────
 const getMentorDashboard = async (mentorId) => {
-  const myClasses = await Class.find({ mentorIds: mentorId });
+  const directTeams = await Team.find({ mentorId });
+  const directClassIds = directTeams.map(t => t.classId);
+
+  const myClasses = await Class.find({
+    $or: [
+      { mentorIds: mentorId },
+      { _id: { $in: directClassIds } }
+    ]
+  });
   const classIds = myClasses.map(c => c._id);
   const myTeams = await Team.find({ $or: [{ mentorId }, { classId: { $in: classIds } }] });
   const teamIds = myTeams.map(t => t._id);
 
   const [upcomingSessions, recentEvals, recentSessions, totalTasks, completedTasks] = await Promise.all([
-    MentoringSession.countDocuments({ lecturerId: mentorId, meetingDate: { $gte: new Date() } }),
+    MentoringSession.countDocuments({
+      $or: [
+        { lecturerId: mentorId },
+        { teamId: { $in: teamIds } }
+      ],
+      meetingDate: { $gte: new Date() }
+    }),
     Evaluation.find({ lecturerId: mentorId })
       .populate({ path: 'teamId', select: 'teamName' })
       .sort({ createdAt: -1 }).limit(5),
-    MentoringSession.find({ lecturerId: mentorId })
+    MentoringSession.find({
+      $or: [
+        { lecturerId: mentorId },
+        { teamId: { $in: teamIds } }
+      ]
+    })
       .populate('teamId', 'teamName').sort({ meetingDate: -1 }).limit(5),
     SprintTask.countDocuments({ teamId: { $in: teamIds } }),
     SprintTask.countDocuments({ teamId: { $in: teamIds }, status: 'DONE' }),

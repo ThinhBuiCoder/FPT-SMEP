@@ -396,12 +396,25 @@ const getAllSessions = async (req, res) => {
   try {
     let query = {};
     if (req.user.role === 'LECTURER' || req.user.role === 'LECTURE') {
-      query.lecturerId = req.user._id;
+      const Class = require('../models/Class');
+      const myClasses = await Class.find({ lectureId: req.user._id });
+      const classIds = myClasses.map(c => c._id);
+      const myTeams = await Team.find({ classId: { $in: classIds } });
+      const teamIds = myTeams.map(t => t._id);
+      query.$or = [
+        { lecturerId: req.user._id },
+        { teamId: { $in: teamIds } }
+      ];
     } else if (req.user.role === 'MENTOR') {
       const Class = require('../models/Class');
       const mentoredClasses = await Class.find({ mentorIds: req.user._id });
       const classIds = mentoredClasses.map(c => c._id);
-      const mentoredTeams = await Team.find({ classId: { $in: classIds } });
+      const mentoredTeams = await Team.find({
+        $or: [
+          { classId: { $in: classIds } },
+          { mentorId: req.user._id }
+        ]
+      });
       const teamIds = mentoredTeams.map(t => t._id);
       
       // MENTOR can see sessions they created or are assigned to their teams
@@ -534,12 +547,25 @@ const getPastSessions = async (req, res) => {
     };
 
     if (req.user.role === 'LECTURER' || req.user.role === 'LECTURE') {
-      query.lecturerId = req.user._id;
+      const Class = require('../models/Class');
+      const myClasses = await Class.find({ lectureId: req.user._id });
+      const classIds = myClasses.map(c => c._id);
+      const myTeams = await Team.find({ classId: { $in: classIds } });
+      const teamIds = myTeams.map(t => t._id);
+      query.$or = [
+        { lecturerId: req.user._id },
+        { teamId: { $in: teamIds } }
+      ];
     } else if (req.user.role === 'MENTOR') {
       const Class = require('../models/Class');
       const mentoredClasses = await Class.find({ mentorIds: req.user._id });
       const classIds = mentoredClasses.map(c => c._id);
-      const mentoredTeams = await Team.find({ classId: { $in: classIds } });
+      const mentoredTeams = await Team.find({
+        $or: [
+          { classId: { $in: classIds } },
+          { mentorId: req.user._id }
+        ]
+      });
       const teamIds = mentoredTeams.map(t => t._id);
       query.$or = [
         { lecturerId: req.user._id },
