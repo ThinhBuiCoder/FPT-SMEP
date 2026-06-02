@@ -145,6 +145,28 @@ export default function ClassDetail() {
   
   const isAdminOrLecturer = user?.role === 'ADMIN' || (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id);
 
+  const getUniqueMentors = () => {
+    const classMentors = cls?.mentorIds || [];
+    const teamMentors = safeTeams.map(t => t.mentorId).filter(Boolean);
+    const seen = new Set();
+    const unique = [];
+
+    const addMentor = (m) => {
+      const id = m?._id?.toString() || m?.toString();
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        const mObj = typeof m === 'object' ? m : { _id: m, name: 'Unknown' };
+        unique.push(mObj);
+      }
+    };
+
+    classMentors.forEach(addMentor);
+    teamMentors.forEach(addMentor);
+    return unique;
+  };
+
+  const activeMentors = getUniqueMentors();
+
   return (
     <div className="space-y-6">
       {/* ── Back + Header ── */}
@@ -293,12 +315,12 @@ export default function ClassDetail() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Mentors</p>
-              {cls.mentorIds && cls.mentorIds.length > 0 ? (
+              {activeMentors.length > 0 ? (
                 <>
                   <p className="font-semibold text-slate-800 text-sm truncate">
-                    {cls.mentorIds.map(m => m.name || 'Unknown').join(', ')}
+                    {activeMentors.map(m => m.name || 'Unknown').join(', ')}
                   </p>
-                  <p className="text-[11px] text-slate-400">{cls.mentorIds.length} assigned</p>
+                  <p className="text-[11px] text-slate-400">{activeMentors.length} assigned</p>
                 </>
               ) : (
                 <p className="text-xs text-slate-400">No mentors assigned</p>
@@ -414,7 +436,7 @@ export default function ClassDetail() {
       {showAssignMentors && (
         <AssignMentorsModal
           classId={id}
-          currentMentors={cls.mentorIds || []}
+          currentMentors={activeMentors}
           onClose={() => setShowAssignMentors(false)}
           onAssigned={async () => {
             setShowAssignMentors(false);

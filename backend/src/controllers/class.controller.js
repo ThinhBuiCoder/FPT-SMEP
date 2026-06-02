@@ -483,7 +483,14 @@ exports.getMyClasses = async (req, res) => {
     }
 
     if (req.user.role === 'MENTOR') {
-      const classes = await Class.find({ mentorIds: req.user._id })
+      const teams = await Team.find({ mentorId: req.user._id });
+      const teamClassIds = teams.map(t => t.classId);
+      const classes = await Class.find({
+        $or: [
+          { mentorIds: req.user._id },
+          { _id: { $in: teamClassIds } }
+        ]
+      })
         .populate('lectureId', 'name email avatar role bio')
         .populate('mentorIds', 'name email avatar role bio')
         .sort({ year: -1, semester: 1, classIndex: 1 });

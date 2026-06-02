@@ -65,8 +65,10 @@ const MentoringSessions = () => {
     try {
       const res = await classApi.getTeams(classId);
       const teamsData = res.data?.teams || res.teams || res.data || [];
+      const selectedClass = myClasses.find(cls => toId(cls._id) === toId(classId));
+      const isClassMentor = selectedClass && selectedClass.mentorIds && selectedClass.mentorIds.some(m => toId(m) === toId(user?._id));
       const visibleTeams = user?.role === 'MENTOR'
-        ? teamsData.filter(team => toId(team?.mentorId) === toId(user?._id))
+        ? teamsData.filter(team => toId(team?.mentorId) === toId(user?._id) || isClassMentor)
         : teamsData;
       const seen = new Set();
       setClassTeams((Array.isArray(visibleTeams) ? visibleTeams : []).filter(team => {
@@ -129,7 +131,19 @@ const MentoringSessions = () => {
           const lecturerClassIds = new Set(accessibleClasses.map(c => toId(c._id)));
           filteredTeams = teamsData.filter(t => lecturerClassIds.has(toId(t.classId)) || toId(t.lectureId) === toId(user?._id));
         } else if (user?.role === 'MENTOR') {
-          accessibleClasses = classesData.filter(c => c.mentorIds && c.mentorIds.some(m => toId(m) === toId(user?._id)));
+          const classAssignedClassIds = new Set(
+            classesData
+              .filter(c => c.mentorIds && c.mentorIds.some(m => toId(m) === toId(user?._id)))
+              .map(c => toId(c._id))
+          );
+          const teamAssignedClassIds = new Set(
+            teamsData
+              .filter(t => toId(t.mentorId) === toId(user?._id))
+              .map(t => toId(t.classId))
+          );
+          const allAccessibleClassIds = new Set([...classAssignedClassIds, ...teamAssignedClassIds]);
+
+          accessibleClasses = classesData.filter(c => allAccessibleClassIds.has(toId(c._id)));
           const mentorClassIds = new Set(accessibleClasses.map(c => toId(c._id)));
 
           filteredTeams = teamsData.filter(t =>
@@ -352,8 +366,20 @@ const MentoringSessions = () => {
     });
   };
 
-  const upcomingSessions = sessions.filter(s => new Date(s.meetingDate) >= new Date()).sort((a, b) => new Date(a.meetingDate) - new Date(b.meetingDate));
-  const pastSessions = sessions.filter(s => new Date(s.meetingDate) < new Date()).sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
+  const isUpcoming = (s) => {
+    if (!s.meetingDate) return false;
+    try {
+      const datePart = new Date(s.meetingDate).toISOString().split('T')[0];
+      const timePart = s.endTime || s.startTime || '23:59';
+      const sessionDateTime = new Date(`${datePart}T${timePart}`);
+      return sessionDateTime >= new Date();
+    } catch {
+      return new Date(s.meetingDate) >= new Date();
+    }
+  };
+
+  const upcomingSessions = sessions.filter(isUpcoming).sort((a, b) => new Date(a.meetingDate) - new Date(b.meetingDate));
+  const pastSessions = sessions.filter(s => !isUpcoming(s)).sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
 
   const renderTimetable = () => {
     const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -546,7 +572,7 @@ const MentoringSessions = () => {
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(s.meetingDate).toLocaleDateString()} {new Date(s.meetingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(s.meetingDate).toLocaleDateString()} {s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : ''}
                         </p>
                       </div>
                       <div className="flex gap-2 shrink-0 ml-2 items-start">
