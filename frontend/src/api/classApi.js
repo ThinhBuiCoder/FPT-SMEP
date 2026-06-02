@@ -32,11 +32,15 @@ export const classApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   // Manually update one student's major
-  updateStudentMajor: (classId, studentId, major) =>
-    axiosClient.patch(`/classes/${classId}/students/${studentId}/major`, { major }),
+  updateStudentMajor: (classId, studentId, newMajor) =>
+    axiosClient.patch(`/classes/${classId}/students/${studentId}/major`, { newMajor }),
   // Lock/Unlock major changes for a class
   toggleMajorLock: (classId) =>
     axiosClient.patch(`/classes/${classId}/toggle-major-lock`),
+  addStudent: (classId, data) =>
+    axiosClient.post(`/classes/${classId}/students`, data),
+  removeStudent: (classId, studentId) =>
+    axiosClient.delete(`/classes/${classId}/students/${studentId}`),
 
   // ─── Teams ───────────────────────────────────────────────────────────────
   getTeams:      (classId)       => axiosClient.get(`/classes/${classId}/teams`),

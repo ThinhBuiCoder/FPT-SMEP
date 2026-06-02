@@ -8,13 +8,18 @@ const Student = require('../models/Student');
  * Normalize a header cell to a consistent key.
  */
 const normalizeHeader = (h) => {
-  const s = String(h).trim().toLowerCase().replace(/\s+/g, '');
-  if (['chuyênngành', 'chuyennganh', 'major', 'chuyenganh'].includes(s)) return 'major';
-  if (['id', 'rollnumber', 'mssv', 'studentid'].includes(s)) return 'id';
-  if (['email'].includes(s)) return 'email';
-  if (['fullname', 'hovaten', 'hoten', 'name'].includes(s)) return 'fullname';
-  if (['class', 'lop'].includes(s)) return 'class';
-  return s;
+  // Convert to string, normalize Unicode, trim, lowercase, remove all whitespace
+  let s = String(h).normalize('NFC').trim().toLowerCase().replace(/\s+/g, '');
+  
+  // Remove Vietnamese accents for robust matching
+  const noAccent = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+
+  if (['chuyennganh', 'major', 'chuyenganh'].includes(noAccent) || ['chuyênngành'].includes(s)) return 'major';
+  if (['id', 'rollnumber', 'mssv', 'studentid'].includes(noAccent)) return 'id';
+  if (['email'].includes(noAccent)) return 'email';
+  if (['fullname', 'hovaten', 'hoten', 'name'].includes(noAccent)) return 'fullname';
+  if (['class', 'lop'].includes(noAccent)) return 'class';
+  return noAccent;
 };
 
 /**

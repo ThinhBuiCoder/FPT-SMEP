@@ -67,5 +67,17 @@ router.patch(
   authorize('ADMIN', 'LECTURER'),
   ctrl.toggleMajorLock
 );
+// Remove a student from a class
+router.delete(
+  '/:classId/students/:studentId',
+  authorize('ADMIN', 'LECTURER'),
+  ctrl.removeStudent
+);
+// Add a single student manually
+router.post(
+  '/:classId/students',
+  authorize('ADMIN', 'LECTURER'),
+  ctrl.addStudent
+);
 
 module.exports = router;

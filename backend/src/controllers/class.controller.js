@@ -976,3 +976,75 @@ exports.toggleMajorLock = async (req, res) => {
     return errorResponse(res, 'Server error', 500);
   }
 };
+// ─── DELETE /api/classes/:classId/students/:studentId ───────────────────────
+exports.removeStudent = async (req, res) => {
+  try {
+    const { classId, studentId } = req.params;
+    
+    const cls = await Class.findById(classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'Access denied. You do not manage this class.', 403);
+    }
+
+    const student = await Student.findOne({ _id: studentId, classId });
+    if (!student) return errorResponse(res, 'Student not found in this class', 404);
+
+    if (student.teamId) {
+      await Team.findByIdAndUpdate(student.teamId, {
+        $pull: { members: { studentId: student._id } }
+      });
+    }
+
+    await Student.findByIdAndDelete(studentId);
+
+    return successResponse(res, null, 'Xóa sinh viên thành công');
+  } catch (err) {
+    console.error('removeStudent error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+// ─── POST /api/classes/:classId/students ──────────────────────────────────────
+exports.addStudent = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { rollNumber, fullName, email, major } = req.body;
+    
+    if (!rollNumber || !fullName || !email) {
+      return errorResponse(res, 'Roll Number, Full Name, and Email are required', 400);
+    }
+
+    const cls = await Class.findById(classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'Access denied. You do not manage this class.', 403);
+    }
+
+    // Check if student already exists in this class
+    const existing = await Student.findOne({ classId, $or: [{ rollNumber }, { email }] });
+    if (existing) {
+      return errorResponse(res, 'Student with this Roll Number or Email already exists in this class', 400);
+    }
+
+    // Attempt to link to existing User
+    const user = await User.findOne({ email });
+
+    const newStudent = await Student.create({
+      classId,
+      rollNumber,
+      fullName,
+      email,
+      major: major || null,
+      subjectCode: cls.subjectCode,
+      userId: user ? user._id : null,
+      programGroup: getProgramGroupFromMajor(major) || null
+    });
+
+    return successResponse(res, { student: newStudent }, 'Thêm sinh viên thành công', 201);
+  } catch (err) {
+    console.error('addStudent error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};

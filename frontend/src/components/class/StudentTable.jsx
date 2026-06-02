@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import { Search, Users, AlertTriangle } from 'lucide-react';
+import { Search, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import EmptyState from '../ui/EmptyState';
 import { getMajorName } from '../../constants/majors';
 
@@ -46,7 +46,7 @@ const majorColor = (major) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-export default function StudentTable({ students: rawStudents, teams: rawTeams, cls, selected, onSelectionChange, onRefresh }) {
+export default function StudentTable({ students: rawStudents, teams: rawTeams, cls, selected, onSelectionChange, onRefresh, onDeleteStudent }) {
   const students = Array.isArray(rawStudents) ? rawStudents : [];
   const teams = Array.isArray(rawTeams) ? rawTeams : [];
   const [search,      setSearch]      = useState('');
@@ -167,6 +167,9 @@ export default function StudentTable({ students: rawStudents, teams: rawTeams, c
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden 2xl:table-cell">Project Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden 2xl:table-cell">Description</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Team</th>
+                {onDeleteStudent && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -230,6 +233,22 @@ export default function StudentTable({ students: rawStudents, teams: rawTeams, c
 
                     {/* Team status */}
                     <td className="px-4 py-3 text-center">{teamStatusBadge(s)}</td>
+                    
+                    {/* Action */}
+                    {onDeleteStudent && (
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // prevent row click (selection)
+                            onDeleteStudent(s._id);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex"
+                          title="Xóa sinh viên"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

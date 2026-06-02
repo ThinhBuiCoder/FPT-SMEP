@@ -17,6 +17,7 @@ import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
 import RenameClassModal from '../../components/class/RenameClassModal';
 import VerifyMajorModal from '../../components/class/VerifyMajorModal';
+import AddStudentModal from '../../components/class/AddStudentModal';
 
 export default function ClassDetail() {
   const { id }    = useParams();
@@ -34,6 +35,7 @@ export default function ClassDetail() {
 
   // Modals & Actions
   const [showImport, setShowImport] = useState(false);
+  const [showAddStudent, setShowAddStudent] = useState(false);
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [showAssignMentors, setShowAssignMentors] = useState(false);
   const [showRename, setShowRename] = useState(false);
@@ -123,12 +125,25 @@ export default function ClassDetail() {
     }
   };
 
+  const handleRemoveStudent = async (studentId) => {
+    if (!window.confirm('Bạn có chắc muốn xóa sinh viên này khỏi lớp?')) return;
+    try {
+      await classApi.removeStudent(id, studentId);
+      toast.success('Xóa sinh viên thành công');
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Xóa sinh viên thất bại');
+    }
+  };
+
   if (loading) return <LoadingSkeleton />;
   if (!cls)    return <div className="text-center py-20 text-slate-400">Class not found.</div>;
 
   const safeStudents = Array.isArray(students) ? students : [];
   const safeTeams    = Array.isArray(teams) ? teams : [];
   const unassignedCount = safeStudents.filter(s => !s.teamId).length;
+  
+  const isAdminOrLecturer = user?.role === 'ADMIN' || (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id);
 
   return (
     <div className="space-y-6">
@@ -186,10 +201,18 @@ export default function ClassDetail() {
           )}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
             <button
+              onClick={() => setShowAddStudent(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
+            >
+              <UserPlus className="w-4 h-4" /> Thêm 1 SV
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
               onClick={() => setShowImport(true)}
               className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
             >
-              <Upload className="w-4 h-4" /> Import Students
+              <Upload className="w-4 h-4" /> Import Excel
             </button>
           )}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
@@ -354,6 +377,7 @@ export default function ClassDetail() {
             selected={selected}
             onSelectionChange={setSelected}
             onRefresh={fetchData}
+            onDeleteStudent={isAdminOrLecturer ? handleRemoveStudent : undefined}
           />
         ) : (
           <TeamList
@@ -417,6 +441,18 @@ export default function ClassDetail() {
         <VerifyMajorModal
           classId={id}
           onClose={() => setShowVerify(false)}
+        />
+      )}
+
+      {/* ── Add Student Modal ── */}
+      {showAddStudent && (
+        <AddStudentModal
+          classId={id}
+          onClose={() => setShowAddStudent(false)}
+          onAdded={() => {
+            setShowAddStudent(false);
+            fetchData();
+          }}
         />
       )}
     </div>
