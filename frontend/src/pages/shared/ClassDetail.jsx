@@ -222,13 +222,31 @@ export default function ClassDetail() {
             </button>
           )}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
-            <button
-              onClick={() => setShowAddStudent(true)}
-              className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
-            >
-              <UserPlus className="w-4 h-4" /> Thêm 1 SV
-            </button>
-          )}
+  <>
+    <button
+      onClick={() =>
+        navigate('/lecturer/data-bank', {
+          state: {
+            classId: cls._id,
+            classCode: cls.classCode,
+            subjectCode: cls.subjectCode,
+            semester: `${cls.semester || ''}${String(cls.year || '').slice(-2)}`,
+          },
+        })
+      }
+      className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition-all font-medium"
+    >
+      Open Data Bank
+    </button>
+
+    <button
+      onClick={() => setShowAddStudent(true)}
+      className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
+    >
+      <UserPlus className="w-4 h-4" /> Thêm 1 SV
+    </button>
+  </>
+)}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
             <button
               onClick={() => setShowImport(true)}

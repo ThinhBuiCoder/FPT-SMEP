@@ -6,10 +6,10 @@ import { userApi } from '../../api/userApi';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const SLOTS = [
-  { val: 1, label: 'Slot 1 (07:30 - 09:00)' },
-  { val: 2, label: 'Slot 2 (09:10 - 10:40)' },
-  { val: 3, label: 'Slot 3 (12:30 - 14:00)' },
-  { val: 4, label: 'Slot 4 (14:10 - 15:40)' }
+  { val: 1, label: 'Slot 1 (07:00 - 09:15)' },
+  { val: 2, label: 'Slot 2 (09:30 - 11:45)' },
+  { val: 3, label: 'Slot 3 (12:30 - 14:45)' },
+  { val: 4, label: 'Slot 4 (15:00 - 17:15)' }
 ];
 
 export default function EditScheduleModal({ classId, currentLecture, currentSchedule, onClose, onAssigned }) {

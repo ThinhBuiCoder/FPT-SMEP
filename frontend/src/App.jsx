@@ -21,6 +21,7 @@ import ClassManagement from './pages/admin/ClassManagement';
 // Lecturer Pages
 import LecturerDashboard from './pages/lecturer/LecturerDashboard';
 import LecturerClasses from './pages/lecturer/LecturerClasses';
+import DataBankPage from './features/data-bank/DataBankPage';
 
 // Mentor Pages
 import MentorDashboard from './pages/mentor/MentorDashboard';
@@ -88,6 +89,7 @@ function App() {
               {/* Lecturer & Mentor Dashboard */}
               <Route path="/lecturer"         element={<ProtectedRoute allowedRoles={['LECTURER', 'MENTOR']}><LecturerDashboard /></ProtectedRoute>} />
               <Route path="/lecturer/classes" element={<ProtectedRoute allowedRoles={['LECTURER', 'MENTOR']}><LecturerClasses /></ProtectedRoute>} />
+              <Route path="/lecturer/data-bank" element={<ProtectedRoute allowedRoles={['ADMIN','LECTURER']}><DataBankPage /></ProtectedRoute>} />
 
               {/* Mentor Dashboard */}
               <Route path="/mentor"           element={<ProtectedRoute allowedRoles={['MENTOR']}><MentorDashboard /></ProtectedRoute>} />

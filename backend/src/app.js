@@ -27,6 +27,7 @@ const workshopRoutes = require('./routes/workshop.routes');
 const weeklyTaskRoutes = require('./routes/weeklyTask.routes');
 const checkpointRoutes = require('./routes/checkpoint.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const dataBankRoutes = require('./routes/dataBank.routes');
 const { globalErrorHandler, notFound } = require('./middlewares/error.middleware');
 
 const path = require('path');
@@ -82,6 +83,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/workshops', workshopRoutes);
 app.use('/api/weekly-tasks', weeklyTaskRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/data-bank', dataBankRoutes);
 // ─── ERROR HANDLERS ───────────────────────────────────────
 app.use(notFound);
 app.use(globalErrorHandler);

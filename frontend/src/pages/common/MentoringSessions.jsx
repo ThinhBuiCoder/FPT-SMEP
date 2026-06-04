@@ -385,10 +385,10 @@ const MentoringSessions = () => {
     const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const slots = [1, 2, 3, 4];
     const slotTimes = {
-      1: '07:30 - 09:00',
-      2: '09:10 - 10:40',
-      3: '12:30 - 14:00',
-      4: '14:10 - 15:40'
+      1: '07:00 - 09:15',
+      2: '09:30 - 11:45',
+      3: '12:30 - 14:45',
+      4: '15:00 - 17:15'
     };
 
     const getClassForSlot = (day, slot) => {

@@ -17,5 +17,15 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'alert', message: 'Use toast notifications instead of alert().' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'window', property: 'alert', message: 'Use toast notifications instead of window.alert().' },
+      ],
+    },
   },
 ])
