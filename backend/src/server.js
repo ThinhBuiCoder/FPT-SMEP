@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const app = require('./app');
 const Message = require('./models/Message');
+const User = require('./models/User');
 
 const PORT = process.env.PORT || 5000;
 
@@ -22,9 +23,37 @@ const io = new Server(server, {
   },
 });
 
+// ── In-memory presence map: socketId → userId ─────────────────
+const onlineUsers = new Map(); // socketId → userId
+
+/**
+ * Tính danh sách userId unique đang online
+ */
+const getOnlineUserIds = () => [...new Set(onlineUsers.values())];
+
+/**
+ * Broadcast danh sách online users tới tất cả connected clients
+ */
+const broadcastOnlineUsers = () => {
+  const userIds = getOnlineUserIds();
+  io.emit('online_users', { count: userIds.length, userIds });
+};
+
 // Socket.io connection logic
 io.on('connection', (socket) => {
   console.log(`🔌 New client connected: ${socket.id}`);
+
+  // ── Presence: user đăng ký online ──────────────────────────
+  socket.on('user_online', async (userId) => {
+    if (!userId) return;
+    onlineUsers.set(socket.id, userId);
+    try {
+      await User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() });
+    } catch (err) {
+      console.warn('[Presence] Could not update online status:', err.message);
+    }
+    broadcastOnlineUsers();
+  });
 
   // User joins their team's chat group room
   socket.on('join_room', (chatGroupId) => {
@@ -70,10 +99,32 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  // ── Presence: disconnect ─────────────────────────────────────
+  socket.on('disconnect', async () => {
+    const userId = onlineUsers.get(socket.id);
+    onlineUsers.delete(socket.id);
+
+    if (userId) {
+      // Chỉ set offline nếu user không có socket nào khác đang connect
+      const stillOnline = getOnlineUserIds().includes(userId);
+      if (!stillOnline) {
+        try {
+          await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
+        } catch (err) {
+          console.warn('[Presence] Could not update offline status:', err.message);
+        }
+      }
+      broadcastOnlineUsers();
+    }
+
     console.log(`🔌 Client disconnected: ${socket.id}`);
   });
 });
+
+// ── Expose io & onlineUsers for REST API ────────────────────────
+app.set('io', io);
+app.set('onlineUsers', onlineUsers);
+
 
 const start = async () => {
   await connectDB();

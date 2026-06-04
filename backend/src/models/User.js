@@ -23,6 +23,9 @@ const userSchema = new mongoose.Schema(
     otpExpires:  { type: Date,   default: null },
     // Google OAuth
     googleId:    { type: String, default: null },
+    // Presence tracking
+    lastSeen:    { type: Date, default: null },
+    isOnline:    { type: Boolean, default: false },
   },
   { timestamps: true }
 );

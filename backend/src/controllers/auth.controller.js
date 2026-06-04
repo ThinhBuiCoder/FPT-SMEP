@@ -5,9 +5,15 @@ const https  = require('https');
 const { validationResult } = require('express-validator');
 const User   = require('../models/User');
 const Student = require('../models/Student');
+const AuthEvent = require('../models/AuthEvent');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { sendOtpEmail, sendResetPasswordEmail } = require('../services/emailService');
 const { isValidProgramMajor } = require('../constants/majors');
+
+// ── Helper: lấy IP từ request ──────────────────────────────
+const getIp = (req) =>
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
+
 
 // ── Helpers ────────────────────────────────────────────────────
 const generateToken = (id) =>
@@ -86,6 +92,21 @@ const register = async (req, res) => {
 
     // Gửi email OTP (không block response nếu gửi thất bại)
     await sendOtpEmail(email, otp, name);
+
+    // ── Tracking: ghi event REGISTER (không làm fail luồng chính) ──
+    try {
+      await AuthEvent.create({
+        userId:    user._id,
+        email:     user.email,
+        role:      user.role,
+        eventType: 'REGISTER',
+        success:   true,
+        ip:        getIp(req),
+        userAgent: req.headers['user-agent'] || null,
+      });
+    } catch (trackErr) {
+      console.warn('[Tracking] Không ghi được REGISTER event:', trackErr.message);
+    }
 
     return successResponse(
       res,
@@ -182,10 +203,40 @@ const login = async (req, res) => {
 
   try {
     const user = await User.findOne({ email }).select('+password');
-    if (!user) return errorResponse(res, 'Email hoặc mật khẩu không đúng.', 401);
+    if (!user) {
+      // ── Tracking: LOGIN_FAILED — email không tồn tại ──
+      try {
+        await AuthEvent.create({
+          eventType: 'LOGIN_FAILED',
+          email,
+          success:   false,
+          ip:        getIp(req),
+          userAgent: req.headers['user-agent'] || null,
+        });
+      } catch (trackErr) {
+        console.warn('[Tracking] Không ghi được LOGIN_FAILED event:', trackErr.message);
+      }
+      return errorResponse(res, 'Email hoặc mật khẩu không đúng.', 401);
+    }
 
     const ok = await user.comparePassword(password);
-    if (!ok) return errorResponse(res, 'Email hoặc mật khẩu không đúng.', 401);
+    if (!ok) {
+      // ── Tracking: LOGIN_FAILED — sai mật khẩu ──
+      try {
+        await AuthEvent.create({
+          userId:    user._id,
+          email:     user.email,
+          role:      user.role,
+          eventType: 'LOGIN_FAILED',
+          success:   false,
+          ip:        getIp(req),
+          userAgent: req.headers['user-agent'] || null,
+        });
+      } catch (trackErr) {
+        console.warn('[Tracking] Không ghi được LOGIN_FAILED event:', trackErr.message);
+      }
+      return errorResponse(res, 'Email hoặc mật khẩu không đúng.', 401);
+    }
 
     // Kiểm tra tài khoản đã xác thực email chưa
     if (!user.isVerified) {
@@ -212,6 +263,21 @@ const login = async (req, res) => {
       isMajorLocked = enrollments.some(s => s.classId?.isMajorLocked);
     }
     const userObj = user.toJSON();
+
+    // ── Tracking: LOGIN thành công ──
+    try {
+      await AuthEvent.create({
+        userId:    user._id,
+        email:     user.email,
+        role:      user.role,
+        eventType: 'LOGIN',
+        success:   true,
+        ip:        getIp(req),
+        userAgent: req.headers['user-agent'] || null,
+      });
+    } catch (trackErr) {
+      console.warn('[Tracking] Không ghi được LOGIN event:', trackErr.message);
+    }
 
     return successResponse(res, { user: { ...userObj, isMajorLocked }, token }, 'Đăng nhập thành công!');
   } catch (err) {
@@ -273,6 +339,21 @@ const googleAuth = async (req, res) => {
       isMajorLocked = enrollments.some(s => s.classId?.isMajorLocked);
     }
     const userObj = user.toJSON();
+
+    // ── Tracking: Google LOGIN thành công ──
+    try {
+      await AuthEvent.create({
+        userId:    user._id,
+        email:     user.email,
+        role:      user.role,
+        eventType: 'LOGIN',
+        success:   true,
+        ip:        getIp(req),
+        userAgent: req.headers['user-agent'] || null,
+      });
+    } catch (trackErr) {
+      console.warn('[Tracking] Không ghi được Google LOGIN event:', trackErr.message);
+    }
 
     return successResponse(res, { user: { ...userObj, isMajorLocked }, token }, 'Đăng nhập bằng Google thành công!');
   } catch (err) {

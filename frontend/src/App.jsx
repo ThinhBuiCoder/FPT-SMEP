@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { usePresence } from './hooks/usePresence';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 import ErrorBoundary from './components/ui/ErrorBoundary';
@@ -51,10 +52,17 @@ import Forbidden from './pages/shared/Forbidden';
 import NotFound from './pages/shared/NotFound';
 import ClassDetail from './pages/shared/ClassDetail'; // Module 2
 
+// Wrapper component to call usePresence inside AuthProvider
+function PresenceProvider({ children }) {
+  usePresence();
+  return children;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <PresenceProvider>
         <Router>
           <Toaster
             position="top-right"
@@ -130,6 +138,7 @@ function App() {
             <Route path="*"    element={<NotFound />} />
           </Routes>
         </Router>
+        </PresenceProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
