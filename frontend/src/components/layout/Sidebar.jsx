@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../utils/cn';
 import {
   LayoutDashboard, Users, GraduationCap, Trophy, CalendarDays,
-  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, X, MessageSquare
+  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, X, MessageSquare, Database
 } from 'lucide-react';
 
 const iconMap = {
@@ -20,6 +20,7 @@ const iconMap = {
   task_alt: Kanban,
   video_chat: Video,
   chat: MessageSquare,
+  database: Database,
 };
 
 const Sidebar = ({ mobileOpen, onMobileClose }) => {
@@ -39,6 +40,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/admin', icon: 'dashboard', label: 'Overview' },
       { path: '/admin/users', icon: 'group', label: 'Users' },
       { path: '/admin/classes', icon: 'school', label: 'Classes' },
+      { path: '/lecturer/data-bank', icon: 'database', label: 'Data Bank' },
       { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },
@@ -48,6 +50,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
     LECTURER: [
       { path: '/lecturer', icon: 'dashboard', label: 'Dashboard' },
       { path: '/lecturer/classes', icon: 'school', label: 'My Classes' },
+      { path: '/lecturer/data-bank', icon: 'database', label: 'Data Bank' },
       { path: '/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },

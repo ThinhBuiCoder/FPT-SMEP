@@ -2,11 +2,13 @@ const Class = require('../models/Class');
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const SLOT_TIMES = {
-  1: { startTime: '07:30', endTime: '09:00' },
-  2: { startTime: '09:10', endTime: '10:40' },
-  3: { startTime: '12:30', endTime: '14:00' },
-  4: { startTime: '14:10', endTime: '15:40' }
+  1: { startTime: '07:00', endTime: '09:15' },
+  2: { startTime: '09:30', endTime: '11:45' },
+  3: { startTime: '12:30', endTime: '14:45' },
+  4: { startTime: '15:00', endTime: '17:15' }
 };
+
+exports.SLOT_TIMES = SLOT_TIMES;
 
 /**
  * Validates if a specific time slot is already taken by the lecturer.

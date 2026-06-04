@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/seed.js",
+    "sync:schedule-times": "node scripts/syncClassScheduleSlotTimes.js",
     "test:ai": "node scripts/testAiApi.js",
     "test:gemini": "node scripts/testGeminiModel.js"
   },

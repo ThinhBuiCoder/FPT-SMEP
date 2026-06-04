@@ -7,7 +7,7 @@ const User    = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
-const { autoGenerateSchedule, validateScheduleConflict } = require('../services/schedule.service');
+const { autoGenerateSchedule, validateScheduleConflict, SLOT_TIMES } = require('../services/schedule.service');
 const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
 const multer  = require('multer');
 const ExcelJS = require('exceljs');
@@ -623,13 +623,6 @@ exports.updateSchedule = async (req, res) => {
       }
     }
 
-    const SLOT_TIMES = {
-      1: { startTime: '07:30', endTime: '09:00' },
-      2: { startTime: '09:10', endTime: '10:40' },
-      3: { startTime: '12:30', endTime: '14:00' },
-      4: { startTime: '14:10', endTime: '15:40' }
-    };
-
     cls.schedule = {
       dayOfWeek,
       slot: parseInt(slot, 10),
@@ -666,13 +659,6 @@ exports.updateTeachingAssignment = async (req, res) => {
       if (hasConflict) {
         return errorResponse(res, 'Lecturer already has another class in this time slot.', 409);
       }
-
-      const SLOT_TIMES = {
-        1: { startTime: '07:30', endTime: '09:00' },
-        2: { startTime: '09:10', endTime: '10:40' },
-        3: { startTime: '12:30', endTime: '14:00' },
-        4: { startTime: '14:10', endTime: '15:40' }
-      };
 
       cls.schedule = {
         dayOfWeek: schedule.dayOfWeek,
