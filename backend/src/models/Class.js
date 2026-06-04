@@ -28,7 +28,9 @@ const classSchema = new mongoose.Schema(
       room:      { type: String, default: 'TBD' }
     },
     chatGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatGroup', default: null },
-    status:      { type: String, enum: ['active', 'disabled'], default: 'active' },
+    // Lecturer can lock/unlock student ability to change their major
+    isMajorLocked: { type: Boolean, default: false },
+    status:        { type: String, enum: ['active', 'disabled'], default: 'active' },
   },
   { timestamps: true }
 );

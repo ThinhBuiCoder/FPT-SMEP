@@ -213,6 +213,11 @@ exports.assignMentor = async (req, res) => {
     await team.save();
     await team.populate('mentorId', 'name email avatar');
 
+    // Also add mentor to Class.mentorIds if not already there
+    await Class.findByIdAndUpdate(team.classId, {
+      $addToSet: { mentorIds: mentorId }
+    });
+
     return successResponse(res, { team }, 'Mentor assigned');
   } catch (err) {
     return errorResponse(res, 'Server error', 500);

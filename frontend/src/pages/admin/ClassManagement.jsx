@@ -24,7 +24,8 @@ const semesterColor = { SP: 'bg-green-100 text-green-700', SU: 'bg-amber-100 tex
 export default function ClassManagement() {
   const { user } = useContext(AuthContext);
   const navigate  = useNavigate();
-  const isAdmin   = user?.role === 'ADMIN';
+  const isAdmin    = user?.role === 'ADMIN';
+  const isLecturer = user?.role === 'LECTURER';
 
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -99,13 +100,13 @@ export default function ClassManagement() {
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
-          {isAdmin && (
+          {(isAdmin || isLecturer) && (
             <button
               id="btn-bulk-create"
               onClick={() => setShowBulk(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-xl hover:bg-primary-700 transition-all shadow-sm hover:shadow-md"
             >
-              <Plus className="w-4 h-4" /> Bulk Create
+              <Plus className="w-4 h-4" /> {isLecturer ? 'Tạo lớp' : 'Bulk Create'}
             </button>
           )}
         </div>
@@ -298,6 +299,7 @@ export default function ClassManagement() {
       {showBulk && (
         <BulkCreateModal
           lecturers={lecturers}
+          isLecturer={isLecturer}
           onClose={() => setShowBulk(false)}
           onCreated={handleBulkCreated}
         />

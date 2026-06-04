@@ -7,6 +7,7 @@ export const classApi = {
   getById:     (id)     => axiosClient.get(`/classes/${id}`),
   bulkCreate:  (data)   => axiosClient.post('/classes/bulk-create', data),
   update:      (id, data) => axiosClient.put(`/classes/${id}`, data),
+  rename:      (id, classCode) => axiosClient.put(`/classes/${id}/rename`, { classCode }),
   delete:      (id)     => axiosClient.delete(`/classes/${id}`),
 
   // ─── Lecturer Assignment & Schedule ──────────────────────────────────────────
@@ -24,6 +25,22 @@ export const classApi = {
     }),
   exportClassExcel: (classId) => 
     axiosClient.get(`/classes/${classId}/export-excel`, { responseType: 'blob' }),
+
+  // Verify student majors against lecturer's Excel file
+  verifyMajors: (classId, formData) =>
+    axiosClient.post(`/classes/${classId}/verify-majors`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  // Manually update one student's major
+  updateStudentMajor: (classId, studentId, newMajor) =>
+    axiosClient.patch(`/classes/${classId}/students/${studentId}/major`, { newMajor }),
+  // Lock/Unlock major changes for a class
+  toggleMajorLock: (classId) =>
+    axiosClient.patch(`/classes/${classId}/toggle-major-lock`),
+  addStudent: (classId, data) =>
+    axiosClient.post(`/classes/${classId}/students`, data),
+  removeStudent: (classId, studentId) =>
+    axiosClient.delete(`/classes/${classId}/students/${studentId}`),
 
   // ─── Teams ───────────────────────────────────────────────────────────────
   getTeams:      (classId)       => axiosClient.get(`/classes/${classId}/teams`),

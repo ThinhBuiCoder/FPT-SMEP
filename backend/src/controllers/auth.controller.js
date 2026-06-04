@@ -205,8 +205,15 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user._id);
-    // toJSON() removes password automatically
-    return successResponse(res, { user, token }, 'Đăng nhập thành công!');
+    
+    let isMajorLocked = false;
+    if (user.role === 'STUDENT') {
+      const enrollments = await Student.find({ userId: user._id }).populate('classId', 'isMajorLocked');
+      isMajorLocked = enrollments.some(s => s.classId?.isMajorLocked);
+    }
+    const userObj = user.toJSON();
+
+    return successResponse(res, { user: { ...userObj, isMajorLocked }, token }, 'Đăng nhập thành công!');
   } catch (err) {
     console.error('Login error:', err);
     return errorResponse(res, 'Lỗi server khi đăng nhập.', 500);
@@ -259,7 +266,15 @@ const googleAuth = async (req, res) => {
     }
 
     const token = generateToken(user._id);
-    return successResponse(res, { user, token }, 'Đăng nhập bằng Google thành công!');
+
+    let isMajorLocked = false;
+    if (user.role === 'STUDENT') {
+      const enrollments = await Student.find({ userId: user._id }).populate('classId', 'isMajorLocked');
+      isMajorLocked = enrollments.some(s => s.classId?.isMajorLocked);
+    }
+    const userObj = user.toJSON();
+
+    return successResponse(res, { user: { ...userObj, isMajorLocked }, token }, 'Đăng nhập bằng Google thành công!');
   } catch (err) {
     console.error('GoogleAuth error:', err);
     return errorResponse(res, 'Lỗi khi xác thực Google.', 500);
@@ -292,10 +307,15 @@ const getGoogleUserInfo = (accessToken) => {
   });
 };
 
-
 // ── GET /api/auth/me ─────────────────────────────────────────
 const getMe = async (req, res) => {
-  return successResponse(res, { user: req.user });
+  let isMajorLocked = false;
+  if (req.user.role === 'STUDENT') {
+    const enrollments = await Student.find({ userId: req.user._id }).populate('classId', 'isMajorLocked');
+    isMajorLocked = enrollments.some(s => s.classId?.isMajorLocked);
+  }
+  const userObj = req.user.toObject ? req.user.toObject() : { ...req.user };
+  return successResponse(res, { user: { ...userObj, isMajorLocked } });
 };
 
 // ── PUT /api/auth/update-profile ─────────────────────────────
@@ -305,6 +325,13 @@ const updateProfile = async (req, res) => {
   if (req.user.role === 'STUDENT' && (programGroup || major)) {
     if (!isValidProgramMajor(programGroup, major)) {
       return errorResponse(res, 'Invalid major for selected program group.', 400);
+    }
+
+    // Check if any enrolled class is locked
+    const enrollments = await Student.find({ userId: req.user._id }).populate('classId', 'isMajorLocked');
+    const isLocked = enrollments.some(s => s.classId?.isMajorLocked);
+    if (isLocked) {
+      return errorResponse(res, 'Không thể thay đổi chuyên ngành vì giảng viên đã khóa tính năng này trong một lớp bạn đang tham gia.', 403);
     }
   }
 

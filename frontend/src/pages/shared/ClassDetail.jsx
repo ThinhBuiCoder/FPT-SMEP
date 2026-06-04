@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar
+  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -15,6 +15,9 @@ import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 import TeamGeneratePanel from '../../components/class/TeamGeneratePanel';
 import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
+import RenameClassModal from '../../components/class/RenameClassModal';
+import VerifyMajorModal from '../../components/class/VerifyMajorModal';
+import AddStudentModal from '../../components/class/AddStudentModal';
 
 export default function ClassDetail() {
   const { id }    = useParams();
@@ -32,10 +35,14 @@ export default function ClassDetail() {
 
   // Modals & Actions
   const [showImport, setShowImport] = useState(false);
+  const [showAddStudent, setShowAddStudent] = useState(false);
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [showAssignMentors, setShowAssignMentors] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [togglingLock, setTogglingLock] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -83,6 +90,19 @@ export default function ClassDetail() {
     }
   };
 
+  const handleToggleMajorLock = async () => {
+    setTogglingLock(true);
+    try {
+      const res = await classApi.toggleMajorLock(id);
+      setCls(prev => ({ ...prev, isMajorLocked: res.data.isMajorLocked }));
+      toast.success(res.message || 'Đã thay đổi trạng thái cập nhật chuyên ngành');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi khi thay đổi trạng thái');
+    } finally {
+      setTogglingLock(false);
+    }
+  };
+
   const handleExportExcel = async () => {
     setExporting(true);
     try {
@@ -105,12 +125,47 @@ export default function ClassDetail() {
     }
   };
 
+  const handleRemoveStudent = async (studentId) => {
+    if (!window.confirm('Bạn có chắc muốn xóa sinh viên này khỏi lớp?')) return;
+    try {
+      await classApi.removeStudent(id, studentId);
+      toast.success('Xóa sinh viên thành công');
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Xóa sinh viên thất bại');
+    }
+  };
+
   if (loading) return <LoadingSkeleton />;
   if (!cls)    return <div className="text-center py-20 text-slate-400">Class not found.</div>;
 
   const safeStudents = Array.isArray(students) ? students : [];
   const safeTeams    = Array.isArray(teams) ? teams : [];
   const unassignedCount = safeStudents.filter(s => !s.teamId).length;
+  
+  const isAdminOrLecturer = user?.role === 'ADMIN' || (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id);
+
+  const getUniqueMentors = () => {
+    const classMentors = cls?.mentorIds || [];
+    const teamMentors = safeTeams.map(t => t.mentorId).filter(Boolean);
+    const seen = new Set();
+    const unique = [];
+
+    const addMentor = (m) => {
+      const id = m?._id?.toString() || m?.toString();
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        const mObj = typeof m === 'object' ? m : { _id: m, name: 'Unknown' };
+        unique.push(mObj);
+      }
+    };
+
+    classMentors.forEach(addMentor);
+    teamMentors.forEach(addMentor);
+    return unique;
+  };
+
+  const activeMentors = getUniqueMentors();
 
   return (
     <div className="space-y-6">
@@ -124,7 +179,20 @@ export default function ClassDetail() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{cls.classCode}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900">{cls.classCode}</h1>
+              {(user?.role === 'ADMIN' ||
+                (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id)) && (
+                <button
+                  id="btn-rename-class"
+                  onClick={() => setShowRename(true)}
+                  title="Đổi tên lớp"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-primary hover:bg-primary-50 transition-all"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <p className="text-sm text-slate-500">{cls.subjectCode || '—'} · {cls.semester || '—'} {cls.year || ''}</p>
           </div>
         </div>
@@ -154,26 +222,62 @@ export default function ClassDetail() {
             </button>
           )}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
-            <button
-              onClick={() => navigate('/lecturer/data-bank', {
-                state: {
-                  classId: cls._id,
-                  classCode: cls.classCode,
-                  subjectCode: cls.subjectCode,
-                  semester: `${cls.semester || ''}${String(cls.year || '').slice(-2)}`,
-                }
-              })}
-              className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition-all font-medium"
-            >
-              Open Data Bank
-            </button>
-          )}
+  <>
+    <button
+      onClick={() =>
+        navigate('/lecturer/data-bank', {
+          state: {
+            classId: cls._id,
+            classCode: cls.classCode,
+            subjectCode: cls.subjectCode,
+            semester: `${cls.semester || ''}${String(cls.year || '').slice(-2)}`,
+          },
+        })
+      }
+      className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition-all font-medium"
+    >
+      Open Data Bank
+    </button>
+
+    <button
+      onClick={() => setShowAddStudent(true)}
+      className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
+    >
+      <UserPlus className="w-4 h-4" /> Thêm 1 SV
+    </button>
+  </>
+)}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
             <button
               onClick={() => setShowImport(true)}
               className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
             >
-              <Upload className="w-4 h-4" /> Import Students
+              <Upload className="w-4 h-4" /> Import Excel
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
+              id="btn-verify-majors"
+              onClick={() => setShowVerify(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-600 rounded-xl text-sm hover:bg-indigo-50 transition-all font-medium"
+            >
+              <ShieldCheck className="w-4 h-4" /> Kiểm tra Chuyên ngành
+            </button>
+          )}
+          {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+            <button
+              onClick={handleToggleMajorLock}
+              disabled={togglingLock}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-sm transition-all font-medium disabled:opacity-50 ${
+                cls.isMajorLocked 
+                  ? 'border-red-300 text-red-600 hover:bg-red-50' 
+                  : 'border-green-300 text-green-600 hover:bg-green-50'
+              }`}
+            >
+              {togglingLock ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                cls.isMajorLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />
+              )}
+              {cls.isMajorLocked ? 'Mở khóa cập nhật' : 'Khóa cập nhật CN'}
             </button>
           )}
         </div>
@@ -229,12 +333,12 @@ export default function ClassDetail() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Mentors</p>
-              {cls.mentorIds && cls.mentorIds.length > 0 ? (
+              {activeMentors.length > 0 ? (
                 <>
                   <p className="font-semibold text-slate-800 text-sm truncate">
-                    {cls.mentorIds.map(m => m.name || 'Unknown').join(', ')}
+                    {activeMentors.map(m => m.name || 'Unknown').join(', ')}
                   </p>
-                  <p className="text-[11px] text-slate-400">{cls.mentorIds.length} assigned</p>
+                  <p className="text-[11px] text-slate-400">{activeMentors.length} assigned</p>
                 </>
               ) : (
                 <p className="text-xs text-slate-400">No mentors assigned</p>
@@ -313,6 +417,7 @@ export default function ClassDetail() {
             selected={selected}
             onSelectionChange={setSelected}
             onRefresh={fetchData}
+            onDeleteStudent={isAdminOrLecturer ? handleRemoveStudent : undefined}
           />
         ) : (
           <TeamList
@@ -349,11 +454,44 @@ export default function ClassDetail() {
       {showAssignMentors && (
         <AssignMentorsModal
           classId={id}
-          currentMentors={cls.mentorIds || []}
+          currentMentors={activeMentors}
           onClose={() => setShowAssignMentors(false)}
           onAssigned={async () => {
             setShowAssignMentors(false);
             await fetchData();
+          }}
+        />
+      )}
+
+      {/* ── Rename Class Modal ── */}
+      {showRename && (
+        <RenameClassModal
+          classId={id}
+          currentCode={cls.classCode}
+          onClose={() => setShowRename(false)}
+          onRenamed={(updated) => {
+            if (updated) setCls(prev => ({ ...prev, classCode: updated.classCode }));
+            setShowRename(false);
+          }}
+        />
+      )}
+
+      {/* ── Verify Majors Modal ── */}
+      {showVerify && (
+        <VerifyMajorModal
+          classId={id}
+          onClose={() => setShowVerify(false)}
+        />
+      )}
+
+      {/* ── Add Student Modal ── */}
+      {showAddStudent && (
+        <AddStudentModal
+          classId={id}
+          onClose={() => setShowAddStudent(false)}
+          onAdded={() => {
+            setShowAddStudent(false);
+            fetchData();
           }}
         />
       )}

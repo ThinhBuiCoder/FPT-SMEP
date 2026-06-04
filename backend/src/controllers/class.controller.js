@@ -9,6 +9,8 @@ const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
 const { autoGenerateSchedule, validateScheduleConflict, SLOT_TIMES } = require('../services/schedule.service');
 const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
+const { verifyMajors } = require('../services/majorVerify.service');
+const { getProgramGroupFromMajor } = require('../constants/majors');
 const multer  = require('multer');
 const ExcelJS = require('exceljs');
 // ─── Multer: memory storage for Excel parsing ─────────────────────────────────
@@ -52,6 +54,7 @@ const getLecturerSemesterFilter = async (lecturerId) => {
 // ─── POST /api/classes/bulk-create ────────────────────────────────────────────
 exports.bulkCreateClasses = async (req, res) => {
   const { subjectCode, count, numberOfClasses, semester, year, lecturerIds, lectureId, mentorIds } = req.body;
+  const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'LECTURE';
 
   // --- Validate inputs ---
   if (!subjectCode) return errorResponse(res, 'subjectCode is required', 400);
@@ -69,20 +72,25 @@ exports.bulkCreateClasses = async (req, res) => {
   const semUpper = semester.toUpperCase();
   const subjectUpper = subjectCode.toUpperCase();
 
-  // Validate lecturers (support both singular lectureId for backward compatibility and array lecturerIds)
+  // Validate lecturers
+  // If the requester IS a LECTURER, ignore body lecturerIds and auto-assign to themselves.
   const validLecturerIds = [];
-  const incomingLecturers = Array.isArray(lecturerIds) ? lecturerIds : (lectureId ? [lectureId] : []);
-  if (incomingLecturers.length > 0) {
-    const uniqueLecturerIds = [...new Set(incomingLecturers.filter(Boolean))];
-    const lecturers = await User.find({ _id: { $in: uniqueLecturerIds } });
-    if (lecturers.length !== uniqueLecturerIds.length) {
-      return errorResponse(res, 'One or more lecturer IDs are invalid', 400);
-    }
-    for (const lect of lecturers) {
-      if (lect.role !== 'LECTURER' && lect.role !== 'LECTURE') {
-        return errorResponse(res, `User ${lect.name} is not a LECTURER`, 400);
+  if (isLecturer) {
+    validLecturerIds.push(req.user._id.toString());
+  } else {
+    const incomingLecturers = Array.isArray(lecturerIds) ? lecturerIds : (lectureId ? [lectureId] : []);
+    if (incomingLecturers.length > 0) {
+      const uniqueLecturerIds = [...new Set(incomingLecturers.filter(Boolean))];
+      const lecturers = await User.find({ _id: { $in: uniqueLecturerIds } });
+      if (lecturers.length !== uniqueLecturerIds.length) {
+        return errorResponse(res, 'One or more lecturer IDs are invalid', 400);
       }
-      validLecturerIds.push(lect._id.toString());
+      for (const lect of lecturers) {
+        if (lect.role !== 'LECTURER' && lect.role !== 'LECTURE') {
+          return errorResponse(res, `User ${lect.name} is not a LECTURER`, 400);
+        }
+        validLecturerIds.push(lect._id.toString());
+      }
     }
   }
 
@@ -475,7 +483,14 @@ exports.getMyClasses = async (req, res) => {
     }
 
     if (req.user.role === 'MENTOR') {
-      const classes = await Class.find({ mentorIds: req.user._id })
+      const teams = await Team.find({ mentorId: req.user._id });
+      const teamClassIds = teams.map(t => t.classId);
+      const classes = await Class.find({
+        $or: [
+          { mentorIds: req.user._id },
+          { _id: { $in: teamClassIds } }
+        ]
+      })
         .populate('lectureId', 'name email avatar role bio')
         .populate('mentorIds', 'name email avatar role bio')
         .sort({ year: -1, semester: 1, classIndex: 1 });
@@ -812,3 +827,217 @@ exports.exportClassExcel = async (req, res) => {
   }
 };
 
+// ─── PUT /api/classes/:id/rename ─────────────────────────────────────────────
+exports.renameClass = async (req, res) => {
+  const { classCode } = req.body;
+  if (!classCode || !classCode.trim())
+    return errorResponse(res, 'classCode is required', 400);
+
+  const newCode = classCode.trim().toUpperCase();
+
+  try {
+    const cls = await Class.findById(req.params.id);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only rename their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'You do not have permission to rename this class', 403);
+    }
+
+    // Check uniqueness: (classCode, semester, year)
+    if (newCode !== cls.classCode) {
+      const conflict = await Class.findOne({
+        classCode: newCode,
+        semester: cls.semester,
+        year: cls.year,
+        _id: { $ne: cls._id },
+      });
+      if (conflict) {
+        return errorResponse(res, `Class code "${newCode}" already exists for ${cls.semester} ${cls.year}`, 409);
+      }
+    }
+
+    cls.classCode = newCode;
+    await cls.save();
+
+    // Sync chat group name if exists
+    try {
+      await createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id });
+    } catch (chatErr) {
+      console.error(`Failed to update chat group after rename ${cls.classCode}:`, chatErr.message);
+    }
+
+    await cls.populate([
+      { path: 'lectureId', select: 'name email avatar role' },
+      { path: 'mentorIds', select: 'name email avatar role' },
+    ]);
+
+    return successResponse(res, { class: cls }, 'Class renamed successfully');
+  } catch (err) {
+    if (err.code === 11000) {
+      return errorResponse(res, 'Class code already exists for this semester/year', 409);
+    }
+    console.error('renameClass error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── POST /api/classes/:classId/verify-majors ─────────────────────────────────
+exports.verifyMajors = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only verify their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'You do not have permission to verify this class', 403);
+    }
+
+    if (!req.file) return errorResponse(res, 'Please upload an Excel file', 400);
+
+    const report = await verifyMajors(req.file.buffer, cls._id);
+    return successResponse(res, report, 'Major verification complete');
+  } catch (err) {
+    console.error('verifyMajors error:', err);
+    return errorResponse(res, err.message || 'Verification failed', 400);
+  }
+};
+
+// ─── PATCH /api/classes/:classId/students/:studentId/major ────────────────────
+exports.updateStudentMajor = async (req, res) => {
+  const { major } = req.body;
+  if (!major || !major.trim())
+    return errorResponse(res, 'major is required', 400);
+
+  const newMajor = major.trim().toUpperCase();
+
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only update their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'No permission', 403);
+    }
+
+    const student = await Student.findOne({ _id: req.params.studentId, classId: cls._id });
+    if (!student) return errorResponse(res, 'Student not found in this class', 404);
+
+    const programGroup = getProgramGroupFromMajor(newMajor) || null;
+    student.major = newMajor;
+    student.programGroup = programGroup;
+    await student.save();
+
+    // Also sync linked User's major if they have one
+    if (student.userId) {
+      await User.findByIdAndUpdate(student.userId, { major: newMajor, programGroup });
+    }
+
+    return successResponse(res, { student }, 'Student major updated');
+  } catch (err) {
+    console.error('updateStudentMajor error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PATCH /api/classes/:classId/toggle-major-lock ────────────────────────────
+exports.toggleMajorLock = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    // Permission: LECTURER can only toggle their own class
+    if ((req.user.role === 'LECTURER' || req.user.role === 'LECTURE') &&
+        cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'No permission', 403);
+    }
+
+    // Toggle
+    cls.isMajorLocked = !cls.isMajorLocked;
+    await cls.save();
+
+    const msg = cls.isMajorLocked
+      ? 'Major change is now LOCKED for students in this class'
+      : 'Major change is now UNLOCKED for students in this class';
+
+    return successResponse(res, { isMajorLocked: cls.isMajorLocked }, msg);
+  } catch (err) {
+    console.error('toggleMajorLock error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+// ─── DELETE /api/classes/:classId/students/:studentId ───────────────────────
+exports.removeStudent = async (req, res) => {
+  try {
+    const { classId, studentId } = req.params;
+    
+    const cls = await Class.findById(classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'Access denied. You do not manage this class.', 403);
+    }
+
+    const student = await Student.findOne({ _id: studentId, classId });
+    if (!student) return errorResponse(res, 'Student not found in this class', 404);
+
+    if (student.teamId) {
+      await Team.findByIdAndUpdate(student.teamId, {
+        $pull: { members: { studentId: student._id } }
+      });
+    }
+
+    await Student.findByIdAndDelete(studentId);
+
+    return successResponse(res, null, 'Xóa sinh viên thành công');
+  } catch (err) {
+    console.error('removeStudent error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+// ─── POST /api/classes/:classId/students ──────────────────────────────────────
+exports.addStudent = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { rollNumber, fullName, email, major } = req.body;
+    
+    if (!rollNumber || !fullName || !email) {
+      return errorResponse(res, 'Roll Number, Full Name, and Email are required', 400);
+    }
+
+    const cls = await Class.findById(classId);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString()) {
+      return errorResponse(res, 'Access denied. You do not manage this class.', 403);
+    }
+
+    // Check if student already exists in this class
+    const existing = await Student.findOne({ classId, $or: [{ rollNumber }, { email }] });
+    if (existing) {
+      return errorResponse(res, 'Student with this Roll Number or Email already exists in this class', 400);
+    }
+
+    // Attempt to link to existing User
+    const user = await User.findOne({ email });
+
+    const newStudent = await Student.create({
+      classId,
+      rollNumber,
+      fullName,
+      email,
+      major: major || null,
+      subjectCode: cls.subjectCode,
+      userId: user ? user._id : null,
+      programGroup: getProgramGroupFromMajor(major) || null
+    });
+
+    return successResponse(res, { student: newStudent }, 'Thêm sinh viên thành công', 201);
+  } catch (err) {
+    console.error('addStudent error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
