@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
-import { PROGRAM_GROUPS } from '../../constants/majors';
+import { TEAM_MAJOR_GROUPS } from '../../constants/majors';
 
 const OTP_EXPIRE_SECONDS = 5 * 60; // 5 minutes
 const RESEND_COOLDOWN    = 60;      // 60-second cooldown before allowing resend
@@ -17,15 +17,9 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role,     setRole]     = useState('STUDENT');
-  const [programGroup, setProgramGroup] = useState('');
-  const [major,        setMajor]        = useState('');
+  const [major,    setMajor]    = useState('');
   const [loading,  setLoading]  = useState(false);
-  const [emailTakenError, setEmailTakenError] = useState(false); // email already registered
-
-  // Reset major when programGroup changes
-  useEffect(() => {
-    setMajor('');
-  }, [programGroup]);
+  const [emailTakenError, setEmailTakenError] = useState(false);
 
   // ── State: Step 2 (OTP) ───────────────────────────────────
   const [step,           setStep]           = useState(1); // 1 = form, 2 = OTP
@@ -83,7 +77,7 @@ const Register = () => {
     setLoading(true);
     setEmailTakenError(false);
     try {
-      await register({ name, email, password, role, programGroup, major });
+      await register({ name, email, password, role, major });
       toast.success('Account created! Check your email for the OTP code.');
       setStep(2);
       startCountdown();
@@ -334,33 +328,22 @@ const Register = () => {
                   </div>
 
                   {role === 'STUDENT' && (
-                    <>
-                      <div>
-                        <label className="block text-caption font-medium text-slate-600 mb-1.5">Program Group</label>
-                        <select
-                          value={programGroup} onChange={e => setProgramGroup(e.target.value)} required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-body text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        >
-                          <option value="">-- Select Program Group --</option>
-                          {PROGRAM_GROUPS.map(g => (
-                            <option key={g.code} value={g.code}>{g.code} - {g.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-caption font-medium text-slate-600 mb-1.5">Major</label>
-                        <select
-                          value={major} onChange={e => setMajor(e.target.value)} required disabled={!programGroup}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-body text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-400"
-                        >
-                          <option value="">-- Select Major --</option>
-                          {programGroup && PROGRAM_GROUPS.find(g => g.code === programGroup)?.majors.map(m => (
-                            <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </>
+                    <div>
+                      <label className="block text-caption font-medium text-slate-600 mb-1.5">Chuyên ngành (Major)</label>
+                      <select
+                        value={major} onChange={e => setMajor(e.target.value)} required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-body text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      >
+                        <option value="">-- Chọn chuyên ngành --</option>
+                        {TEAM_MAJOR_GROUPS.map(group => (
+                          <optgroup key={group.key} label={group.label}>
+                            {group.majors.map(m => (
+                              <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
                   )}
 
                   <Button type="submit" variant="gradient" size="lg" className="w-full mt-2" iconRight={ArrowRight} isLoading={loading}>

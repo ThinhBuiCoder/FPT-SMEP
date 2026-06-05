@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Search, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import EmptyState from '../ui/EmptyState';
-import { getMajorName } from '../../constants/majors';
+import { getMajorName, TEAM_MAJOR_GROUPS } from '../../constants/majors';
 
 /**
  * Get display label for a major code.
@@ -129,10 +129,32 @@ export default function StudentTable({ students: rawStudents, teams: rawTeams, c
           onChange={(e) => setFilterMajor(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
-          <option value="">All Majors</option>
-          {majors.map(m => (
-            <option key={m} value={m}>{m}{getMajorName(m) ? ` — ${getMajorName(m)}` : ''}</option>
-          ))}
+          <option value="">Tất cả chuyên ngành</option>
+          {/* Group by TEAM_MAJOR_GROUPS, only show majors present in this class */}
+          {TEAM_MAJOR_GROUPS.map(group => {
+            const presentInGroup = group.majors.filter(m => majors.includes(m.code));
+            if (presentInGroup.length === 0) return null;
+            return (
+              <optgroup key={group.key} label={group.label}>
+                {presentInGroup.map(m => (
+                  <option key={m.code} value={m.code}>{m.code} — {m.name}</option>
+                ))}
+              </optgroup>
+            );
+          })}
+          {/* Majors outside of team groups */}
+          {(() => {
+            const teamMajorCodes = TEAM_MAJOR_GROUPS.flatMap(g => g.majors.map(m => m.code));
+            const others = majors.filter(m => !teamMajorCodes.includes(m));
+            if (others.length === 0) return null;
+            return (
+              <optgroup label="Khác">
+                {others.map(m => (
+                  <option key={m} value={m}>{m}{getMajorName(m) ? ` — ${getMajorName(m)}` : ''}</option>
+                ))}
+              </optgroup>
+            );
+          })()}
         </select>
         {selected.length > 0 && (
           <span className="flex items-center px-3 py-1.5 bg-primary-50 text-primary rounded-xl text-sm font-medium">

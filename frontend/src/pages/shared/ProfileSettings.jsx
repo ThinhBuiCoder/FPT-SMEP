@@ -1,19 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useLocation } from 'react-router-dom';
 import { Mail, Key, User, ShieldCheck, Camera, Lock } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import axiosClient from '../../api/axiosClient';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { PROGRAM_GROUPS } from '../../constants/majors';
+import { TEAM_MAJOR_GROUPS, getTeamGroupFromMajor, ALL_TEAM_MAJOR_CODES } from '../../constants/majors';
 
 const roleBadgeVariant = { ADMIN: 'Approved', LECTURER: 'Submitted', MENTOR: 'Review', STUDENT: 'Reviewed' };
 const roleLabel = { ADMIN: 'Administrator', LECTURER: 'Lecturer', MENTOR: 'Mentor', STUDENT: 'Student' };
 
 const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('profile');
+
+  useEffect(() => {
+    if (location.state?.message) {
+      toast.error(location.state.message, { id: 'missing-major-toast', duration: 5000 });
+      // clear the state so it doesn't trigger again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
   
   // Profile state
   const [name, setName] = useState(user?.name || '');
@@ -41,11 +51,13 @@ const ProfileSettings = () => {
     try {
       const payload = { name, avatar };
       if (role === 'STUDENT') {
-        payload.programGroup = programGroup;
         payload.major = major;
+        // Auto-derive programGroup from chosen major
+        const derivedGroup = getTeamGroupFromMajor(major);
+        payload.programGroup = derivedGroup === 'GROUP_1' ? 'BBA' : derivedGroup === 'GROUP_2' ? 'BIT' : '';
       }
       const res = await axiosClient.put('/auth/update-profile', payload);
-      updateUser(res.user);
+      updateUser(res.data?.user || res.user);
       toast.success('Profile updated successfully');
     } catch (err) {
       toast.error(err.message || 'Failed to update profile');
@@ -85,6 +97,13 @@ const ProfileSettings = () => {
     { id: 'password', label: 'Security', icon: Key },
   ];
 
+  const isMissingMajor = role === 'STUDENT' && (!user?.major || !ALL_TEAM_MAJOR_CODES.includes(user.major.toUpperCase()));
+
+  // If student has no major, auto-switch to profile tab so they can fill it immediately
+  useEffect(() => {
+    if (isMissingMajor) setActiveTab('profile');
+  }, [isMissingMajor]);
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -92,6 +111,23 @@ const ProfileSettings = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Account Settings</h1>
         <p className="text-slate-500 mt-1">Manage your profile and security preferences</p>
       </motion.div>
+
+      {/* ── Missing Major Banner ── */}
+      {isMissingMajor && (
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl p-4 shadow-sm"
+        >
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <p className="font-semibold text-amber-800 text-sm">Bạn chưa chọn chuyên ngành!</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Vui lòng chọn <strong>Chuyên ngành</strong> bên dưới để có thể sử dụng đầy đủ hệ thống.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Profile Banner */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
@@ -185,28 +221,19 @@ const ProfileSettings = () => {
                       </div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Program Group</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Chuyên ngành (Major)</label>
                       <select
-                        value={programGroup} onChange={e => { setProgramGroup(e.target.value); setMajor(''); }} required
+                        value={major} onChange={e => setMajor(e.target.value)} required
                         disabled={user?.isMajorLocked}
                         className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
                       >
-                        <option value="">-- Select Program Group --</option>
-                        {PROGRAM_GROUPS.map(g => (
-                          <option key={g.code} value={g.code}>{g.code} - {g.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Major</label>
-                      <select
-                        value={major} onChange={e => setMajor(e.target.value)} required disabled={!programGroup || user?.isMajorLocked}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-                      >
-                        <option value="">-- Select Major --</option>
-                        {programGroup && PROGRAM_GROUPS.find(g => g.code === programGroup)?.majors.map(m => (
-                          <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+                        <option value="">-- Chọn chuyên ngành --</option>
+                        {TEAM_MAJOR_GROUPS.map(group => (
+                          <optgroup key={group.key} label={group.label}>
+                            {group.majors.map(m => (
+                              <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </div>

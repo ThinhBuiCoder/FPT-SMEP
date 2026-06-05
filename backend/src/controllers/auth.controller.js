@@ -8,7 +8,7 @@ const Student = require('../models/Student');
 const AuthEvent = require('../models/AuthEvent');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { sendOtpEmail, sendResetPasswordEmail } = require('../services/emailService');
-const { isValidProgramMajor } = require('../constants/majors');
+const { getProgramGroupFromMajor, ALL_TEAM_MAJORS } = require('../constants/majors');
 
 // ── Helper: lấy IP từ request ──────────────────────────────
 const getIp = (req) =>
@@ -61,14 +61,14 @@ const register = async (req, res) => {
     let validProgramGroup = null;
     let validMajor = null;
     if (userRole === 'STUDENT') {
-      if (!programGroup || !major) {
-        return errorResponse(res, 'programGroup and major are required for students.', 400);
+      if (!major) {
+        return errorResponse(res, 'Major is required for students.', 400);
       }
-      if (!isValidProgramMajor(programGroup, major)) {
-        return errorResponse(res, 'Invalid major for selected program group.', 400);
+      if (!ALL_TEAM_MAJORS.includes(major.toUpperCase())) {
+        return errorResponse(res, 'Invalid major selected.', 400);
       }
-      validProgramGroup = programGroup;
-      validMajor = major;
+      validMajor = major.toUpperCase();
+      validProgramGroup = getProgramGroupFromMajor(validMajor) || 'BBA';
     }
 
     // Tạo OTP
@@ -403,9 +403,9 @@ const getMe = async (req, res) => {
 const updateProfile = async (req, res) => {
   const { name, bio, phone, studentId, programGroup, major, avatar } = req.body;
   
-  if (req.user.role === 'STUDENT' && (programGroup || major)) {
-    if (!isValidProgramMajor(programGroup, major)) {
-      return errorResponse(res, 'Invalid major for selected program group.', 400);
+  if (req.user.role === 'STUDENT' && major) {
+    if (!ALL_TEAM_MAJORS.includes(major.toUpperCase())) {
+      return errorResponse(res, 'Invalid major selected.', 400);
     }
 
     // Check if any enrolled class is locked
@@ -419,9 +419,12 @@ const updateProfile = async (req, res) => {
   try {
     const updateData = { name, bio, phone, studentId };
     if (avatar !== undefined) updateData.avatar = avatar;
-    if (req.user.role === 'STUDENT' && programGroup && major) {
-      updateData.programGroup = programGroup;
-      updateData.major = major;
+    
+    let computedProgramGroup = programGroup;
+    if (req.user.role === 'STUDENT' && major) {
+      computedProgramGroup = getProgramGroupFromMajor(major.toUpperCase()) || programGroup || 'BBA';
+      updateData.programGroup = computedProgramGroup;
+      updateData.major = major.toUpperCase();
     }
 
     const user = await User.findByIdAndUpdate(
@@ -431,10 +434,10 @@ const updateProfile = async (req, res) => {
     );
 
     // Sync to Student model
-    if (req.user.role === 'STUDENT' && programGroup && major) {
+    if (req.user.role === 'STUDENT' && major) {
       await Student.updateMany(
         { email: user.email },
-        { $set: { programGroup, major, userId: user._id } }
+        { $set: { programGroup: computedProgramGroup, major: major.toUpperCase(), userId: user._id } }
       );
     }
 

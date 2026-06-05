@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Users, AlertTriangle, CheckCircle2, Loader2, Info, AlertCircle } from 'lucide-react';
 import { classApi } from '../../api/classApi';
-import { getMajorName } from '../../constants/majors';
+import { getMajorName, getTeamGroupFromMajor, TEAM_MAJOR_GROUPS } from '../../constants/majors';
 
 const majorDisplay = (code) => {
   if (!code) return code;
@@ -20,15 +20,6 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
   // Real-time validation
   const validation = useMemo(() => {
     const selectedStudents = students.filter(s => selected.includes(s._id));
-
-    // Valid majors: non-null, non-empty strings
-    const validMajors = selectedStudents
-      .map(s => s.major)
-      .filter(m => typeof m === 'string' && m.trim().length > 0)
-      .map(m => m.trim().toUpperCase());
-
-    const uniqueMajors = [...new Set(validMajors)];
-    const majorCount   = uniqueMajors.length;
     const studentCount = selectedStudents.length;
 
     // Students with missing/invalid major
@@ -36,16 +27,58 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
       s => !s.major || typeof s.major !== 'string' || !s.major.trim()
     ).length;
 
-    const isValidSize = studentCount >= 4 && studentCount <= 6;
-    const isValidMajor = majorCount >= 2;
-    const canCreate = isValidSize && isValidMajor;
-    const sizeError = studentCount > 0 && !isValidSize;
-    const majorError = studentCount > 0 && !isValidMajor;
+    // Determine which team groups are represented
+    const groupsPresent = new Set();
+    const studentsByGroup = { GROUP_1: [], GROUP_2: [] };
 
-    return { selectedStudents, majors: majorCount, uniqueMajors, studentCount, canCreate, sizeError, majorError, missingMajorCount };
+    for (const s of selectedStudents) {
+      const major = s.major;
+      if (!major) continue;
+      const group = getTeamGroupFromMajor(major);
+      if (group) {
+        groupsPresent.add(group);
+        studentsByGroup[group] = [...(studentsByGroup[group] || []), s];
+      }
+    }
+
+    const hasGroup1 = groupsPresent.has('GROUP_1');
+    const hasGroup2 = groupsPresent.has('GROUP_2');
+    const hasBothGroups = hasGroup1 && hasGroup2;
+
+    const isValidSize = studentCount >= 4 && studentCount <= 6;
+    const isValidGroups = hasBothGroups;
+    const canCreate = isValidSize && isValidGroups;
+    const sizeError = studentCount > 0 && !isValidSize;
+    const groupError = studentCount > 0 && !isValidGroups;
+
+    // Unique majors for display
+    const uniqueMajors = [...new Set(
+      selectedStudents
+        .map(s => s.major)
+        .filter(m => typeof m === 'string' && m.trim())
+        .map(m => m.trim().toUpperCase())
+    )];
+
+    return {
+      selectedStudents,
+      studentCount,
+      uniqueMajors,
+      hasGroup1,
+      hasGroup2,
+      hasBothGroups,
+      canCreate,
+      sizeError,
+      groupError,
+      missingMajorCount,
+      studentsByGroup,
+    };
   }, [selected, students]);
 
-  const { studentCount, uniqueMajors, majors: majorCount, canCreate, sizeError, majorError, missingMajorCount } = validation;
+  const {
+    studentCount, uniqueMajors,
+    hasGroup1, hasGroup2, hasBothGroups,
+    canCreate, sizeError, groupError, missingMajorCount,
+  } = validation;
 
   const generate = async (mode) => {
     setSubmitting(true);
@@ -68,51 +101,79 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
 
   if (selected.length === 0) {
     return (
-      <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-4 flex items-center gap-3 text-slate-400">
-        <Info className="w-5 h-5 shrink-0" />
-        <p className="text-sm">Select students from the table below to create a team. Tick the circular checkboxes.</p>
+      <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-4 flex items-start gap-3 text-slate-400">
+        <Info className="w-5 h-5 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-slate-500">Chọn sinh viên để tạo nhóm</p>
+          <p className="text-xs mt-1">
+            Nhóm cần <strong>4–6 thành viên</strong> từ <strong>cả 2 nhóm ngành</strong>:
+            {' '}Nhóm 1 (BBA: BBA_HM, BBA_IB, BBA_MC, BBA_MKT, BEN, BBA_TM) và Nhóm 2 (BIT: BIT_AI, BIT_GD, BIT_IA, BIT_SE).
+            Tỉ lệ không quan trọng.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className={`rounded-2xl border p-4 transition-all ${
-      (sizeError || majorError) ? 'bg-red-50 border-red-200' :
+      (sizeError || groupError) ? 'bg-red-50 border-red-200' :
       canCreate ? 'bg-green-50 border-green-200' :
       'bg-slate-50 border-slate-200'
     }`}>
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-start gap-4">
         {/* Status indicator */}
-        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-          {canCreate && <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />}
-          {(sizeError || majorError) && <AlertTriangle className="w-6 h-6 text-red-500 shrink-0" />}
-          {!canCreate && !sizeError && !majorError && <Users className="w-6 h-6 text-slate-400 shrink-0" />}
+        <div className="flex items-start gap-3 flex-1 min-w-[200px]">
+          {canCreate && <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0 mt-0.5" />}
+          {(sizeError || groupError) && <AlertTriangle className="w-6 h-6 text-red-500 shrink-0 mt-0.5" />}
+          {!canCreate && !sizeError && !groupError && <Users className="w-6 h-6 text-slate-400 shrink-0 mt-0.5" />}
 
           <div>
             <p className="font-semibold text-slate-800">
-              {studentCount} student{studentCount !== 1 ? 's' : ''} selected
+              {studentCount} sinh viên đã chọn
             </p>
-            <p className="text-xs text-slate-500">
-              {majorCount} major{majorCount !== 1 ? 's' : ''}: {uniqueMajors.map(m => majorDisplay(m)).join(', ') || 'none'}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {uniqueMajors.length > 0
+                ? uniqueMajors.map(m => majorDisplay(m)).join(', ')
+                : 'Chưa có chuyên ngành'}
             </p>
           </div>
         </div>
 
         {/* Requirements checklist */}
-        <div className="flex gap-4 text-xs">
-          <span className={`flex items-center gap-1 font-medium ${(studentCount >= 4 && studentCount <= 6) ? 'text-green-600' : 'text-slate-400'}`}>
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${(studentCount >= 4 && studentCount <= 6) ? 'bg-green-500' : 'bg-slate-300'}`}>✓</span>
-            4-6 students ({studentCount}/6)
-          </span>
-          <span className={`flex items-center gap-1 font-medium ${majorCount >= 2 ? 'text-green-600' : 'text-red-500'}`}>
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${majorCount >= 2 ? 'bg-green-500' : 'bg-red-400'}`}>
-              {majorCount >= 2 ? '✓' : '✗'}
+        <div className="flex flex-col gap-2 text-xs min-w-[260px]">
+          {/* Size check */}
+          <span className={`flex items-center gap-1.5 font-medium ${(studentCount >= 4 && studentCount <= 6) ? 'text-green-600' : studentCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${(studentCount >= 4 && studentCount <= 6) ? 'bg-green-500' : studentCount > 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
+              {(studentCount >= 4 && studentCount <= 6) ? '✓' : '✗'}
             </span>
-            2+ majors ({majorCount}/2)
+            4–6 thành viên ({studentCount}/6)
+          </span>
+
+          {/* Group 1 check */}
+          <span className={`flex items-center gap-1.5 font-medium ${hasGroup1 ? 'text-green-600' : studentCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] shrink-0 ${hasGroup1 ? 'bg-green-500' : studentCount > 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
+              {hasGroup1 ? '✓' : '✗'}
+            </span>
+            <span>
+              {TEAM_MAJOR_GROUPS[0].label}:{' '}
+              <span className="font-normal text-slate-500">{TEAM_MAJOR_GROUPS[0].majors.map(m => m.code).join(', ')}</span>
+            </span>
+          </span>
+
+          {/* Group 2 check */}
+          <span className={`flex items-center gap-1.5 font-medium ${hasGroup2 ? 'text-green-600' : studentCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] shrink-0 ${hasGroup2 ? 'bg-green-500' : studentCount > 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
+              {hasGroup2 ? '✓' : '✗'}
+            </span>
+            <span>
+              {TEAM_MAJOR_GROUPS[1].label}:{' '}
+              <span className="font-normal text-slate-500">{TEAM_MAJOR_GROUPS[1].majors.map(m => m.code).join(', ')}</span>
+            </span>
           </span>
         </div>
 
-        {/* Mentor Selection (visible when mentors exist in the class) */}
+        {/* Mentor Selection */}
         {classMentors.length > 0 && (
           <div className="flex items-center gap-2 text-xs">
             <span className="font-semibold text-slate-600">Assign Mentor:</span>
@@ -130,15 +191,15 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
         )}
 
         {/* Action buttons */}
-        <div className="flex gap-2">
-          {majorError && (
-            <div className="px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-medium">
-              Team must include students from at least 2 different majors.
+        <div className="flex gap-2 items-center">
+          {groupError && !sizeError && (
+            <div className="px-3 py-2 bg-red-100 text-red-600 rounded-xl text-xs font-medium max-w-[220px]">
+              Nhóm phải có SV từ cả 2 nhóm ngành.
             </div>
           )}
           {sizeError && (
-            <div className="px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-medium">
-              Team size must be between 4 and 6 students.
+            <div className="px-3 py-2 bg-red-100 text-red-600 rounded-xl text-xs font-medium">
+              Nhóm cần 4–6 thành viên.
             </div>
           )}
 
@@ -149,7 +210,7 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
               className="px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              ✨ Create Team
+              ✨ Tạo nhóm
             </button>
           )}
         </div>
@@ -160,8 +221,8 @@ export default function TeamGeneratePanel({ classId, selected: rawSelected, stud
         <div className="mt-3 flex items-start gap-2 bg-amber-50 rounded-xl p-3 border border-amber-200">
           <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-700">
-            <strong>{missingMajorCount} student{missingMajorCount !== 1 ? 's' : ''}</strong> do not have a valid major.
-            Please ask them to update their profile or check their registration data.
+            <strong>{missingMajorCount} sinh viên</strong> chưa có chuyên ngành.
+            Vui lòng yêu cầu họ cập nhật hồ sơ hoặc kiểm tra dữ liệu đăng ký.
           </p>
         </div>
       )}
