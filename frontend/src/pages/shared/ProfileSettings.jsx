@@ -44,7 +44,7 @@ const ProfileSettings = () => {
     e.preventDefault();
     if (!name.trim()) return toast.error('Name is required');
     if (role === 'STUDENT') {
-      if (!programGroup || !major) return toast.error('Program Group and Major are required for students.');
+      if (!major) return toast.error('Major is required for students.');
     }
     
     setIsSavingProfile(true);
