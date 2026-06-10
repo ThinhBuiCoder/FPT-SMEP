@@ -47,14 +47,6 @@ const recordHistory = async ({ evaluation, action, changedBy, note = '' }) => {
   });
 };
 
-const ensureEditable = (evaluation, user) => {
-  if (evaluation.status === 'SUBMITTED' && user.role !== 'ADMIN') {
-    const error = new Error('Submitted evaluations cannot be edited directly.');
-    error.statusCode = 409;
-    throw error;
-  }
-};
-
 const normalizeEvaluationPayload = (checkpointNumber, payload) => {
   const checkpointConfig = getCheckpointConfig(checkpointNumber);
   if (!checkpointConfig) {
@@ -260,7 +252,7 @@ const createTeamEvaluation = async (req, res) => {
     const { teamId } = req.params;
     const checkpointNumber = req.params.checkpointNumber || req.body.checkpointNumber;
     const cpNum = parseInt(checkpointNumber, 10);
-    const { proposalId, pitchDeckId, rubricScores, overallFeedback, strengths, weaknesses, suggestions, status } = req.body;
+    const { proposalId, pitchDeckId, rubricScores, overallFeedback, status } = req.body;
 
     // Must be evaluator (Lecturer/Mentor/Admin assigned to team/class)
     await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
@@ -281,6 +273,8 @@ const createTeamEvaluation = async (req, res) => {
     }
 
     const normalized = normalizeEvaluationPayload(cpNum, { rubricScores: rubricScores || [] });
+    const initialStatus = status === 'SUBMITTED' || status === 'PUBLISHED' ? status : 'DRAFT';
+    const submittedAt = initialStatus === 'SUBMITTED' || initialStatus === 'PUBLISHED' ? new Date() : null;
 
     const evaluation = new Evaluation({
       teamId,
@@ -296,14 +290,18 @@ const createTeamEvaluation = async (req, res) => {
       checkpointTotal: normalized.checkpointTotal,
       weightedScore: normalized.checkpointTotal,
       overallFeedback: overallFeedback || '',
-      strengths: strengths || '',
-      weaknesses: weaknesses || '',
-      suggestions: suggestions || '',
-      status: status || 'DRAFT'
+      status: initialStatus,
+      submittedAt,
+      lockedAt: submittedAt,
     });
 
     await evaluation.save();
-    await recordHistory({ evaluation, action: 'CREATED', changedBy: req.user, note: 'Initial evaluation created.' });
+    await recordHistory({
+      evaluation,
+      action: initialStatus === 'DRAFT' ? 'CREATED' : 'SUBMITTED',
+      changedBy: req.user,
+      note: initialStatus === 'DRAFT' ? 'Initial evaluation created.' : 'Evaluation submitted officially.',
+    });
     await evaluation.save();
     await evaluation.populate('lecturerId', 'name email avatar role');
 
@@ -321,13 +319,14 @@ const updateTeamEvaluation = async (req, res) => {
     if (!ev) return errorResponse(res, "Evaluation not found.", 404);
     await workspaceAccess.assertCanMutateWorkspace(req.user, ev.teamId);
 
-    // Only owner or admin can update, and submitted evaluations are locked.
+    // Only the owner or an admin can update an evaluation.
     if (ev.lecturerId.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
       return errorResponse(res, "You do not have permission to update this evaluation.", 403);
     }
-    ensureEditable(ev, req.user);
 
-    const { proposalId, pitchDeckId, rubricScores, overallFeedback, strengths, weaknesses, suggestions, status } = req.body;
+    const { proposalId, pitchDeckId, rubricScores, overallFeedback, status } = req.body;
+    const wasSubmitted = ev.status === 'SUBMITTED' || ev.status === 'PUBLISHED';
+    const becomesSubmitted = !wasSubmitted && (status === 'SUBMITTED' || status === 'PUBLISHED');
     
     if (proposalId) ev.proposalId = proposalId;
     if (pitchDeckId) ev.pitchDeckId = pitchDeckId;
@@ -339,15 +338,24 @@ const updateTeamEvaluation = async (req, res) => {
       ev.weightedScore = normalized.checkpointTotal;
     }
     if (overallFeedback !== undefined) ev.overallFeedback = overallFeedback;
-    if (strengths !== undefined) ev.strengths = strengths;
-    if (weaknesses !== undefined) ev.weaknesses = weaknesses;
-    if (suggestions !== undefined) ev.suggestions = suggestions;
-    if (status && (status === 'DRAFT' || status === 'SUBMITTED' || status === 'PUBLISHED')) {
+    ev.strengths = '';
+    ev.weaknesses = '';
+    ev.suggestions = '';
+    if (!wasSubmitted && status && (status === 'DRAFT' || status === 'SUBMITTED' || status === 'PUBLISHED')) {
       ev.status = status;
+    }
+    if (becomesSubmitted) {
+      ev.submittedAt = ev.submittedAt || new Date();
+      ev.lockedAt = new Date();
     }
 
     await ev.save();
-    await recordHistory({ evaluation: ev, action: 'UPDATED', changedBy: req.user, note: 'Evaluation updated.' });
+    await recordHistory({
+      evaluation: ev,
+      action: becomesSubmitted ? 'SUBMITTED' : 'UPDATED',
+      changedBy: req.user,
+      note: becomesSubmitted ? 'Evaluation submitted officially.' : 'Evaluation updated.',
+    });
     await ev.save();
     await ev.populate('lecturerId', 'name email avatar role');
 
@@ -370,7 +378,9 @@ const submitTeamEvaluation = async (req, res) => {
       return errorResponse(res, "You do not have permission to submit this evaluation.", 403);
     }
 
-    ensureEditable(ev, req.user);
+    if (ev.status === 'SUBMITTED' || ev.status === 'PUBLISHED') {
+      return successResponse(res, { evaluation: ev }, "Evaluation has already been submitted.");
+    }
     ev.status = 'SUBMITTED';
     ev.submittedAt = ev.submittedAt || new Date();
     ev.lockedAt = new Date();

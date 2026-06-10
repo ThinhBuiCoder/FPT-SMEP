@@ -5,7 +5,17 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { STATUS_CFG } from '../constants';
 import TaskCard from './TaskCard';
 
-function BoardColumn({ status, tasks, permissions, onEditTask, onDeleteTask, onStatusChange, activeOverStatus }) {
+function BoardColumn({
+  status,
+  tasks,
+  permissions,
+  onEditTask,
+  onDeleteTask,
+  onStatusChange,
+  onSwipeStatusChange,
+  enableSwipe = false,
+  activeOverStatus,
+}) {
   const cfg = STATUS_CFG[status];
   const reduceMotion = useReducedMotion();
   const { setNodeRef, isOver } = useDroppable({
@@ -56,6 +66,8 @@ function BoardColumn({ status, tasks, permissions, onEditTask, onDeleteTask, onS
                   onEdit={onEditTask}
                   onDelete={onDeleteTask}
                   onStatusChange={onStatusChange}
+                  onSwipeStatusChange={onSwipeStatusChange}
+                  enableSwipe={enableSwipe}
                 />
               ))}
             </AnimatePresence>

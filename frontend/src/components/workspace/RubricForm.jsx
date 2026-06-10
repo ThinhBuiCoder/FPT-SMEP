@@ -17,8 +17,6 @@ const LEVEL_OPTIONS = [
   { value: 'POOR', label: 'Poor', score: 4.0, range: '< 5.0' },
 ];
 
-const DEFAULT_LEVEL = LEVEL_OPTIONS[1].value;
-
 const normalizeCriteria = (criteria = []) => {
   const source = Array.isArray(criteria) && criteria.length > 0 ? criteria : DEFAULT_CRITERIA;
   return source.map((item) => ({
@@ -78,16 +76,13 @@ export default function RubricForm({
   const criteria = useMemo(() => normalizeCriteria(customCriteria), [customCriteria]);
   const [rubricScores, setRubricScores] = useState(() => initialRows(criteria, initialData));
   const [overallFeedback, setOverallFeedback] = useState('');
-  const [strengths, setStrengths] = useState('');
-  const [weaknesses, setWeaknesses] = useState('');
-  const [suggestions, setSuggestions] = useState('');
+  const isSubmitted = initialData?.status === 'SUBMITTED' || initialData?.status === 'PUBLISHED';
 
   useEffect(() => {
+    // Reset the form when switching checkpoint or loading a newer evaluation version.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRubricScores(initialRows(criteria, initialData));
     setOverallFeedback(initialData?.overallFeedback || '');
-    setStrengths(initialData?.strengths || '');
-    setWeaknesses(initialData?.weaknesses || '');
-    setSuggestions(initialData?.suggestions || '');
   }, [criteria, initialData]);
 
   const selectedLevelMeta = (value) => LEVEL_OPTIONS.find((opt) => opt.value === value) || LEVEL_OPTIONS[1];
@@ -186,10 +181,7 @@ export default function RubricForm({
       checkpointTitle,
       rubricScores,
       overallFeedback,
-      strengths,
-      weaknesses,
-      suggestions,
-      status,
+      status: isSubmitted ? initialData.status : status,
     });
   };
 
@@ -339,56 +331,25 @@ export default function RubricForm({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-emerald-700 mb-1">Strengths</label>
-            <textarea
-              rows={4}
-              value={strengths}
-              onChange={(e) => setStrengths(e.target.value)}
-              disabled={readOnly}
-              className="block w-full rounded-xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm disabled:bg-slate-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-red-700 mb-1">Weaknesses</label>
-            <textarea
-              rows={4}
-              value={weaknesses}
-              onChange={(e) => setWeaknesses(e.target.value)}
-              disabled={readOnly}
-              className="block w-full rounded-xl border-slate-200 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm disabled:bg-slate-50"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-blue-700 mb-1">Suggestions for Improvement</label>
-          <textarea
-            rows={4}
-            value={suggestions}
-            onChange={(e) => setSuggestions(e.target.value)}
-            disabled={readOnly}
-            className="block w-full rounded-xl border-slate-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-50"
-          />
-        </div>
       </div>
 
       {!readOnly && onSubmit && (
         <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3">
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e, 'DRAFT')}
-            className="inline-flex justify-center py-2.5 px-4 border border-slate-200 shadow-sm text-sm font-semibold rounded-xl text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
-            Save Draft
-          </button>
+          {!isSubmitted && (
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, 'DRAFT')}
+              className="inline-flex justify-center py-2.5 px-4 border border-slate-200 shadow-sm text-sm font-semibold rounded-xl text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            >
+              Save Draft
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => handleSubmit(e, 'SUBMITTED')}
             className="inline-flex justify-center py-2.5 px-4 border border-transparent shadow-sm text-sm font-semibold rounded-xl text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
           >
-            Submit Evaluation
+            {isSubmitted ? 'Save Changes' : 'Submit Evaluation'}
           </button>
         </div>
       )}

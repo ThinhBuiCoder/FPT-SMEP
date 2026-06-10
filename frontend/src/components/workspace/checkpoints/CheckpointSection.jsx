@@ -48,7 +48,11 @@ export default function CheckpointSection({ teamId, isEditable }) {
     }
   }, [teamId]);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    // Fetch checkpoint progress whenever the selected team changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStats();
+  }, [fetchStats]);
 
   const completedCount = configs.filter((cp) => {
     const s = stats[cp.number];
@@ -99,17 +103,18 @@ export default function CheckpointSection({ teamId, isEditable }) {
           )}
         </div>
 
-        {/* Grid of checkpoint cards */}
-        <div className="p-6">
+        {/* Vertical checkpoint list */}
+        <div className="px-4 py-6 sm:px-6">
           {configs.length === 0 && !loading ? (
             <p className="text-sm text-slate-400 text-center py-8">No checkpoints configured.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {configs.map((cp) => (
+            <div className="space-y-4">
+              {configs.map((cp, index) => (
                 <CheckpointCard
                   key={cp.number}
                   checkpoint={cp}
                   submissionStats={stats}
+                  isLast={index === configs.length - 1}
                   onOpen={() => setSelected(cp)}
                 />
               ))}

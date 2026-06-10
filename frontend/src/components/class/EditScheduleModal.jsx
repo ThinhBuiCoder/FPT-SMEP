@@ -3,14 +3,7 @@ import toast from 'react-hot-toast';
 import { X, Loader2 } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 import { userApi } from '../../api/userApi';
-
-const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-const SLOTS = [
-  { val: 1, label: 'Slot 1 (07:00 - 09:15)' },
-  { val: 2, label: 'Slot 2 (09:30 - 11:45)' },
-  { val: 3, label: 'Slot 3 (12:30 - 14:45)' },
-  { val: 4, label: 'Slot 4 (15:00 - 17:15)' }
-];
+import { SLOT_OPTIONS, TEACHING_DAYS } from '../../constants/classSchedule';
 
 export default function EditScheduleModal({ classId, currentLecture, currentSchedule, onClose, onAssigned }) {
   const [form, setForm] = useState({
@@ -29,7 +22,7 @@ export default function EditScheduleModal({ classId, currentLecture, currentSche
         const res = await userApi.getAll({ role: 'LECTURER', limit: 200 });
         const list = res?.data?.users || res?.users || [];
         setLecturers(list);
-      } catch (err) {
+      } catch {
         toast.error('Failed to load lecturers');
       } finally {
         setLoadingUsers(false);
@@ -107,7 +100,7 @@ export default function EditScheduleModal({ classId, currentLecture, currentSche
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">— Select Day —</option>
-                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                {TEACHING_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div>
@@ -118,7 +111,7 @@ export default function EditScheduleModal({ classId, currentLecture, currentSche
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">— Select Slot —</option>
-                {SLOTS.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
+                {SLOT_OPTIONS.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
               </select>
             </div>
           </div>

@@ -8,6 +8,7 @@ const SLOT_TIMES = {
   4: { startTime: '15:00', endTime: '17:15' }
 };
 
+exports.DAYS = DAYS;
 exports.SLOT_TIMES = SLOT_TIMES;
 
 /**

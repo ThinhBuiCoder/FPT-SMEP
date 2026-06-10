@@ -10,6 +10,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Modal from '../../components/ui/Modal';
+import { formatSlotTime, SLOT_OPTIONS, TEACHING_DAYS } from '../../constants/classSchedule';
 import { Calendar, Plus, Video, Clock, Trash2, Edit, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -382,14 +383,7 @@ const MentoringSessions = () => {
   const pastSessions = sessions.filter(s => !isUpcoming(s)).sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
 
   const renderTimetable = () => {
-    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const slots = [1, 2, 3, 4];
-    const slotTimes = {
-      1: '07:00 - 09:15',
-      2: '09:30 - 11:45',
-      3: '12:30 - 14:45',
-      4: '15:00 - 17:15'
-    };
+    const slots = SLOT_OPTIONS.map(option => option.val);
 
     const getClassForSlot = (day, slot) => {
       return myClasses.find(c => {
@@ -415,7 +409,7 @@ const MentoringSessions = () => {
           <thead>
             <tr className="bg-slate-50/70 border-b border-slate-200">
               <th className="py-3 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[150px]">Time / Slot</th>
-              {days.map(d => (
+              {TEACHING_DAYS.map(d => (
                 <th key={d} className="py-3 px-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   {d}
                 </th>
@@ -427,9 +421,9 @@ const MentoringSessions = () => {
               <tr key={slot} className="hover:bg-slate-50/10 transition-colors">
                 <td className="py-4 px-4 align-top border-r border-slate-100/60">
                   <div className="font-semibold text-slate-800 text-sm">Slot {slot}</div>
-                  <div className="text-xs text-slate-400 mt-1">{slotTimes[slot]}</div>
+                  <div className="text-xs text-slate-400 mt-1">{formatSlotTime(slot)}</div>
                 </td>
-                {days.map(day => {
+                {TEACHING_DAYS.map(day => {
                   const cls = getClassForSlot(day, slot);
                   return (
                     <td key={day} className="py-3 px-3 align-middle border-r border-slate-100 last:border-r-0 text-center">
