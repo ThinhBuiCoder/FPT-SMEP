@@ -201,32 +201,12 @@ export const MentorEvaluationCard = ({ evaluation }) => {
       )}
 
       {/* Feedback text — fully visible to Mentor */}
-      {(evaluation?.overallFeedback || evaluation?.strengths || evaluation?.weaknesses || evaluation?.suggestions) && (
+      {evaluation?.overallFeedback && (
         <div className="p-4 border-t border-slate-200 space-y-2 text-sm">
-          {evaluation?.overallFeedback && (
-            <p className="text-slate-600 whitespace-pre-wrap">
-              <span className="font-semibold text-slate-700">Overall: </span>
-              {evaluation.overallFeedback}
-            </p>
-          )}
-          {evaluation?.strengths && (
-            <p className="text-emerald-700 whitespace-pre-wrap">
-              <span className="font-semibold">Strengths: </span>
-              {evaluation.strengths}
-            </p>
-          )}
-          {evaluation?.weaknesses && (
-            <p className="text-red-700 whitespace-pre-wrap">
-              <span className="font-semibold">Weaknesses: </span>
-              {evaluation.weaknesses}
-            </p>
-          )}
-          {evaluation?.suggestions && (
-            <p className="text-blue-700 whitespace-pre-wrap">
-              <span className="font-semibold">Suggestions: </span>
-              {evaluation.suggestions}
-            </p>
-          )}
+          <p className="text-slate-600 whitespace-pre-wrap">
+            <span className="font-semibold text-slate-700">Overall: </span>
+            {evaluation.overallFeedback}
+          </p>
         </div>
       )}
     </div>

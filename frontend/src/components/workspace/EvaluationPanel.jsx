@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClipboardCheck, Loader2, ShieldCheck, Sparkles, History, Layers3 } from 'lucide-react';
+import { ClipboardCheck, Loader2, Sparkles, History, Layers3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { evaluationApi } from '../../api/evaluationApi';
 import RubricForm from './RubricForm';
@@ -82,28 +82,17 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId, isRea
       }
 
       if (res.success) {
-        toast.success(formData.status === 'SUBMITTED' ? 'Official evaluation submitted.' : 'Draft saved.');
+        const wasAlreadySubmitted = activeEvaluation?.status === 'SUBMITTED' || activeEvaluation?.status === 'PUBLISHED';
+        toast.success(wasAlreadySubmitted
+          ? 'Evaluation updated.'
+          : formData.status === 'SUBMITTED'
+            ? 'Official evaluation submitted.'
+            : 'Draft saved.');
         await fetchCheckpointData();
       }
     } catch (err) {
       const message = err.response?.data?.message || err.response?.data?.error || 'Failed to save evaluation';
       toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitOfficial = async () => {
-    if (!activeEvaluation) return;
-    try {
-      setSaving(true);
-      const res = await evaluationApi.submitCheckpointEvaluation(activeEvaluation._id);
-      if (res.success) {
-        toast.success('Official evaluation submitted.');
-        await fetchCheckpointData();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to submit evaluation');
     } finally {
       setSaving(false);
     }
@@ -217,25 +206,11 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId, isRea
                   key={`${selectedCheckpoint}-${activeEvaluation?._id || 'new'}`}
                   initialData={activeEvaluation || {}}
                   onSubmit={saveEvaluation}
-                  readOnly={activeEvaluation?.status === 'SUBMITTED'}
+                  readOnly={saving}
                   criteria={checkpointData?.rubrics || []}
                   checkpointNumber={selectedCheckpoint}
                   checkpointTitle={checkpointTitle}
                 />
-
-                {activeEvaluation && activeEvaluation.status !== 'SUBMITTED' && (
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-end">
-                    <button
-                      type="button"
-                      onClick={submitOfficial}
-                      disabled={saving}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                      Submit official evaluation
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -292,12 +267,9 @@ export default function EvaluationPanel({ teamId, proposalId, pitchDeckId, isRea
                           </div>
                         ))}
                       </div>
-                      {(ev.overallFeedback || ev.strengths || ev.weaknesses || ev.suggestions) && (
+                      {ev.overallFeedback && (
                         <div className="space-y-2 text-sm">
                           {ev.overallFeedback && <p className="text-slate-600 whitespace-pre-wrap"><span className="font-semibold text-slate-700">Overall:</span> {ev.overallFeedback}</p>}
-                          {ev.strengths && <p className="text-emerald-700 whitespace-pre-wrap"><span className="font-semibold">Strengths:</span> {ev.strengths}</p>}
-                          {ev.weaknesses && <p className="text-red-700 whitespace-pre-wrap"><span className="font-semibold">Weaknesses:</span> {ev.weaknesses}</p>}
-                          {ev.suggestions && <p className="text-blue-700 whitespace-pre-wrap"><span className="font-semibold">Suggestions:</span> {ev.suggestions}</p>}
                         </div>
                       )}
                     </div>

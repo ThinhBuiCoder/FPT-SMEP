@@ -169,9 +169,6 @@ const sanitizeEvaluationForMentor = (evaluation) => {
     rubricScores: sanitizedRubricScores,
     // Feedback text is visible to Mentor
     overallFeedback: doc.overallFeedback || '',
-    strengths: doc.strengths || '',
-    weaknesses: doc.weaknesses || '',
-    suggestions: doc.suggestions || '',
     // Explicitly omitted: score, weightedScore, checkpointTotal, totalWeight
     _mentorView: true, // sentinel flag for frontend
   };
@@ -206,9 +203,6 @@ const sanitizeHistoryItemForMentor = (historyItem) => {
       overallBorderClass: snapshotPerf.borderClass,
       rubricScores: (doc.snapshot.rubricScores || []).map(sanitizeRubricScore),
       overallFeedback: doc.snapshot.overallFeedback || '',
-      strengths: doc.snapshot.strengths || '',
-      weaknesses: doc.snapshot.weaknesses || '',
-      suggestions: doc.snapshot.suggestions || '',
     };
   }
 
