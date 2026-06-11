@@ -18,7 +18,9 @@ router.use(protect);
 router.get('/',              ctrl.getTeams);
 router.get('/:id',           ctrl.getTeamById);
 // Update team name/description
-router.put('/:teamId',       authorize('ADMIN', 'LECTURER'), ctrl.updateTeam);
+router.put('/:teamId',       authorize('ADMIN', 'LECTURER', 'STUDENT'), ctrl.updateTeam);
+// Review team proposal
+router.put('/:teamId/review', authorize('ADMIN', 'LECTURER'), ctrl.reviewTeamProposal);
 // Delete team (also removes chat group + unassigns students)
 router.delete('/:teamId',    authorize('ADMIN', 'LECTURER'), ctrl.deleteTeam);
 // Assign mentor to a team

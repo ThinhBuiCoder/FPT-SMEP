@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useLocation } from 'react-router-dom';
-import { Mail, Key, User, ShieldCheck, Camera, Lock } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Mail, Key, User, ShieldCheck, Camera, Lock, ArrowLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import axiosClient from '../../api/axiosClient';
@@ -15,6 +15,7 @@ const roleLabel = { ADMIN: 'Administrator', LECTURER: 'Lecturer', MENTOR: 'Mento
 const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
@@ -28,7 +29,6 @@ const ProfileSettings = () => {
   // Profile state
   const [name, setName] = useState(user?.name || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
-  const [programGroup, setProgramGroup] = useState(user?.programGroup || '');
   const [major, setMajor] = useState(user?.major || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -39,6 +39,7 @@ const ProfileSettings = () => {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   const role = user?.role?.toUpperCase() || 'STUDENT';
+  const myClassesPath = role === 'STUDENT' ? '/student/classes' : role === 'ADMIN' ? '/admin/classes' : '/lecturer/classes';
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -98,11 +99,6 @@ const ProfileSettings = () => {
   ];
 
   const isMissingMajor = role === 'STUDENT' && (!user?.major || !ALL_TEAM_MAJOR_CODES.includes(user.major.toUpperCase()));
-
-  // If student has no major, auto-switch to profile tab so they can fill it immediately
-  useEffect(() => {
-    if (isMissingMajor) setActiveTab('profile');
-  }, [isMissingMajor]);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -240,8 +236,19 @@ const ProfileSettings = () => {
                   </>
                 )}
 
-                <div className="pt-2">
-                  <Button type="submit" variant="gradient" isLoading={isSavingProfile} disabled={isSavingProfile}>Save Changes</Button>
+                <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                  <Button type="submit" variant="primary" isLoading={isSavingProfile} disabled={isSavingProfile}>
+                    Save Changes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    icon={ArrowLeft}
+                    onClick={() => navigate(myClassesPath)}
+                    className="bg-secondary hover:bg-secondary-dark hover:shadow-glow-cyan focus:ring-secondary/20"
+                  >
+                    Back my classes
+                  </Button>
                 </div>
               </form>
             </div>

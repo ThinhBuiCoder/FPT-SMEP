@@ -1,13 +1,14 @@
-import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
-import { Search, ChevronDown, User, LogOut, Menu, Settings } from 'lucide-react';
+import { Search, ChevronDown, User, LogOut, Menu, Settings, Moon, Sun } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Badge from '../ui/Badge';
 import NotificationDropdown from './NotificationDropdown';
+import { useTheme } from '../../context/ThemeContext';
 
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef(null);
@@ -74,6 +75,16 @@ const Navbar = ({ onMenuClick }) => {
 
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-all hover:bg-slate-200 hover:text-slate-900"
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+
         {/* Notification */}
         <NotificationDropdown />
 

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, Download, UserPlus, CheckCircle2, AlertTriangle, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock
+  Upload, Download, UserPlus, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -13,11 +13,14 @@ import StudentTable from '../../components/class/StudentTable';
 import TeamList from '../../components/class/TeamList';
 import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 import TeamGeneratePanel from '../../components/class/TeamGeneratePanel';
+import StudentTeamGeneratePanel from '../../components/class/StudentTeamGeneratePanel';
+import ReviewTeamProposalModal from '../../components/class/ReviewTeamProposalModal';
 import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
 import RenameClassModal from '../../components/class/RenameClassModal';
 import VerifyMajorModal from '../../components/class/VerifyMajorModal';
 import AddStudentModal from '../../components/class/AddStudentModal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 export default function ClassDetail() {
   const { id }    = useParams();
@@ -40,9 +43,12 @@ export default function ClassDetail() {
   const [showAssignMentors, setShowAssignMentors] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const [reviewTeam, setReviewTeam] = useState(null);
+  const [studentToDelete, setStudentToDelete] = useState(null);
   const [backfilling, setBackfilling] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [togglingLock, setTogglingLock] = useState(false);
+  const [removingStudent, setRemovingStudent] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -61,7 +67,10 @@ export default function ClassDetail() {
     }
   }, [id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, [fetchData]);
 
   const handleImported = async () => {
     setShowImport(false);
@@ -125,14 +134,21 @@ export default function ClassDetail() {
     }
   };
 
-  const handleRemoveStudent = async (studentId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa sinh viên này khỏi lớp?')) return;
+  const handleRemoveStudent = (student) => {
+    setStudentToDelete(student);
+  };
+  const confirmRemoveStudent = async () => {
+    if (!studentToDelete?._id) return;
+    setRemovingStudent(true);
     try {
-      await classApi.removeStudent(id, studentId);
+      await classApi.removeStudent(id, studentToDelete._id);
       toast.success('Xóa sinh viên thành công');
-      fetchData();
+      setStudentToDelete(null);
+      await fetchData();
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Xóa sinh viên thất bại');
+    } finally {
+      setRemovingStudent(false);
     }
   };
 
@@ -382,13 +398,23 @@ export default function ClassDetail() {
       {/* ── Team Generation Panel (always visible when students exist) ── */}
       {safeStudents.length > 0 && (
         <div className="sticky top-20 z-40 shadow-xl rounded-2xl bg-white/80 backdrop-blur-md">
-          <TeamGeneratePanel
-            classId={id}
-            selected={selected}
-            students={safeStudents}
-            classMentors={cls.mentorIds || []}
-            onTeamCreated={handleTeamCreated}
-          />
+          {user?.role === 'STUDENT' ? (
+            <StudentTeamGeneratePanel
+              classId={id}
+              selected={selected}
+              students={safeStudents}
+              onTeamCreated={handleTeamCreated}
+              currentStudentId={safeStudents.find(s => s.userId === user._id)?._id}
+            />
+          ) : (
+            <TeamGeneratePanel
+              classId={id}
+              selected={selected}
+              students={safeStudents}
+              classMentors={cls.mentorIds || []}
+              onTeamCreated={handleTeamCreated}
+            />
+          )}
         </div>
       )}
 
@@ -423,11 +449,14 @@ export default function ClassDetail() {
           <TeamList
             teams={safeTeams}
             onRefresh={fetchData}
+            onReview={(team) => setReviewTeam(team)}
+            canDelete={isAdminOrLecturer}
+            canManageInfo={isAdminOrLecturer}
           />
         )}
       </motion.div>
 
-      {/* ── Import Modal ── */}
+      {/* ── Modals ── */}
       {showImport && (
         <ImportStudentsModal
           classId={id}
@@ -436,7 +465,6 @@ export default function ClassDetail() {
         />
       )}
 
-      {/* ── Edit Schedule & Lecturer Modal ── */}
       {showEditSchedule && (
         <EditScheduleModal
           classId={id}
@@ -450,7 +478,6 @@ export default function ClassDetail() {
         />
       )}
 
-      {/* ── Assign Mentors Modal ── */}
       {showAssignMentors && (
         <AssignMentorsModal
           classId={id}
@@ -495,6 +522,31 @@ export default function ClassDetail() {
           }}
         />
       )}
+
+      {reviewTeam && (
+        <ReviewTeamProposalModal
+          team={reviewTeam}
+          classStudents={safeStudents}
+          onClose={() => setReviewTeam(null)}
+          onRefresh={handleTeamCreated}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={!!studentToDelete}
+        onClose={() => setStudentToDelete(null)}
+        onConfirm={confirmRemoveStudent}
+        isSubmitting={removingStudent}
+        title="Xóa sinh viên khỏi lớp?"
+        description={
+          studentToDelete
+            ? `Sinh viên "${studentToDelete.fullName}" sẽ bị xóa khỏi lớp và gỡ khỏi nhóm hiện tại nếu có.`
+            : ''
+        }
+        confirmText="Xóa sinh viên"
+        cancelText="Hủy"
+      />
     </div>
   );
 }
+

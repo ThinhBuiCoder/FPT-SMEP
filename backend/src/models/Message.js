@@ -29,6 +29,23 @@ const messageSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    messageType: {
+      type: String,
+      enum: ['TEXT', 'STICKER'],
+      default: 'TEXT',
+    },
+    sticker: {
+      emoji: { type: String, default: null },
+      label: { type: String, default: null },
+    },
+    mentions: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      name: { type: String, trim: true, default: '' },
+    }],
+    isEdited: { type: Boolean, default: false },
+    editedAt: { type: Date, default: null },
+    isRevoked: { type: Boolean, default: false },
+    revokedAt: { type: Date, default: null },
     attachment: {
       url: { type: String, default: null },
       name: { type: String, default: null },

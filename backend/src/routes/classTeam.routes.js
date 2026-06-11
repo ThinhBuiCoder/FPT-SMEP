@@ -10,6 +10,10 @@ router.use(protect);
 
 // POST /api/classes/:classId/teams/generate
 router.post('/generate', authorize('ADMIN', 'LECTURER'), ctrl.generateTeam);
+
+// POST /api/classes/:classId/teams/student-proposal
+router.post('/student-proposal', authorize('STUDENT'), ctrl.createStudentProposal);
+
 // GET  /api/classes/:classId/teams
 router.get('/',          ctrl.getTeamsByClass);
 

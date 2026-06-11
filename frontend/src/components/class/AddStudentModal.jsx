@@ -2,9 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { X, Loader2 } from 'lucide-react';
 import { classApi } from '../../api/classApi';
-import { PROGRAM_GROUPS } from '../../constants/majors';
-
-const ALL_MAJORS = PROGRAM_GROUPS.flatMap(g => g.majors);
+import { TEAM_MAJOR_GROUPS } from '../../constants/majors';
 
 export default function AddStudentModal({ classId, onClose, onAdded }) {
   const [form, setForm] = useState({
@@ -90,8 +88,12 @@ export default function AddStudentModal({ classId, onClose, onAdded }) {
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="">-- Chưa chọn --</option>
-              {ALL_MAJORS.map(m => (
-                <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+              {TEAM_MAJOR_GROUPS.map(group => (
+                <optgroup key={group.key} label={group.label}>
+                  {group.majors.map(m => (
+                    <option key={m.code} value={m.code}>{m.code} - {m.name}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

@@ -69,10 +69,10 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
     ],
     STUDENT: [
-      { path: '/student', icon: 'dashboard', label: 'Dashboard' },
       { path: '/student/classes', icon: 'school', label: 'My Classes' },
       { path: '/student/team', icon: 'group', label: 'My Team' },
       { path: '/student/workspace', icon: 'view_kanban', label: 'Startup Workspace' },
+      { path: '/student', icon: 'dashboard', label: 'Dashboard' },
       { path: '/workshops', icon: 'calendar_month', label: 'Workshops' },
       { path: '/rankings', icon: 'military_tech', label: 'Rankings' },
       { path: '/chat', icon: 'chat', label: 'Group Chat' },

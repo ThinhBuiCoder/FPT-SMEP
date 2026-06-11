@@ -70,9 +70,9 @@ io.on('connection', (socket) => {
   // Real-time message receiver
   socket.on('send_message', async (data) => {
     try {
-      const { chatGroupId, senderId, senderName, senderRole, text, attachment } = data;
+      const { chatGroupId, senderId, senderName, senderRole, text, attachment, sticker, mentions } = data;
 
-      if (!chatGroupId || !senderId || (!text && !attachment)) {
+      if (!chatGroupId || !senderId || (!text && !attachment && !sticker)) {
         console.error('⚠️ Invalid send_message data received:', data);
         return;
       }
@@ -84,6 +84,9 @@ io.on('connection', (socket) => {
         senderName,
         senderRole,
         text: text || '',
+        messageType: sticker ? 'STICKER' : 'TEXT',
+        sticker: sticker || null,
+        mentions: Array.isArray(mentions) ? mentions : [],
         attachment: attachment || null,
       });
 
@@ -100,6 +103,52 @@ io.on('connection', (socket) => {
   });
 
   // ── Presence: disconnect ─────────────────────────────────────
+  socket.on('edit_message', async (data) => {
+    try {
+      const { messageId, senderId, text } = data;
+      if (!messageId || !senderId || !text?.trim()) return;
+
+      const message = await Message.findById(messageId);
+      if (!message || message.isRevoked) return;
+      if (message.senderId.toString() !== senderId.toString()) return;
+
+      message.text = text.trim();
+      message.isEdited = true;
+      message.editedAt = new Date();
+      await message.save();
+
+      const populated = await Message.findById(message._id)
+        .populate('senderId', 'name email avatar');
+      io.to(message.chatGroupId.toString()).emit('message_updated', populated);
+    } catch (err) {
+      console.error('Error handling edit_message socket event:', err.message);
+    }
+  });
+
+  socket.on('revoke_message', async (data) => {
+    try {
+      const { messageId, senderId } = data;
+      if (!messageId || !senderId) return;
+
+      const message = await Message.findById(messageId);
+      if (!message || message.isRevoked) return;
+      if (message.senderId.toString() !== senderId.toString()) return;
+
+      message.text = '';
+      message.attachment = null;
+      message.sticker = null;
+      message.isRevoked = true;
+      message.revokedAt = new Date();
+      await message.save();
+
+      const populated = await Message.findById(message._id)
+        .populate('senderId', 'name email avatar');
+      io.to(message.chatGroupId.toString()).emit('message_revoked', populated);
+    } catch (err) {
+      console.error('Error handling revoke_message socket event:', err.message);
+    }
+  });
+
   socket.on('disconnect', async () => {
     const userId = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);

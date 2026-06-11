@@ -90,6 +90,10 @@ const register = async (req, res) => {
       otpExpires,
     });
 
+    if (userRole === 'STUDENT') {
+      await Student.updateMany({ email }, { $set: { userId: user._id } });
+    }
+
     // Gửi email OTP (không block response nếu gửi thất bại)
     await sendOtpEmail(email, otp, name);
 
@@ -302,11 +306,22 @@ const googleAuth = async (req, res) => {
     // Tìm user theo googleId hoặc email
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
+    // Check if there is a pre-existing student record added by Admin
+    const existingStudent = await Student.findOne({ email });
+
     if (user) {
-      // Cập nhật googleId nếu chưa có (user tạo bằng email trước đó)
+      // If user exists but lacks a major, sync it from the student record
+      if (user.role === 'STUDENT' && !user.major && existingStudent && existingStudent.major) {
+        user.major = existingStudent.major;
+        user.programGroup = existingStudent.programGroup || getProgramGroupFromMajor(existingStudent.major);
+        if (!user.studentId) user.studentId = existingStudent.rollNumber;
+        await user.save({ validateBeforeSave: false });
+      }
+
+      // Update googleId if missing
       if (!user.googleId) {
         user.googleId   = googleId;
-        user.isVerified = true; // Tự động verify khi liên kết Google
+        user.isVerified = true;
         if (!user.avatar && picture) user.avatar = picture;
         await user.save({ validateBeforeSave: false });
       }
@@ -318,17 +333,25 @@ const googleAuth = async (req, res) => {
         return errorResponse(res, 'Your account registration was rejected.', 403);
       }
     } else {
-      // Tạo tài khoản mới từ Google
+      // Create new user from Google
       user = await User.create({
         name,
         email,
-        password:   googleId + process.env.JWT_SECRET, // password ngẫu nhiên
+        password:   googleId + process.env.JWT_SECRET,
         googleId,
         avatar:     picture || null,
         role:       'STUDENT',
         status:     'APPROVED',
-        isVerified: true, // Email đã được Google xác thực
+        isVerified: true,
+        major:      existingStudent ? existingStudent.major : null,
+        programGroup: existingStudent ? (existingStudent.programGroup || getProgramGroupFromMajor(existingStudent.major)) : null,
+        studentId:  existingStudent ? existingStudent.rollNumber : null
       });
+    }
+
+    // Link any existing Student records to this user ID
+    if (existingStudent && user.role === 'STUDENT') {
+      await Student.updateMany({ email }, { $set: { userId: user._id } });
     }
 
     const token = generateToken(user._id);

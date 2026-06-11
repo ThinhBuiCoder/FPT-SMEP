@@ -31,6 +31,13 @@ const teamSchema = new mongoose.Schema(
     groupExe201: { type: String, default: "" },
     projectName: { type: String, default: "" },
     description: { type: String, default: "" },
+
+    // Proposal fields
+    status:       { type: String, enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'NEEDS_REVISION'], default: 'APPROVED' },
+    rejectReason: { type: String, default: null },
+    reviewedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewedAt:   { type: Date, default: null },
+    leaderId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   },
   { timestamps: true }
 );

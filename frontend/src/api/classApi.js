@@ -45,6 +45,8 @@ export const classApi = {
   // ─── Teams ───────────────────────────────────────────────────────────────
   getTeams:      (classId)       => axiosClient.get(`/classes/${classId}/teams`),
   generateTeam:  (classId, data) => axiosClient.post(`/classes/${classId}/teams/generate`, data),
+  studentProposeTeam: (classId, payload) =>
+    axiosClient.post(`/classes/${classId}/teams/student-proposal`, payload),
 
   // ─── Student/User side ───────────────────────────────────────────────────
   getMyClasses:     () => axiosClient.get('/classes/my-classes'),

@@ -6,7 +6,7 @@ import { chatApi } from '../../api/chatApi';
 import {
   MessageSquare, Send, Users, Shield, GraduationCap, Star,
   Search, Loader2, Clock, User, Paperclip, Pencil, X,
-  ChevronRight, BadgeCheck, Menu
+  ChevronRight, BadgeCheck, Menu, Smile, RotateCcw, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ const roleConfig = {
 };
 
 const normalizeRole = (r = '') => r.toUpperCase();
+const STICKERS = ['👍', '👏', '🔥', '💡', '✅', '🎉', '🚀', '🙌'];
 
 const roleBadge = (role) => {
   const cfg = roleConfig[normalizeRole(role)] || roleConfig.STUDENT;
@@ -243,6 +244,9 @@ export default function GroupChat() {
   const [showMobileChannels, setShowMobileChannels] = useState(false);
   // userId → nickname map cho channel đang chọn
   const [nicknameMap, setNicknameMap]       = useState({});
+  const [channelMembers, setChannelMembers] = useState([]);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading]       = useState(false);
@@ -251,6 +255,8 @@ export default function GroupChat() {
   const chatEndRef       = useRef(null);
   const fileInputRef     = useRef(null);
   const selectedChannelRef = useRef(null); // track current channel for reconnect
+  const currentUserId = user?._id || user?.id;
+  const currentUserIdString = (currentUserId || '').toString();
 
   function scrollToBottom() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -277,6 +283,14 @@ export default function GroupChat() {
         return [...prev, msg];
       });
       setTimeout(scrollToBottom, 100);
+    });
+
+    socket.on('message_updated', (msg) => {
+      setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
+    });
+
+    socket.on('message_revoked', (msg) => {
+      setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
     });
 
     return () => socket.disconnect();
@@ -310,6 +324,9 @@ export default function GroupChat() {
       setLoadingMessages(true);
       setShowMembers(false);
       setNicknameMap({});
+      setChannelMembers([]);
+      setEditingMessage(null);
+      setShowStickerPicker(false);
       try {
         socketRef.current.emit('leave_room', selectedChannel._id);
         // Only join if socket is already connected; connect handler handles the rest
@@ -333,6 +350,7 @@ export default function GroupChat() {
         // Build { userId: nickname } map
         if (memberRes.status === 'fulfilled') {
           const members = memberRes.value?.data?.members || memberRes.value?.members || [];
+          setChannelMembers(members);
           const map = {};
           members.forEach(m => {
             if (m.userId && m.nickname) {
@@ -355,11 +373,47 @@ export default function GroupChat() {
     setSelectedFile(file);
   };
 
+  const getMemberDisplayName = (member) => member?.nickname || member?.displayName || member?.email || 'member';
+  const getMentionToken = (member) => `@${getMemberDisplayName(member).replace(/\s+/g, '_')}`;
+  const mentionMatch = inputText.match(/@([\p{L}\p{N}_-]*)$/u);
+  const mentionSuggestions = mentionMatch
+    ? channelMembers
+        .filter(member => {
+          const query = mentionMatch[1].toLowerCase();
+          return getMemberDisplayName(member).toLowerCase().includes(query)
+            || member.email?.toLowerCase().includes(query);
+        })
+        .slice(0, 5)
+    : [];
+
+  const insertMention = (member) => {
+    const token = `${getMentionToken(member)} `;
+    setInputText(prev => prev.replace(/@([\p{L}\p{N}_-]*)$/u, token));
+  };
+
+  const buildMentions = () => channelMembers
+    .filter(member => inputText.includes(getMentionToken(member)))
+    .map(member => ({
+      userId: member.userId || null,
+      name: getMemberDisplayName(member),
+    }));
+
   // ─── Send Message ─────────────────────────────────────────────────────────
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!selectedChannel || !socketRef.current) return;
     if (!inputText.trim() && !selectedFile) return;
+
+    if (editingMessage) {
+      socketRef.current.emit('edit_message', {
+        messageId: editingMessage._id,
+        senderId: currentUserId,
+        text: inputText.trim(),
+      });
+      setEditingMessage(null);
+      setInputText('');
+      return;
+    }
 
     let attachmentPayload = null;
     if (selectedFile) {
@@ -378,15 +432,14 @@ export default function GroupChat() {
       setUploading(false);
     }
 
-    const myId = (user?._id || user?.id || '').toString();
-    const myNickname = nicknameMap[myId] || null;
+    const myNickname = nicknameMap[currentUserIdString] || null;
 
     // Normalize role to uppercase ENUM value expected by backend schema
     const validRoles = ['ADMIN', 'LECTURER', 'STUDENT', 'MENTOR'];
     const rawRole = (user?.role || 'STUDENT').toUpperCase();
     const senderRole = validRoles.includes(rawRole) ? rawRole : 'STUDENT';
 
-    if (!myId) {
+    if (!currentUserIdString) {
       toast.error('Không thể gửi tin nhắn: chưa xác thực người dùng.');
       return;
     }
@@ -403,10 +456,44 @@ export default function GroupChat() {
       senderRole,
       text:        inputText.trim(),
       attachment:  attachmentPayload,
+      mentions:    buildMentions(),
     });
     setInputText('');
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSendSticker = (emoji) => {
+    if (!selectedChannel || !socketRef.current?.connected || !currentUserIdString) return;
+
+    const validRoles = ['ADMIN', 'LECTURER', 'STUDENT', 'MENTOR'];
+    const rawRole = (user?.role || 'STUDENT').toUpperCase();
+    const senderRole = validRoles.includes(rawRole) ? rawRole : 'STUDENT';
+    const myNickname = nicknameMap[currentUserIdString] || null;
+
+    socketRef.current.emit('send_message', {
+      chatGroupId: selectedChannel._id,
+      senderId: currentUserId,
+      senderName: myNickname || user?.name || 'Anonymous',
+      senderRole,
+      sticker: { emoji, label: 'sticker' },
+    });
+    setShowStickerPicker(false);
+  };
+
+  const handleStartEdit = (message) => {
+    setEditingMessage(message);
+    setInputText(message.text || '');
+    setSelectedFile(null);
+    setShowStickerPicker(false);
+  };
+
+  const handleRevokeMessage = (message) => {
+    if (!socketRef.current?.connected || !currentUserIdString) return;
+    socketRef.current.emit('revoke_message', {
+      messageId: message._id,
+      senderId: currentUserId,
+    });
   };
 
   const filteredChannels = channels.filter(c =>
@@ -423,8 +510,6 @@ export default function GroupChat() {
       </div>
     );
   }
-
-  const currentUserId = user?._id || user?.id;
 
   return (
     <div className="relative mx-auto flex h-[calc(100dvh-96px)] max-w-7xl overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-xs sm:h-[calc(100vh-130px)]">
@@ -578,13 +663,14 @@ export default function GroupChat() {
                   </div>
                 ) : (
                   messages.map((m, index) => {
-                    const isMine = m.senderId?._id === currentUserId || m.senderId === currentUserId;
+                    const isMine = (m.senderId?._id || m.senderId || '').toString() === currentUserIdString;
                     const senderAvatar = m.senderId?.avatar;
                     const formattedTime = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     // Ưu tiên nickname từ map; fallback về senderName đã lưu
                     const senderId = (m.senderId?._id || m.senderId || '').toString();
                     const resolvedName = (senderId && nicknameMap[senderId]) || m.senderName;
                     const hasNickname  = senderId && !!nicknameMap[senderId];
+                    const canManageMessage = isMine && !m.isRevoked;
 
                     return (
                       <div
@@ -611,6 +697,28 @@ export default function GroupChat() {
                               <span className="text-[10px] text-slate-400 font-medium">({m.senderName})</span>
                             )}
                             {roleBadge(m.senderRole)}
+                            {canManageMessage && (
+                              <span className="ml-1 inline-flex overflow-hidden rounded-lg border border-slate-200/60">
+                                {m.text && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(m)}
+                                    className="px-1.5 py-1 text-slate-400 hover:bg-slate-100 hover:text-primary"
+                                    title="Edit message"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeMessage(m)}
+                                  className="px-1.5 py-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                  title="Revoke message"
+                                >
+                                  <RotateCcw className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
                           </div>
 
                           <div className={`rounded-2xl p-2.5 text-sm leading-relaxed break-words sm:p-3 ${
@@ -618,9 +726,20 @@ export default function GroupChat() {
                               ? 'bg-primary text-white rounded-tr-none'
                               : 'bg-white border border-slate-200/60 text-slate-800 rounded-tl-none shadow-3xs'
                           }`}>
-                            {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                            {m.isRevoked ? (
+                              <p className={`italic ${isMine ? 'text-primary-100' : 'text-slate-400'}`}>
+                                Tin nhắn đã được thu hồi
+                              </p>
+                            ) : (
+                              <>
+                                {m.messageType === 'STICKER' && m.sticker?.emoji && (
+                                  <div className="text-4xl leading-none">{m.sticker.emoji}</div>
+                                )}
+                                {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                              </>
+                            )}
 
-                            {m.attachment?.url && (
+                            {!m.isRevoked && m.attachment?.url && (
                               <div className="mt-2 max-w-[70vw] sm:max-w-xs">
                                 {m.attachment.fileType === 'image' ? (
                                   <a href={m.attachment.url} target="_blank" rel="noopener noreferrer">
@@ -652,7 +771,7 @@ export default function GroupChat() {
                               isMine ? 'text-primary-100' : 'text-slate-400'
                             }`}>
                               <Clock className="w-2.5 h-2.5" />
-                              {formattedTime}
+                              {formattedTime}{m.isEdited ? ' · edited' : ''}
                             </span>
                           </div>
                         </div>
@@ -686,6 +805,18 @@ export default function GroupChat() {
 
             {/* Input Form */}
             <div className="shrink-0 space-y-2 border-t border-slate-100 bg-white p-3 sm:p-4">
+              {editingMessage && (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-xs text-primary">
+                  <span className="font-semibold">Editing message</span>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingMessage(null); setInputText(''); }}
+                    className="font-bold hover:text-primary-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               {uploading && (
                 <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -707,6 +838,34 @@ export default function GroupChat() {
                   </button>
                 </div>
               )}
+              {showStickerPicker && (
+                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                  {STICKERS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleSendSticker(emoji)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl hover:bg-slate-100"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {mentionSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                  {mentionSuggestions.map((member, index) => (
+                    <button
+                      key={member.userId || member.studentId || index}
+                      type="button"
+                      onClick={() => insertMention(member)}
+                      className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-primary-50 hover:text-primary"
+                    >
+                      {getMentionToken(member)}
+                    </button>
+                  ))}
+                </div>
+              )}
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                   type="file"
@@ -718,17 +877,26 @@ export default function GroupChat() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
+                  disabled={uploading || !!editingMessage}
                   className="shrink-0 rounded-xl border border-slate-200 p-3 text-slate-500 transition-all hover:bg-slate-50 cursor-pointer"
                   title="Upload image or file"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowStickerPicker(v => !v)}
+                  disabled={!!editingMessage}
+                  className="shrink-0 rounded-xl border border-slate-200 p-3 text-slate-500 transition-all hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+                  title="Send sticker"
+                >
+                  <Smile className="w-4 h-4" />
+                </button>
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder={selectedFile ? 'Add a message or press Send...' : 'Type a message...'}
+                  placeholder={editingMessage ? 'Edit your message...' : selectedFile ? 'Add a message or press Send...' : 'Type a message... Use @ to tag'}
                   className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/20 px-3 py-3 text-sm transition-all focus:outline-none focus:border-primary sm:px-4"
                 />
                 <button
@@ -736,7 +904,8 @@ export default function GroupChat() {
                   disabled={uploading || (!inputText.trim() && !selectedFile)}
                   className="flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-600 disabled:opacity-50 active:scale-95 cursor-pointer sm:px-4"
                 >
-                  <span className="hidden sm:inline">Send</span> <Send className="w-4 h-4" />
+                  <span className="hidden sm:inline">{editingMessage ? 'Save' : 'Send'}</span>
+                  {editingMessage ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                 </button>
               </form>
             </div>

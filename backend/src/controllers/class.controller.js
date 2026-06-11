@@ -741,7 +741,6 @@ exports.exportClassExcel = async (req, res) => {
       { header: 'Major', key: 'major', width: 18 },
       { header: 'SubjectCode', key: 'subjectCode', width: 16 },
       { header: 'GroupName', key: 'groupName', width: 20 },
-      { header: 'Group EXE201', key: 'groupExe201', width: 20 },
       { header: 'Project Name', key: 'projectName', width: 30 },
       { header: 'Description', key: 'description', width: 50 }
     ];
@@ -773,7 +772,6 @@ exports.exportClassExcel = async (req, res) => {
     // Add rows
     students.forEach(student => {
       let groupName = '';
-      let groupExe201 = '';
       let projectName = '';
       let description = '';
 
@@ -781,7 +779,6 @@ exports.exportClassExcel = async (req, res) => {
         const team = teamMap.get(student.teamId.toString());
         if (team) {
           groupName = team.groupName || '';
-          groupExe201 = team.groupExe201 || '';
           projectName = team.projectName || '';
           description = team.description || '';
         }
@@ -793,7 +790,6 @@ exports.exportClassExcel = async (req, res) => {
         major: student.major || '',
         subjectCode: student.subjectCode || cls.subjectCode || '',
         groupName,
-        groupExe201,
         projectName,
         description
       });
@@ -806,7 +802,7 @@ exports.exportClassExcel = async (req, res) => {
           bottom: { style: 'thin' },
           right: { style: 'thin' }
         };
-        if (colNumber === 8) { // Description column
+        if (colNumber === 7) { // Description column
           cell.alignment = { wrapText: true, vertical: 'top' };
         } else {
           cell.alignment = { vertical: 'top' };
@@ -1023,6 +1019,10 @@ exports.addStudent = async (req, res) => {
 
     // Attempt to link to existing User
     const user = await User.findOne({ email });
+
+    if (user && user.major && major && user.major.toUpperCase() !== major.toUpperCase()) {
+      return errorResponse(res, `Sinh viên này đã có tài khoản với chuyên ngành ${user.major}. Vui lòng chọn lại cho khớp!`, 400);
+    }
 
     const newStudent = await Student.create({
       classId,

@@ -189,3 +189,87 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: #94a3b8;
 }
+
+/* Global dark theme overrides for the existing Tailwind utility-heavy UI. */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
+.dark .bg-mesh {
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+}
+
+.dark .bg-white,
+.dark .bg-white\/80,
+.dark .bg-white\/60,
+.dark .bg-white\/50 {
+  background-color: rgba(15, 23, 42, 0.94) !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/95,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/40,
+.dark .bg-slate-50\/30,
+.dark .bg-slate-50\/20 {
+  background-color: rgba(30, 41, 59, 0.72) !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-slate-100\/80,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-50:hover {
+  background-color: rgba(51, 65, 85, 0.86) !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/80,
+.dark .border-white\/50 {
+  border-color: rgba(71, 85, 105, 0.78) !important;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-400,
+.dark .text-slate-300 {
+  color: #94a3b8 !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(71, 85, 105, 0.9) !important;
+  color: #e2e8f0 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark table thead,
+.dark .shadow-float,
+.dark .shadow-xl,
+.dark .shadow-sm,
+.dark .shadow-xs {
+  box-shadow: 0 12px 36px -24px rgba(0, 0, 0, 0.85) !important;
+}

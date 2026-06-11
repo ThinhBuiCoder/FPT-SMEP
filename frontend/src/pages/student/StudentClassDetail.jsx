@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, GraduationCap, Users, Calendar, Mail, Loader2, Sparkles, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, GraduationCap, Users, Mail, Loader2, LayoutGrid } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { classApi } from '../../api/classApi';
 import TeamList from '../../components/class/TeamList';
+import StudentTable from '../../components/class/StudentTable';
+import StudentTeamGeneratePanel from '../../components/class/StudentTeamGeneratePanel';
+import { useAuth } from '../../hooks/useAuth';
 
 const semesterLabel = (sem) => {
   if (sem === 'SP') return 'Spring';
@@ -12,42 +15,31 @@ const semesterLabel = (sem) => {
   return sem;
 };
 
-const majorColor = (major) => {
-  const colors = [
-    'bg-blue-100 text-blue-700',
-    'bg-purple-100 text-purple-700',
-    'bg-cyan-100 text-cyan-700',
-    'bg-orange-100 text-orange-700',
-    'bg-pink-100 text-pink-700',
-    'bg-teal-100 text-teal-700',
-  ];
-  if (!major) return 'bg-slate-100 text-slate-400';
-  let hash = 0;
-  for (const c of major) hash = c.charCodeAt(0) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-};
-
 export default function StudentClassDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('classmates');
+  const [selected, setSelected] = useState([]);
+
+  const fetchClassDetail = useCallback(async () => {
+    try {
+      const res = await classApi.getMyClassDetail(id);
+      setData(res?.data || res || null);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load class details');
+      navigate('/student/classes');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, navigate]);
 
   useEffect(() => {
-    const fetchClassDetail = async () => {
-      try {
-        const res = await classApi.getMyClassDetail(id);
-        setData(res?.data || res || null);
-      } catch (err) {
-        toast.error(err?.message || 'Failed to load class details');
-        navigate('/student/classes');
-      } finally {
-        setLoading(false);
-      }
-    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchClassDetail();
-  }, [id, navigate]);
+  }, [fetchClassDetail]);
 
   if (loading) {
     return (
@@ -62,6 +54,18 @@ export default function StudentClassDetail() {
   const students = Array.isArray(data?.students) ? data.students : [];
   const teams    = Array.isArray(data?.teams) ? data.teams : [];
   const lecturer = cls?.lectureId;
+  const currentUserId = (user?._id || user?.id || '').toString();
+  const currentStudent = students.find(s => {
+    const studentUserId = (s.userId?._id || s.userId || '').toString();
+    return (studentUserId && studentUserId === currentUserId)
+      || (user?.email && s.email?.toLowerCase() === user.email.toLowerCase());
+  });
+
+  const handleTeamCreated = async () => {
+    setSelected([]);
+    await fetchClassDetail();
+    setActiveTab('classmates');
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -121,6 +125,18 @@ export default function StudentClassDetail() {
         </div>
       </div>
 
+      {students.length > 0 && (
+        <div className="sticky top-20 z-30 rounded-2xl bg-white/80 shadow-xl backdrop-blur-md">
+          <StudentTeamGeneratePanel
+            classId={id}
+            selected={selected}
+            students={students}
+            onTeamCreated={handleTeamCreated}
+            currentStudentId={currentStudent?._id}
+          />
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button
@@ -147,54 +163,25 @@ export default function StudentClassDetail() {
 
       {/* Tab Contents */}
       {activeTab === 'classmates' ? (
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Classmate</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Roll Number</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Major</th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Team Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {students.map((student) => (
-                <tr key={student._id} className="hover:bg-slate-50/40 transition-colors">
-                  <td className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-secondary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {student.fullName?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <span className="font-semibold text-slate-800">{student.fullName}</span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 font-mono text-xs">{student.rollNumber}</td>
-                  <td className="px-6 py-4">
-                    {student.major ? (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${majorColor(student.major)}`}>
-                        {student.major}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {student.teamId ? (
-                      <span className="px-2 py-0.5 text-xs font-semibold bg-green-50 text-green-600 rounded-full border border-green-100">
-                        Assigned
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-400 rounded-full border border-slate-200/40">
-                        Unassigned
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <StudentTable
+          students={students}
+          teams={teams}
+          cls={cls}
+          selected={selected}
+          onSelectionChange={setSelected}
+          onRefresh={fetchClassDetail}
+          maxSelection={7}
+        />
       ) : (
-        <TeamList teams={teams} onRefresh={() => {}} />
+        <TeamList
+          teams={teams}
+          onRefresh={fetchClassDetail}
+          canDelete={false}
+          canManageInfo={false}
+          currentStudentId={currentStudent?._id}
+        />
       )}
     </div>
   );
 }
+

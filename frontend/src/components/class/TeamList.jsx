@@ -18,18 +18,34 @@ const safeName = (ref) => {
   return null;
 };
 
-function TeamCard({ team, onRefresh }) {
+const normalizeTeamText = (value) => (typeof value === 'string' ? value.trim() : '');
+
+function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId }) {
   const navigate = useNavigate();
   const [expanded,  setExpanded]  = useState(false);
   const [deleting,  setDeleting]  = useState(false);
   const [editing,   setEditing]   = useState(false);
   const [saving,    setSaving]    = useState(false);
   const [formData,  setFormData]  = useState({
+    teamName: team.teamName || '',
     groupName: team.groupName || '',
-    groupExe201: team.groupExe201 || '',
     projectName: team.projectName || '',
     description: team.description || '',
   });
+
+  const resetFormData = () => {
+    setFormData({
+      teamName: team.teamName || '',
+      groupName: team.groupName || '',
+      projectName: team.projectName || '',
+      description: team.description || '',
+    });
+  };
+
+  const beginEdit = () => {
+    resetFormData();
+    setEditing(true);
+  };
 
   const handleDelete = async () => {
     if (!confirm(`Delete ${team.teamName || 'this team'}? This will also remove the chat group.`)) return;
@@ -46,9 +62,35 @@ function TeamCard({ team, onRefresh }) {
   };
 
   const handleSave = async () => {
+    const nextData = {
+      groupName: normalizeTeamText(formData.groupName),
+      projectName: normalizeTeamText(formData.projectName),
+      description: normalizeTeamText(formData.description),
+    };
+
+    if (canManageInfo) {
+      nextData.teamName = normalizeTeamText(formData.teamName);
+      if (nextData.teamName.length < 3 || nextData.teamName.length > 60) {
+        toast.error('Team name must be 3-60 characters.');
+        return;
+      }
+    }
+    if (nextData.groupName.length < 3 || nextData.groupName.length > 60) {
+      toast.error('Group name must be 3-60 characters.');
+      return;
+    }
+    if (nextData.projectName.length < 3 || nextData.projectName.length > 60) {
+      toast.error('Project name must be 3-60 characters.');
+      return;
+    }
+    if (nextData.description && (nextData.description.length < 20 || nextData.description.length > 500)) {
+      toast.error('Description must be 20-500 characters when provided.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await teamApi.update(team._id, formData);
+      await teamApi.update(team._id, nextData);
       toast.success('Team info updated');
       setEditing(false);
       onRefresh();
@@ -62,20 +104,36 @@ function TeamCard({ team, onRefresh }) {
   const members = Array.isArray(team.members) ? team.members : [];
   const lecturerName = safeName(team.lectureId);
   const mentorName   = safeName(team.mentorId);
+  const teamNameText = team.teamName || 'Unnamed Team';
+  const teamNumberMatch = teamNameText.match(/\bTeam\s*(\d+)\b/i);
+  const teamBadge = teamNumberMatch?.[1] || teamNameText.trim().charAt(0)?.toUpperCase() || '?';
+  
+  const isPending = team.status === 'PENDING' || team.status === 'NEEDS_REVISION';
+  const leaderId = (team.leaderId?._id || team.leaderId || '').toString();
+  const isLeader = currentStudentId && leaderId === currentStudentId.toString();
+  const canEditInfo = canManageInfo || isLeader;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-2xl border ${isPending ? 'border-orange-300 shadow-orange-100' : 'border-slate-200/60'} shadow-sm overflow-hidden`}>
       {/* Team header */}
       <div className="flex items-center justify-between p-4">
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-3 flex-1 text-left"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <span className="text-white font-bold text-sm">{team.teamName?.replace('Team ', '') || '?'}</span>
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isPending ? 'bg-orange-100 text-orange-600' : 'bg-gradient-to-br from-primary to-secondary text-white'}`}>
+            <span className="font-bold text-sm">{teamBadge}</span>
           </div>
           <div>
-            <p className="font-bold text-slate-900">{team.teamName || 'Unnamed Team'}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-slate-900">{teamNameText}</p>
+              {isPending && (
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full uppercase">Pending</span>
+              )}
+              {team.status === 'REJECTED' && (
+                <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full uppercase">Rejected</span>
+              )}
+            </div>
             <p className="text-xs text-slate-400 font-mono">{team.teamCode || '—'}</p>
           </div>
           {expanded ? <ChevronDown className="w-4 h-4 text-slate-400 ml-2" /> : <ChevronRight className="w-4 h-4 text-slate-400 ml-2" />}
@@ -87,27 +145,39 @@ function TeamCard({ team, onRefresh }) {
           </span>
           {/* Chat group status badge */}
           {team.chatGroupId ? (
-            <span className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-semibold rounded-full flex items-center gap-1">
-              <MessageSquare className="w-3 h-3" /> Chat Active
+            <span className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-semibold rounded-full flex items-center gap-1 hidden sm:flex">
+              <MessageSquare className="w-3 h-3" /> Chat
             </span>
           ) : (
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-xs font-semibold rounded-full flex items-center gap-1">
-              <MessageSquareDashed className="w-3 h-3" /> Chat not created
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-xs font-semibold rounded-full flex items-center gap-1 hidden sm:flex">
+              <MessageSquareDashed className="w-3 h-3" /> No Chat
             </span>
           )}
+          
+          {isPending && onReview && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onReview(team); }}
+              className="px-2.5 py-1 text-xs font-semibold border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all shadow-sm"
+            >
+              Review
+            </button>
+          )}
+
           <button
             onClick={() => navigate(`/workspace/teams/${team._id}`)}
             className="px-2.5 py-1 text-xs font-semibold border border-slate-200 text-slate-600 hover:border-primary hover:text-primary rounded-lg transition-all bg-white shrink-0 cursor-pointer shadow-2xs"
           >
             Workspace
           </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
-          >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-          </button>
+          {canDelete && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -119,8 +189,8 @@ function TeamCard({ team, onRefresh }) {
           <div className="mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Team Info</h4>
-              {!editing && (
-                <button onClick={() => setEditing(true)} className="text-xs font-medium text-primary hover:underline">
+              {!editing && canEditInfo && (
+                <button onClick={beginEdit} className="text-xs font-medium text-primary hover:underline">
                   Edit Info
                 </button>
               )}
@@ -128,29 +198,41 @@ function TeamCard({ team, onRefresh }) {
 
             {editing ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3 p-2 bg-slate-50 rounded border border-slate-100">
+                {canManageInfo && (
                   <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
-                    <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Team Name</label>
+                    <input
+                      type="text"
+                      value={formData.teamName}
+                      onChange={e => setFormData({ ...formData, teamName: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary"
+                      maxLength={60}
+                    />
                   </div>
-                  <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">Group EXE201</p>
-                    <p className="text-sm text-slate-700 font-medium">{team.groupExe201 || 'Not set'}</p>
-                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Group Name</label>
+                  <input
+                    type="text"
+                    value={formData.groupName}
+                    onChange={e => setFormData({ ...formData, groupName: e.target.value })}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary"
+                    maxLength={60}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Project Name</label>
-                  <input type="text" value={formData.projectName} onChange={e => setFormData({ ...formData, projectName: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" />
+                  <input type="text" value={formData.projectName} onChange={e => setFormData({ ...formData, projectName: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" maxLength={60} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-                  <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" rows={2} />
+                  <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary" rows={2} maxLength={500} />
                 </div>
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-all flex items-center gap-1">
                     {saving && <Loader2 className="w-3 h-3 animate-spin" />} Save
                   </button>
-                  <button onClick={() => setEditing(false)} disabled={saving} className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-100 transition-all">
+                  <button onClick={() => { resetFormData(); setEditing(false); }} disabled={saving} className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-100 transition-all">
                     Cancel
                   </button>
                 </div>
@@ -158,12 +240,12 @@ function TeamCard({ team, onRefresh }) {
             ) : (
               <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                 <div>
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
-                  <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Team Name</p>
+                  <p className="text-sm text-slate-700 font-medium">{team.teamName || 'Not set'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Group EXE201</p>
-                  <p className="text-sm text-slate-700 font-medium">{team.groupExe201 || 'Not set'}</p>
+                  <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
+                  <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-[10px] uppercase font-semibold text-slate-400">Project Name</p>
@@ -234,7 +316,7 @@ function TeamCard({ team, onRefresh }) {
   );
 }
 
-export default function TeamList({ teams, onRefresh }) {
+export default function TeamList({ teams, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId }) {
   // Guard: teams might be null/undefined
   const safeTeams = Array.isArray(teams) ? teams : [];
 
@@ -251,7 +333,15 @@ export default function TeamList({ teams, onRefresh }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {safeTeams.map(team => (
-        <TeamCard key={team._id} team={team} onRefresh={onRefresh} />
+        <TeamCard
+          key={team._id}
+          team={team}
+          onRefresh={onRefresh}
+          onReview={onReview}
+          canDelete={canDelete}
+          canManageInfo={canManageInfo}
+          currentStudentId={currentStudentId}
+        />
       ))}
     </div>
   );
