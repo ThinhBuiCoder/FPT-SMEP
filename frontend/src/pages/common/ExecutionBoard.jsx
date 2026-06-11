@@ -191,6 +191,12 @@ export default function ExecutionBoard() {
     mutations.changeStatus.mutate({ taskId, status });
   }, [isReadOnly, mutations.changeStatus]);
 
+  const handleSwipeStatusChange = useCallback((taskId, status) => {
+    if (isReadOnly) return;
+    setActiveMobileStatus(status);
+    mutations.changeStatus.mutate({ taskId, status });
+  }, [isReadOnly, mutations.changeStatus]);
+
   const getStatusFromOver = useCallback((over) => {
     if (!over?.id) return null;
     const overId = String(over.id);
@@ -329,6 +335,8 @@ export default function ExecutionBoard() {
               onEditTask={handleEdit}
               onDeleteTask={setDeleteTarget}
               onStatusChange={handleStatusChange}
+              onSwipeStatusChange={handleSwipeStatusChange}
+              enableSwipe
               activeOverStatus={activeOverStatus}
               />
           </div>

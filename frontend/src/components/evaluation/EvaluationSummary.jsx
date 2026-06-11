@@ -10,7 +10,6 @@ import PerformanceLevelBadge from './PerformanceLevelBadge';
  * Displays comprehensive evaluation summary with:
  * - Rubric scores table with weighted calculations
  * - Overall feedback section
- * - Strengths, weaknesses, and suggestions
  * - Comments/feedback threads
  * - Evaluation history
  */
@@ -28,28 +27,27 @@ const EvaluationSummary = ({
   const shouldHideSensitiveScores = isMentor || (currentUserRole || '').toUpperCase() === 'STUDENT' || (currentUserRole || '').toUpperCase() === 'USER';
   const [formData, setFormData] = useState({
     overallFeedback: evaluation?.overallFeedback || '',
-    strengths: evaluation?.strengths || '',
-    weaknesses: evaluation?.weaknesses || '',
-    suggestions: evaluation?.suggestions || '',
   });
 
   const [rubricScores, setRubricScores] = useState(evaluation?.rubricScores || []);
   const [totalScore, setTotalScore] = useState(evaluation?.checkpointTotal || 0);
 
-  const canEdit = isLecturer && evaluation?.status !== 'SUBMITTED';
+  const canEdit = isLecturer;
   const canSubmit = isLecturer && evaluation?.status === 'DRAFT';
 
   const handleSaveChanges = async () => {
     await onUpdate?.({
       ...formData,
       rubricScores: rubricScores,
-      status: 'DRAFT'
+      status: evaluation?.status === 'SUBMITTED' || evaluation?.status === 'PUBLISHED'
+        ? evaluation.status
+        : 'DRAFT'
     });
     setEditMode(false);
   };
 
   const handleSubmit = async () => {
-    if (window.confirm('Are you sure you want to submit this evaluation? It cannot be edited after submission.')) {
+    if (window.confirm('Are you sure you want to submit this evaluation?')) {
       await onSubmit?.({
         ...formData,
         rubricScores: rubricScores,
@@ -149,9 +147,6 @@ const EvaluationSummary = ({
                     setEditMode(false);
                     setFormData({
                       overallFeedback: evaluation?.overallFeedback || '',
-                      strengths: evaluation?.strengths || '',
-                      weaknesses: evaluation?.weaknesses || '',
-                      suggestions: evaluation?.suggestions || '',
                     });
                   }}
                   className="btn btn-ghost btn-sm"
@@ -202,65 +197,6 @@ const EvaluationSummary = ({
             )}
           </div>
 
-          {/* Strengths */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Strengths
-            </label>
-            {editMode && canEdit ? (
-              <textarea
-                value={formData.strengths}
-                onChange={(e) => setFormData({...formData, strengths: e.target.value})}
-                placeholder="What are the team's main strengths?"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="4"
-              />
-            ) : (
-              <div className="bg-green-50 p-3 rounded-lg text-sm text-gray-700 border border-green-200">
-                {formData.strengths || 'No strengths documented.'}
-              </div>
-            )}
-          </div>
-
-          {/* Weaknesses */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Weaknesses & Areas for Improvement
-            </label>
-            {editMode && canEdit ? (
-              <textarea
-                value={formData.weaknesses}
-                onChange={(e) => setFormData({...formData, weaknesses: e.target.value})}
-                placeholder="What areas need improvement?"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="4"
-              />
-            ) : (
-              <div className="bg-red-50 p-3 rounded-lg text-sm text-gray-700 border border-red-200">
-                {formData.weaknesses || 'No weaknesses documented.'}
-              </div>
-            )}
-          </div>
-
-          {/* Suggestions */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Suggestions for Next Steps
-            </label>
-            {editMode && canEdit ? (
-              <textarea
-                value={formData.suggestions}
-                onChange={(e) => setFormData({...formData, suggestions: e.target.value})}
-                placeholder="What should the team focus on?"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="4"
-              />
-            ) : (
-              <div className="bg-blue-50 p-3 rounded-lg text-sm text-gray-700 border border-blue-200">
-                {formData.suggestions || 'No suggestions provided.'}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

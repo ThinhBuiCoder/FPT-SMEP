@@ -7,7 +7,7 @@ const User    = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
-const { autoGenerateSchedule, validateScheduleConflict, SLOT_TIMES } = require('../services/schedule.service');
+const { autoGenerateSchedule, validateScheduleConflict, DAYS, SLOT_TIMES } = require('../services/schedule.service');
 const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
 const { verifyMajors } = require('../services/majorVerify.service');
 const { getProgramGroupFromMajor } = require('../constants/majors');
@@ -628,21 +628,28 @@ exports.updateSchedule = async (req, res) => {
   if (!dayOfWeek || !slot) return errorResponse(res, 'dayOfWeek and slot are required', 400);
 
   try {
+    const normalizedDay = String(dayOfWeek).toUpperCase();
+    const slotNumber = parseInt(slot, 10);
+    const slotTime = SLOT_TIMES[slotNumber];
+    if (!DAYS.includes(normalizedDay) || !slotTime) {
+      return errorResponse(res, 'Invalid dayOfWeek or slot. Slot must be between 1 and 4.', 400);
+    }
+
     const cls = await Class.findById(req.params.classId);
     if (!cls) return errorResponse(res, 'Class not found', 404);
 
     if (cls.lectureId) {
-      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, dayOfWeek, slot, cls._id);
+      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, normalizedDay, slotNumber, cls._id);
       if (hasConflict) {
         return errorResponse(res, 'Lecturer already has another class in this time slot.', 409);
       }
     }
 
     cls.schedule = {
-      dayOfWeek,
-      slot: parseInt(slot, 10),
-      startTime: SLOT_TIMES[slot].startTime,
-      endTime: SLOT_TIMES[slot].endTime,
+      dayOfWeek: normalizedDay,
+      slot: slotNumber,
+      startTime: slotTime.startTime,
+      endTime: slotTime.endTime,
       room: room || 'TBD'
     };
 
@@ -669,17 +676,24 @@ exports.updateTeachingAssignment = async (req, res) => {
       cls.lectureId = lectureId;
     }
 
-    if (schedule && schedule.dayOfWeek && schedule.slot) {
-      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, schedule.dayOfWeek, schedule.slot, cls._id);
+    if (schedule) {
+      const normalizedDay = String(schedule.dayOfWeek || '').toUpperCase();
+      const slotNumber = parseInt(schedule.slot, 10);
+      const slotTime = SLOT_TIMES[slotNumber];
+      if (!DAYS.includes(normalizedDay) || !slotTime) {
+        return errorResponse(res, 'Invalid schedule. dayOfWeek is required and slot must be between 1 and 4.', 400);
+      }
+
+      const hasConflict = await validateScheduleConflict(cls.lectureId, cls.semester, cls.year, normalizedDay, slotNumber, cls._id);
       if (hasConflict) {
         return errorResponse(res, 'Lecturer already has another class in this time slot.', 409);
       }
 
       cls.schedule = {
-        dayOfWeek: schedule.dayOfWeek,
-        slot: parseInt(schedule.slot, 10),
-        startTime: SLOT_TIMES[schedule.slot].startTime,
-        endTime: SLOT_TIMES[schedule.slot].endTime,
+        dayOfWeek: normalizedDay,
+        slot: slotNumber,
+        startTime: slotTime.startTime,
+        endTime: slotTime.endTime,
         room: schedule.room || 'TBD'
       };
     }

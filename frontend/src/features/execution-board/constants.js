@@ -2,6 +2,8 @@ export const WEEKS = Array.from({ length: 10 }, (_, index) => index + 1);
 
 export const STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'OVERDUE'];
 
+export const WORKFLOW_STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED'];
+
 export const EMPTY_GROUPED = {
   TODO: [],
   IN_PROGRESS: [],

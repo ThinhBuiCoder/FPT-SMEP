@@ -196,35 +196,6 @@ const EvaluationHistoryPage = ({
                   </div>
                 )}
 
-                {/* Strengths */}
-                {item.snapshot.strengths && (
-                  <div>
-                    <h4 className="font-bold text-green-900 mb-2">Strengths</h4>
-                    <div className="bg-green-50 bg-opacity-50 p-3 rounded text-sm text-gray-800 whitespace-pre-wrap border border-green-200">
-                      {item.snapshot.strengths}
-                    </div>
-                  </div>
-                )}
-
-                {/* Weaknesses */}
-                {item.snapshot.weaknesses && (
-                  <div>
-                    <h4 className="font-bold text-red-900 mb-2">Weaknesses</h4>
-                    <div className="bg-red-50 bg-opacity-50 p-3 rounded text-sm text-gray-800 whitespace-pre-wrap border border-red-200">
-                      {item.snapshot.weaknesses}
-                    </div>
-                  </div>
-                )}
-
-                {/* Suggestions */}
-                {item.snapshot.suggestions && (
-                  <div>
-                    <h4 className="font-bold text-blue-900 mb-2">Suggestions</h4>
-                    <div className="bg-blue-50 bg-opacity-50 p-3 rounded text-sm text-gray-800 whitespace-pre-wrap border border-blue-200">
-                      {item.snapshot.suggestions}
-                    </div>
-                  </div>
-                )}
 
                 {/* Change Summary */}
                 <div className="bg-white bg-opacity-75 p-3 rounded border border-gray-300">
