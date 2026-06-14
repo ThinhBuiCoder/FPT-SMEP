@@ -38,6 +38,11 @@ const messageSchema = new mongoose.Schema(
       emoji: { type: String, default: null },
       label: { type: String, default: null },
     },
+    reactions: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      emoji: { type: String, required: true },
+      userName: { type: String, trim: true, default: '' },
+    }],
     mentions: [{
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
       name: { type: String, trim: true, default: '' },

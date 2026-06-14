@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const StudentMaster = require('../models/StudentMaster');
 const AcademicDataset = require('../models/AcademicDataset');
 const DataBankColumn = require('../models/DataBankColumn');
@@ -28,6 +29,7 @@ const CONFLICT_LEVEL = {
   Email: 'MEDIUM',
   Phone: 'MEDIUM',
 };
+const checksumBuffer = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
 
 const DEFAULT_COLUMNS = [
   { key: 'RollNumber', displayName: 'RollNumber', aliases: ['Roll No', 'Roll Number', 'Student Code'], isSystemField: true },
@@ -267,7 +269,7 @@ const detectDatasetMismatch = (headers, datasetType) => {
   return null;
 };
 
-const analyzeRows = async ({ rows, mappings, scope, ownerId }) => {
+const analyzeRows = async ({ rows, mappings, scope }) => {
   const rollMapping = getRollMapping(mappings);
   if (!rollMapping) {
     return { blockingIssues: ['Missing RollNumber Column'], duplicateRollNumbers: [], rowAnalyses: [], summary: {} };
@@ -284,7 +286,7 @@ const analyzeRows = async ({ rows, mappings, scope, ownerId }) => {
   const rollNumbers = [...new Set(rollRows.map((r) => r.rollNumber))];
   const [students, datasets] = await Promise.all([
     StudentMaster.find({ normalizedRollNumber: { $in: rollNumbers } }),
-    AcademicDataset.find({ rollNumber: { $in: rollNumbers }, ...scope, ...(ownerId ? { ownerId } : {}) }),
+    AcademicDataset.find({ rollNumber: { $in: rollNumbers }, ...scope }),
   ]);
   const studentMap = new Map(students.map((s) => [s.normalizedRollNumber, s]));
   const datasetMap = new Map(datasets.map((d) => [d.rollNumber, d]));
@@ -358,13 +360,13 @@ const createPreview = async ({ buffer, fileName, sheetName, headerRow, scope, ma
     rows: extracted.rows,
     mappings: resolvedMappings,
     scope: normalizedScope,
-    ownerId: user.role === 'ADMIN' ? null : user._id,
   });
   const datasetWarning = detectDatasetMismatch(extracted.headers, normalizedScope.datasetType);
   if (datasetWarning) analysis.dataQualityIssues.push({ severity: 'WARNING', message: datasetWarning });
   const unapprovedColumns = resolvedMappings.filter((m) => !m.approved && m.action !== 'IGNORE_COLUMN');
   const batch = await DataBankImportBatch.create({
     fileName,
+    fileChecksum: checksumBuffer(buffer),
     uploadedBy: user._id,
     sheetName: worksheet.name,
     headerRow: Number(headerRow || 1),
@@ -483,6 +485,12 @@ const commitImport = async ({ batchId, buffer, mappings, user, confirmHighConfli
     err.statusCode = 403;
     throw err;
   }
+  await assertClassAccess(batch.classId, user);
+  if (batch.fileChecksum && batch.fileChecksum !== checksumBuffer(buffer)) {
+    const err = new Error('The uploaded file does not match the file used to create this preview');
+    err.statusCode = 409;
+    throw err;
+  }
   const { workbook } = await parseWorkbook(buffer);
   const worksheet = workbook.getWorksheet(batch.sheetName);
   if (!worksheet) {
@@ -502,7 +510,6 @@ const commitImport = async ({ batchId, buffer, mappings, user, confirmHighConfli
       classCode: batch.classCode,
       datasetType: batch.datasetType,
     },
-    ownerId: user.role === 'ADMIN' ? null : user._id,
   });
   if (analysis.blockingIssues.length) {
     const err = new Error(`Commit blocked: ${analysis.blockingIssues.join(', ')}`);
@@ -606,9 +613,19 @@ const listDatasets = async ({ filters, user }) => {
   for (const key of ['semester', 'subjectCode', 'classCode', 'datasetType']) {
     if (filters[key]) query[key] = String(filters[key]).trim().toUpperCase();
   }
-  if (filters.classId && mongoose.Types.ObjectId.isValid(filters.classId)) query.classId = filters.classId;
+  if (filters.classId) {
+    if (!mongoose.Types.ObjectId.isValid(filters.classId)) {
+      const err = new Error('Invalid classId');
+      err.statusCode = 400;
+      throw err;
+    }
+    await assertClassAccess(filters.classId, user);
+    query.classId = filters.classId;
+  } else if (user.role !== 'ADMIN') {
+    const accessibleClasses = await Class.find({ lectureId: user._id }).select('_id');
+    query.classId = { $in: accessibleClasses.map((cls) => cls._id) };
+  }
   if (filters.importBatch) query.lastImportBatchId = filters.importBatch;
-  if (user.role !== 'ADMIN') query.ownerId = user._id;
   const datasets = await AcademicDataset.find(query)
     .populate('studentId')
     .sort({ semester: -1, subjectCode: 1, classCode: 1, rollNumber: 1 })
@@ -616,19 +633,16 @@ const listDatasets = async ({ filters, user }) => {
   return datasets.filter((d) => !filters.major || d.studentId?.major === String(filters.major).trim().toUpperCase());
 };
 
-const buildExportRows = (datasets, selectedColumns, selectedRollNumbers = []) => {
-  const columns = selectedColumns?.length ? selectedColumns : ['RollNumber', 'FullName', 'Email', 'Major'];
+const buildExportRows = (datasets, selectedColumns, selectedRollNumbers = null) => {
+  const columns = selectedColumns?.length ? [...selectedColumns] : ['RollNumber', 'FullName', 'Email', 'Major'];
   if (!columns.includes('RollNumber')) columns.unshift('RollNumber');
   const rowMap = new Map();
   for (const dataset of datasets) {
     const rollNumber = dataset.rollNumber;
     if (!rowMap.has(rollNumber)) {
-      rowMap.set(rollNumber, {
-        RollNumber: rollNumber,
-        FullName: dataset.studentId?.fullName || '',
-        Email: dataset.studentId?.email || '',
-        Major: dataset.studentId?.major || '',
-      });
+      const row = Object.fromEntries(columns.map((column) => [column, '']));
+      row.RollNumber = rollNumber;
+      rowMap.set(rollNumber, row);
     }
     const row = rowMap.get(rollNumber);
     for (const column of columns) {
@@ -642,7 +656,7 @@ const buildExportRows = (datasets, selectedColumns, selectedRollNumbers = []) =>
     }
   }
   const rows = [...rowMap.values()];
-  if (!selectedRollNumbers?.length) return rows;
+  if (!Array.isArray(selectedRollNumbers)) return rows;
   const selectedSet = new Set(selectedRollNumbers);
   const order = new Map(selectedRollNumbers.map((rollNumber, index) => [rollNumber, index]));
   return rows
@@ -653,7 +667,8 @@ const buildExportRows = (datasets, selectedColumns, selectedRollNumbers = []) =>
 const exportWorkbook = async ({ filters, selectedColumns, selectedRollNumbers, headerAliases, user }) => {
   const datasets = await listDatasets({ filters, user });
   const rows = buildExportRows(datasets, selectedColumns, selectedRollNumbers);
-  const columns = rows.length ? Object.keys(rows[0]) : (selectedColumns?.length ? selectedColumns : ['RollNumber']);
+  const columns = selectedColumns?.length ? [...selectedColumns] : ['RollNumber', 'FullName', 'Email', 'Major'];
+  if (!columns.includes('RollNumber')) columns.unshift('RollNumber');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Data Bank Export', { views: [{ state: 'frozen', ySplit: 1 }] });
   sheet.columns = columns.map((key) => ({ header: headerAliases?.[key] || key, key, width: Math.max(14, String(headerAliases?.[key] || key).length + 4) }));
@@ -685,6 +700,7 @@ const rollbackLatestBatch = async ({ batchId, user, forceSnapshotRestore = false
     err.statusCode = 409;
     throw err;
   }
+  await assertClassAccess(batch.classId, user);
   const newer = await DataBankImportBatch.findOne({ classId: batch.classId, status: 'COMMITTED', committedAt: { $gt: batch.committedAt } }).sort({ committedAt: -1 });
   if (newer && !(user.role === 'ADMIN' && forceSnapshotRestore)) {
     const err = new Error('Only latest batch can be rolled back. Older rollback requires Admin snapshot restore confirmation.');
@@ -701,7 +717,7 @@ const rollbackLatestBatch = async ({ batchId, user, forceSnapshotRestore = false
   await session.withTransaction(async () => {
     const rollNumbers = snapshot.scope.rollNumbers || [];
     await AcademicDataset.deleteMany({
-      rollNumber: { $in: rollNumbers },
+      ...(snapshot.scope.fullScope ? {} : { rollNumber: { $in: rollNumbers } }),
       classId: snapshot.scope.classId,
       semester: snapshot.scope.semester,
       subjectCode: snapshot.scope.subjectCode,
@@ -737,8 +753,19 @@ const rollbackLatestBatch = async ({ batchId, user, forceSnapshotRestore = false
 };
 
 const listImportHistory = async ({ user, limit = 50, classId }) => {
-  const query = user.role === 'ADMIN' ? {} : { uploadedBy: user._id };
-  if (classId && mongoose.Types.ObjectId.isValid(classId)) query.classId = classId;
+  const query = {};
+  if (classId) {
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+      const err = new Error('Invalid classId');
+      err.statusCode = 400;
+      throw err;
+    }
+    await assertClassAccess(classId, user);
+    query.classId = classId;
+  } else if (user.role !== 'ADMIN') {
+    const accessibleClasses = await Class.find({ lectureId: user._id }).select('_id');
+    query.classId = { $in: accessibleClasses.map((cls) => cls._id) };
+  }
   return DataBankImportBatch.find(query).populate('uploadedBy', 'name email role').sort({ createdAt: -1 }).limit(Math.min(Number(limit), 200));
 };
 
@@ -752,7 +779,7 @@ const listAccessibleClasses = async ({ user }) => {
 const createSyncSnapshot = async ({ batch, rollNumbers, user }) => {
   const [studentMasters, academicDatasets] = await Promise.all([
     StudentMaster.find({ normalizedRollNumber: { $in: rollNumbers } }).lean(),
-    AcademicDataset.find({ rollNumber: { $in: rollNumbers }, classId: batch.classId, datasetType: batch.datasetType }).lean(),
+    AcademicDataset.find({ classId: batch.classId, datasetType: batch.datasetType }).lean(),
   ]);
   await DataBankSnapshot.create({
     importBatch: batch._id,
@@ -764,6 +791,7 @@ const createSyncSnapshot = async ({ batch, rollNumbers, user }) => {
       classCode: batch.classCode,
       datasetType: batch.datasetType,
       rollNumbers,
+      fullScope: true,
     },
     studentMasters,
     academicDatasets,
@@ -781,19 +809,23 @@ const upsertStudentMasterFromRoster = async ({ rosterStudent, batch, user, histo
     Major: ['major', rosterStudent.major],
   };
   for (const [fieldKey, [docKey, value]] of Object.entries(masterFields)) {
-    if (isEmptyValue(value) || !isEmptyValue(master[docKey])) continue;
+    if (isEmptyValue(value)) continue;
+    const normalizedValue = fieldKey === 'Email'
+      ? String(value).trim().toLowerCase()
+      : String(value).trim();
+    if (stringifyValue(master[docKey]) === stringifyValue(normalizedValue)) continue;
     await recordHistory({
       history,
       studentId: master._id,
       rollNumber,
       fieldKey,
       oldValue: master[docKey],
-      newValue: value,
+      newValue: normalizedValue,
       batch,
       user,
       entity: 'StudentMaster',
     });
-    master[docKey] = value;
+    master[docKey] = normalizedValue;
   }
   await master.save();
   return master;
@@ -845,17 +877,54 @@ const syncStudentListDataset = async ({ cls, students, user }) => {
       SubjectCode: rosterStudent.subjectCode || cls.subjectCode,
     };
     for (const [fieldKey, value] of Object.entries(fields)) {
-      if (isEmptyValue(value) || !isEmptyValue(dataset.dynamicFields.get(fieldKey))) continue;
+      const oldValue = dataset.dynamicFields.get(fieldKey);
+      if (isEmptyValue(value)) {
+        if (isEmptyValue(oldValue)) continue;
+        dataset.dynamicFields.delete(fieldKey);
+        await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue, newValue: null, batch, user, entity: 'AcademicDataset' });
+        continue;
+      }
+      if (stringifyValue(oldValue) === stringifyValue(value)) continue;
       dataset.dynamicFields.set(fieldKey, value);
-      await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue: null, newValue: value, batch, user, entity: 'AcademicDataset' });
+      await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue, newValue: value, batch, user, entity: 'AcademicDataset' });
     }
     dataset.lastImportBatchId = batch._id;
     await dataset.save();
   }
+  const staleDatasets = await AcademicDataset.find({
+    classId: cls._id,
+    datasetType: 'STUDENT_LIST',
+    rollNumber: { $nin: rollNumbers },
+  });
+  for (const dataset of staleDatasets) {
+    for (const [fieldKey, oldValue] of dataset.dynamicFields.entries()) {
+      await recordHistory({
+        history,
+        datasetId: dataset._id,
+        studentId: dataset.studentId,
+        rollNumber: dataset.rollNumber,
+        fieldKey,
+        oldValue,
+        newValue: null,
+        batch,
+        user,
+        entity: 'AcademicDataset',
+      });
+    }
+  }
+  if (staleDatasets.length) {
+    await AcademicDataset.deleteMany({ _id: { $in: staleDatasets.map((dataset) => dataset._id) } });
+  }
   if (history.length) await DataBankFieldHistory.insertMany(history);
   batch.rowsInserted = inserted;
   batch.rowsUpdated = updated;
-  batch.analysis = { mode: 'INITIAL_SYNC', source: 'Student', rowsTotal: students.length };
+  batch.rowsSkipped = staleDatasets.length;
+  batch.analysis = {
+    mode: 'INITIAL_SYNC',
+    source: 'Student',
+    rowsTotal: students.length,
+    staleRowsRemoved: staleDatasets.length,
+  };
   await batch.save();
   return batch;
 };
@@ -885,12 +954,14 @@ const syncTeamAssignmentDataset = async ({ cls, students, teams, user }) => {
   const history = [];
   let inserted = 0;
   let updated = 0;
+  const assignedRollNumbers = [];
   for (const rosterStudent of students) {
     const team = byStudentId.get(rosterStudent._id.toString());
     if (!team) continue;
     const master = await upsertStudentMasterFromRoster({ rosterStudent, batch, user, history });
     if (!master) continue;
     const rollNumber = normalizeRollNumber(rosterStudent.rollNumber);
+    assignedRollNumbers.push(rollNumber);
     let dataset = await AcademicDataset.findOne({ rollNumber, classId: cls._id, datasetType: 'TEAM_ASSIGNMENT' });
     if (!dataset) {
       dataset = new AcademicDataset({
@@ -917,17 +988,55 @@ const syncTeamAssignmentDataset = async ({ cls, students, teams, user }) => {
       Description: team.description,
     };
     for (const [fieldKey, value] of Object.entries(fields)) {
-      if (isEmptyValue(value) || !isEmptyValue(dataset.dynamicFields.get(fieldKey))) continue;
+      const oldValue = dataset.dynamicFields.get(fieldKey);
+      if (isEmptyValue(value)) {
+        if (isEmptyValue(oldValue)) continue;
+        dataset.dynamicFields.delete(fieldKey);
+        await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue, newValue: null, batch, user, entity: 'AcademicDataset' });
+        continue;
+      }
+      if (stringifyValue(oldValue) === stringifyValue(value)) continue;
       dataset.dynamicFields.set(fieldKey, value);
-      await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue: null, newValue: value, batch, user, entity: 'AcademicDataset' });
+      await recordHistory({ history, datasetId: dataset._id, studentId: master._id, rollNumber, fieldKey, oldValue, newValue: value, batch, user, entity: 'AcademicDataset' });
     }
     dataset.lastImportBatchId = batch._id;
     await dataset.save();
   }
+  const staleDatasets = await AcademicDataset.find({
+    classId: cls._id,
+    datasetType: 'TEAM_ASSIGNMENT',
+    rollNumber: { $nin: assignedRollNumbers },
+  });
+  for (const dataset of staleDatasets) {
+    for (const [fieldKey, oldValue] of dataset.dynamicFields.entries()) {
+      await recordHistory({
+        history,
+        datasetId: dataset._id,
+        studentId: dataset.studentId,
+        rollNumber: dataset.rollNumber,
+        fieldKey,
+        oldValue,
+        newValue: null,
+        batch,
+        user,
+        entity: 'AcademicDataset',
+      });
+    }
+  }
+  if (staleDatasets.length) {
+    await AcademicDataset.deleteMany({ _id: { $in: staleDatasets.map((dataset) => dataset._id) } });
+  }
   if (history.length) await DataBankFieldHistory.insertMany(history);
   batch.rowsInserted = inserted;
   batch.rowsUpdated = updated;
-  batch.analysis = { mode: 'INITIAL_SYNC', source: 'Team', rowsTotal: students.length, teamCount: teams.length };
+  batch.rowsSkipped = staleDatasets.length;
+  batch.analysis = {
+    mode: 'INITIAL_SYNC',
+    source: 'Team',
+    rowsTotal: students.length,
+    teamCount: teams.length,
+    staleAssignmentsRemoved: staleDatasets.length,
+  };
   await batch.save();
   return batch;
 };
@@ -941,7 +1050,7 @@ const syncClassData = async ({ classId, user }) => {
   ]);
   const batches = [];
   batches.push(await syncStudentListDataset({ cls, students, user }));
-  if (teams.length) batches.push(await syncTeamAssignmentDataset({ cls, students, teams, user }));
+  batches.push(await syncTeamAssignmentDataset({ cls, students, teams, user }));
   await DataBankAuditLog.create({
     user: user._id,
     action: 'Import',
@@ -1138,7 +1247,12 @@ const editManualCell = async ({ classId, rollNumber, fieldKey, value, datasetTyp
     student[systemDocKey] = newValue;
     await student.save();
   } else {
-    let dataset = await AcademicDataset.findOne({ rollNumber: normalizedRollNumber, classId: cls._id, [`dynamicFields.${fieldKey}`]: { $exists: true } });
+    let dataset = await AcademicDataset.findOne({
+      rollNumber: normalizedRollNumber,
+      classId: cls._id,
+      datasetType,
+      [`dynamicFields.${fieldKey}`]: { $exists: true },
+    });
     if (!dataset) dataset = await getOrCreateDataset({ cls, student, rollNumber: normalizedRollNumber, datasetType, ownerId: cls.lectureId || user._id });
     const oldValue = dataset.dynamicFields.get(fieldKey);
     dataset.dynamicFields.set(fieldKey, value);
@@ -1159,7 +1273,118 @@ const editManualCell = async ({ classId, rollNumber, fieldKey, value, datasetTyp
   return { rollNumber: normalizedRollNumber, fieldKey, value };
 };
 
-const clearManualCell = async ({ classId, rollNumber, fieldKey, user }) => {
+const editManualCellsBulk = async ({ classId, updates, user }) => {
+  const cls = await assertClassAccess(classId, user);
+  if (!Array.isArray(updates) || updates.length === 0 || updates.length > 1000) {
+    const err = new Error('updates must contain between 1 and 1000 cells');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const normalizedUpdates = updates.map((update) => ({
+    rollNumber: normalizeRollNumber(update.rollNumber),
+    fieldKey: String(update.fieldKey || '').trim(),
+    value: update.value,
+    datasetType: String(update.datasetType || 'CUSTOM').trim().toUpperCase(),
+  }));
+  for (const update of normalizedUpdates) {
+    if (!update.rollNumber || !update.fieldKey || update.fieldKey === 'RollNumber' || isEmptyValue(update.value)) {
+      const err = new Error('Each update requires rollNumber, editable fieldKey, and a non-empty value');
+      err.statusCode = 400;
+      throw err;
+    }
+    assertDatasetType(update.datasetType);
+  }
+
+  const batch = await createManualBatch({
+    cls,
+    user,
+    datasetType: normalizedUpdates[0].datasetType,
+    fileName: `MANUAL_FILL_${normalizedUpdates[0].fieldKey}_${normalizedUpdates.length}`,
+  });
+  const history = [];
+
+  for (const update of normalizedUpdates) {
+    const student = await getOrCreateStudentMaster({ rollNumber: update.rollNumber });
+    const systemDocKey = getSystemDocKey(update.fieldKey);
+    if (systemDocKey) {
+      const newValue = update.fieldKey === 'Email'
+        ? String(update.value).trim().toLowerCase()
+        : String(update.value).trim();
+      await recordHistory({
+        history,
+        studentId: student._id,
+        rollNumber: update.rollNumber,
+        fieldKey: update.fieldKey,
+        oldValue: student[systemDocKey],
+        newValue,
+        batch,
+        user,
+        entity: 'StudentMaster',
+      });
+      student[systemDocKey] = newValue;
+      await student.save();
+      continue;
+    }
+
+    let dataset = await AcademicDataset.findOne({
+      rollNumber: update.rollNumber,
+      classId: cls._id,
+      datasetType: update.datasetType,
+      [`dynamicFields.${update.fieldKey}`]: { $exists: true },
+    });
+    if (!dataset) {
+      dataset = await getOrCreateDataset({
+        cls,
+        student,
+        rollNumber: update.rollNumber,
+        datasetType: update.datasetType,
+        ownerId: cls.lectureId || user._id,
+      });
+    }
+    const oldValue = dataset.dynamicFields.get(update.fieldKey);
+    dataset.dynamicFields.set(update.fieldKey, update.value);
+    dataset.lastImportBatchId = batch._id;
+    await recordHistory({
+      history,
+      datasetId: dataset._id,
+      studentId: student._id,
+      rollNumber: update.rollNumber,
+      fieldKey: update.fieldKey,
+      oldValue,
+      newValue: update.value,
+      batch,
+      user,
+      entity: 'AcademicDataset',
+    });
+    await dataset.save();
+  }
+
+  if (history.length) await DataBankFieldHistory.insertMany(history);
+  batch.rowsUpdated = history.length;
+  batch.analysis = {
+    mode: 'MANUAL_FILL_CELLS',
+    fieldKey: normalizedUpdates[0].fieldKey,
+    requestedCells: normalizedUpdates.length,
+    updatedCells: history.length,
+  };
+  await batch.save();
+  await DataBankAuditLog.create({
+    user: user._id,
+    action: 'Manual Edit',
+    entity: 'AcademicDataset',
+    details: {
+      mode: 'FILL_CELLS',
+      classId,
+      fieldKey: normalizedUpdates[0].fieldKey,
+      requestedCells: normalizedUpdates.length,
+      updatedCells: history.length,
+    },
+  });
+  return { requestedCells: normalizedUpdates.length, updatedCells: history.length };
+};
+
+const clearManualCell = async ({ classId, rollNumber, fieldKey, datasetType, user }) => {
   const cls = await assertClassAccess(classId, user);
   const normalizedRollNumber = normalizeRollNumber(rollNumber);
   if (!normalizedRollNumber || !fieldKey || SYSTEM_FIELDS.includes(fieldKey) || fieldKey === 'RollNumber') {
@@ -1167,7 +1392,12 @@ const clearManualCell = async ({ classId, rollNumber, fieldKey, user }) => {
     err.statusCode = 400;
     throw err;
   }
-  const dataset = await AcademicDataset.findOne({ rollNumber: normalizedRollNumber, classId: cls._id, [`dynamicFields.${fieldKey}`]: { $exists: true } });
+  const dataset = await AcademicDataset.findOne({
+    rollNumber: normalizedRollNumber,
+    classId: cls._id,
+    ...(datasetType ? { datasetType } : {}),
+    [`dynamicFields.${fieldKey}`]: { $exists: true },
+  });
   if (!dataset) return { cleared: false };
   const batch = await createManualBatch({ cls, user, datasetType: dataset.datasetType, fileName: `MANUAL_CLEAR_${normalizedRollNumber}_${fieldKey}` });
   const oldValue = dataset.dynamicFields.get(fieldKey);
@@ -1224,6 +1454,7 @@ const deleteManualColumn = async ({ classId, fieldKey, user }) => {
     err.statusCode = 400;
     throw err;
   }
+  const normalizedFieldKey = normalizeColumnKey(fieldKey);
   const datasets = await AcademicDataset.find({ classId: cls._id, [`dynamicFields.${fieldKey}`]: { $exists: true } });
   const batch = await createManualBatch({ cls, user, datasetType: 'CUSTOM', fileName: `MANUAL_DELETE_COLUMN_${fieldKey}` });
   const history = [];
@@ -1245,22 +1476,66 @@ const deleteManualColumn = async ({ classId, fieldKey, user }) => {
     });
   }
   if (history.length) await DataBankFieldHistory.insertMany(history);
+  const deletedColumn = await DataBankColumn.findOneAndDelete({
+    normalizedKey: normalizedFieldKey,
+    isSystemField: false,
+  });
+  const templates = await DataBankExportTemplate.find({
+    ownerId: user._id,
+    'filters.classId': classId.toString(),
+    $or: [
+      { selectedColumns: fieldKey },
+      { columnOrder: fieldKey },
+      { [`headerAliases.${fieldKey}`]: { $exists: true } },
+    ],
+  });
+  for (const template of templates) {
+    template.selectedColumns = template.selectedColumns.filter((key) => key !== fieldKey);
+    template.columnOrder = template.columnOrder.filter((key) => key !== fieldKey);
+    if (template.headerAliases instanceof Map) template.headerAliases.delete(fieldKey);
+    else if (template.headerAliases) delete template.headerAliases[fieldKey];
+    await template.save();
+  }
   batch.rowsUpdated = datasets.length;
-  batch.analysis = { mode: 'MANUAL_DELETE_COLUMN', fieldKey, affectedRows: datasets.length };
+  batch.analysis = {
+    mode: 'MANUAL_DELETE_COLUMN',
+    fieldKey,
+    affectedRows: datasets.length,
+    columnDefinitionDeleted: Boolean(deletedColumn),
+    templatesUpdated: templates.length,
+  };
   await batch.save();
   await DataBankAuditLog.create({
     user: user._id,
     action: 'Column Management',
     entity: 'AcademicDataset',
-    details: { mode: 'DELETE_COLUMN_VALUES', classId, fieldKey, affectedRows: datasets.length },
+    entityId: deletedColumn?._id,
+    details: {
+      mode: 'DELETE_COLUMN_PERMANENTLY',
+      classId,
+      fieldKey,
+      affectedRows: datasets.length,
+      columnDefinitionDeleted: Boolean(deletedColumn),
+      templatesUpdated: templates.length,
+    },
   });
-  return { affectedRows: datasets.length };
+  return {
+    affectedRows: datasets.length,
+    columnDefinitionDeleted: Boolean(deletedColumn),
+    templatesUpdated: templates.length,
+  };
+};
+
+const getBatchIdsForClass = async (classId) => {
+  const batches = await DataBankImportBatch.find({ classId }).select('_id');
+  return batches.map((batch) => batch._id);
 };
 
 module.exports = {
   DATASET_TYPES,
   SYSTEM_FIELDS,
   getColumns,
+  buildExportRows,
   parseWorkbook,
   createPreview,
   commitImport,
@@ -1274,7 +1549,10 @@ module.exports = {
   addManualColumn,
   addManualRow,
   editManualCell,
+  editManualCellsBulk,
   clearManualCell,
   deleteManualRow,
   deleteManualColumn,
+  assertClassAccess,
+  getBatchIdsForClass,
 };

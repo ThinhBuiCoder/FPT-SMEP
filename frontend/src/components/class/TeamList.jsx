@@ -127,8 +127,11 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
           <div>
             <div className="flex items-center gap-2">
               <p className="font-bold text-slate-900">{teamNameText}</p>
-              {isPending && (
+              {team.status === 'PENDING' && (
                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full uppercase">Pending</span>
+              )}
+              {team.status === 'NEEDS_REVISION' && (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase">Needs revision</span>
               )}
               {team.status === 'REJECTED' && (
                 <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full uppercase">Rejected</span>
@@ -184,6 +187,18 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
       {/* Members & Details */}
       {expanded && (
         <div className="border-t border-slate-100 p-4">
+          {team.status === 'NEEDS_REVISION' && team.rejectReason && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-bold uppercase text-amber-700">Nội dung cần chỉnh sửa</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-amber-800">{team.rejectReason}</p>
+            </div>
+          )}
+          {team.status === 'REJECTED' && team.rejectReason && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-bold uppercase text-red-700">Lý do từ chối</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-red-800">{team.rejectReason}</p>
+            </div>
+          )}
           
           {/* Team Info Section */}
           <div className="mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">

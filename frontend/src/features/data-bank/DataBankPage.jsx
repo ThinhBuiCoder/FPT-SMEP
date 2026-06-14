@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -20,6 +20,7 @@ import { dataBankApi } from '../../api/dataBankApi';
 
 const mappingActions = ['MAP_TO_EXISTING', 'ADD_NEW_COLUMN', 'IGNORE_COLUMN', 'RENAME_AND_ADD'];
 const systemColumns = ['RollNumber', 'FullName', 'Email', 'Major'];
+const datasetTypes = ['STUDENT_LIST', 'TEAM_ASSIGNMENT', 'CHECKPOINT', 'EVALUATION', 'PROPOSAL', 'MENTORING', 'CUSTOM'];
 const groupStorageKey = 'dataBankGridGroupColumn';
 
 const unwrap = (res) => res?.data || res;
@@ -86,15 +87,23 @@ const DataBankPage = () => {
   const [selectedExportColumns, setSelectedExportColumns] = useState(['RollNumber', 'FullName', 'Email', 'Major']);
   const [exportPreviewRows, setExportPreviewRows] = useState([]);
   const [busy, setBusy] = useState('');
+  const [loadingData, setLoadingData] = useState(true);
   const [confirmHighConflicts, setConfirmHighConflicts] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ key: 'RollNumber', direction: 'asc' });
   const [editingCell, setEditingCell] = useState(null);
   const [editingValue, setEditingValue] = useState('');
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [fillRange, setFillRange] = useState(null);
   const [groupColumnInput, setGroupColumnInput] = useState(() => localStorage.getItem(groupStorageKey) || '');
   const [groupColumn, setGroupColumn] = useState(() => localStorage.getItem(groupStorageKey) || '');
+  const [rememberGrouping, setRememberGrouping] = useState(() => Boolean(localStorage.getItem(groupStorageKey)));
   const [textDialog, setTextDialog] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const loadRequestRef = useRef(0);
+  const pendingTemplateRef = useRef(null);
+  const savingCellRef = useRef(false);
+  const fillDragRef = useRef(null);
   const sensors = useSensors(useSensor(PointerSensor));
 
   const classFilters = useMemo(() => (
@@ -123,7 +132,10 @@ const DataBankPage = () => {
     setConfirmDialog(null);
   };
 
-  const loadReferenceData = async () => {
+  const loadReferenceData = async ({ showLoading = false } = {}) => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+    if (showLoading) setLoadingData(true);
     try {
       const [classRes, colRes, historyRes, templateRes, dataRes, gridRes] = await Promise.all([
         dataBankApi.getClasses(),
@@ -133,6 +145,7 @@ const DataBankPage = () => {
         dataBankApi.getDatasets(classFilters),
         dataBankApi.getDatasets(gridFilters),
       ]);
+      if (requestId !== loadRequestRef.current) return;
       setClasses(unwrap(classRes).classes || []);
       setColumns(unwrap(colRes).columns || []);
       setHistory(unwrap(historyRes).history || []);
@@ -140,11 +153,17 @@ const DataBankPage = () => {
       setDatasets(unwrap(dataRes).datasets || []);
       setGridDatasets(unwrap(gridRes).datasets || []);
     } catch (err) {
-      toast.error(err.message || 'Failed to load Data Bank');
+      if (requestId === loadRequestRef.current) {
+        toast.error(err.message || 'Failed to load Data Bank');
+      }
+    } finally {
+      if (requestId === loadRequestRef.current && showLoading) setLoadingData(false);
     }
   };
 
-  useEffect(() => { loadReferenceData(); }, [selectedClassId, classFilters, gridFilters]);
+  useEffect(() => {
+    loadReferenceData({ showLoading: true });
+  }, [selectedClassId, classFilters, gridFilters]);
 
   useEffect(() => {
     if (location.state?.classId) setSelectedClassId(location.state.classId);
@@ -161,7 +180,13 @@ const DataBankPage = () => {
   const applyClassToScope = (classId) => {
     setSelectedClassId(classId);
     const cls = classes.find((item) => item._id === classId);
-    if (!cls) return;
+    if (!cls) {
+      setScope((current) => ({ ...current, classId: '', classCode: '', subjectCode: '', semester: '' }));
+      setPreview(null);
+      setMappings([]);
+      setExportPreviewRows([]);
+      return;
+    }
     setScope((current) => ({
       ...current,
       classId: cls._id,
@@ -170,11 +195,16 @@ const DataBankPage = () => {
       semester: `${cls.semester || ''}${String(cls.year || '').slice(-2)}`,
     }));
     setPreview(null);
+    setMappings([]);
+    setConfirmHighConflicts(false);
     setExportPreviewRows([]);
   };
 
   const spreadsheetColumns = useMemo(() => {
     const keys = new Set(systemColumns);
+    columns.forEach((column) => {
+      if (column?.key) keys.add(column.key);
+    });
     const seenByRoll = new Map();
     gridDatasets.forEach((dataset) => {
       const rollNumber = dataset.rollNumber || dataset._id;
@@ -189,7 +219,7 @@ const DataBankPage = () => {
       });
     });
     return [...keys];
-  }, [gridDatasets]);
+  }, [columns, gridDatasets]);
 
   const dynamicColumnKeys = useMemo(() => {
     const keys = new Set(['RollNumber', 'FullName', 'Email', 'Major']);
@@ -197,6 +227,11 @@ const DataBankPage = () => {
     spreadsheetColumns.forEach((key) => keys.add(key));
     return [...keys];
   }, [columns, spreadsheetColumns]);
+
+  const manageableColumnKeys = useMemo(
+    () => new Set(spreadsheetColumns.filter((column) => !systemColumns.includes(column))),
+    [spreadsheetColumns]
+  );
 
   const spreadsheetRows = useMemo(() => {
     const rowMap = new Map();
@@ -210,6 +245,7 @@ const DataBankPage = () => {
           FullName: dataset.studentId?.fullName || '',
           Email: dataset.studentId?.email || '',
           Major: dataset.studentId?.major || '',
+          __fieldSources: {},
         });
       }
       const row = rowMap.get(rollNumber);
@@ -217,8 +253,14 @@ const DataBankPage = () => {
       row.Email = row.Email || dataset.studentId?.email || '';
       row.Major = row.Major || dataset.studentId?.major || '';
       Object.entries(dynamicFields).forEach(([key, value]) => {
-        if (row[key] === undefined || row[key] === '') row[key] = value;
-        else if (String(row[key]) !== String(value ?? '')) row[`${dataset.datasetType}_${key}`] = value;
+        if (row[key] === undefined || row[key] === '') {
+          row[key] = value;
+          row.__fieldSources[key] = { fieldKey: key, datasetType: dataset.datasetType };
+        } else if (String(row[key]) !== String(value ?? '')) {
+          const scopedKey = `${dataset.datasetType}_${key}`;
+          row[scopedKey] = value;
+          row.__fieldSources[scopedKey] = { fieldKey: key, datasetType: dataset.datasetType };
+        }
       });
     });
     return [...rowMap.values()];
@@ -267,6 +309,12 @@ const DataBankPage = () => {
       return left > right ? direction : -direction;
     });
   }, [columnFilters, groupColumn, sortConfig, spreadsheetRows]);
+
+  const latestRollbackBatchId = useMemo(() => {
+    const latestCommitted = history.find((batch) => batch.status === 'COMMITTED');
+    if (!latestCommitted || latestCommitted.fileName?.startsWith('MANUAL_')) return null;
+    return latestCommitted._id;
+  }, [history]);
 
   const inspectFile = async (selectedFile) => {
     setFile(selectedFile);
@@ -348,6 +396,11 @@ const DataBankPage = () => {
   };
 
   const refreshExportPreview = async () => {
+    if (!selectedClassId) return toast.error('Please select a class first');
+    if (filteredSpreadsheetRows.length === 0) {
+      setExportPreviewRows([]);
+      return toast.error('No rows match the current filters');
+    }
     setBusy('exportPreview');
     try {
       const res = await dataBankApi.exportPreview({
@@ -364,6 +417,10 @@ const DataBankPage = () => {
   };
 
   const downloadExport = async () => {
+    if (!selectedClassId) return toast.error('Please select a class first');
+    if (filteredSpreadsheetRows.length === 0) {
+      return toast.error('No rows match the current filters');
+    }
     setBusy('download');
     try {
       const response = await dataBankApi.downloadExport({
@@ -457,7 +514,6 @@ const DataBankPage = () => {
     if (!fieldKey) return;
     try {
       await dataBankApi.addGridColumn({ classId: selectedClassId, fieldKey, displayName: fieldKey });
-      toast.success('Column added');
       await loadReferenceData();
     } catch (err) {
       toast.error(err.message || 'Column add failed');
@@ -468,13 +524,30 @@ const DataBankPage = () => {
     if (!selectedClassId) return toast.error('Please select a class first');
     if (systemColumns.includes(fieldKey)) return toast.error('System columns cannot be deleted');
     const confirmed = await requestConfirm({
-      title: 'Delete column values',
-      description: `Delete column "${fieldKey}" values from this class?`,
-      confirmText: 'Delete Column',
+      title: 'Permanently delete column',
+      description: `Permanently delete column "${fieldKey}" and all of its values from this class? This action cannot be undone.`,
+      confirmText: 'Delete Permanently',
     });
     if (!confirmed) return;
     try {
       await dataBankApi.deleteGridColumn({ classId: selectedClassId, fieldKey });
+      setColumns((current) => current.filter((column) => column.key !== fieldKey));
+      setGridDatasets((current) => current.map((dataset) => {
+        if (!Object.prototype.hasOwnProperty.call(dataset.dynamicFields || {}, fieldKey)) return dataset;
+        const dynamicFields = { ...dataset.dynamicFields };
+        delete dynamicFields[fieldKey];
+        return { ...dataset, dynamicFields };
+      }));
+      setColumnFilters((current) => {
+        const next = { ...current };
+        delete next[fieldKey];
+        return next;
+      });
+      if (groupColumn === fieldKey) {
+        setGroupColumn('');
+        setGroupColumnInput('');
+        localStorage.removeItem(groupStorageKey);
+      }
       toast.success('Column deleted');
       await loadReferenceData();
     } catch (err) {
@@ -502,7 +575,6 @@ const DataBankPage = () => {
         datasetType: scope.datasetType || 'CUSTOM',
         values: { RollNumber: rollNumber, FullName: fullName },
       });
-      toast.success('Row added');
       await loadReferenceData();
     } catch (err) {
       toast.error(err.message || 'Row add failed');
@@ -528,12 +600,21 @@ const DataBankPage = () => {
 
   const startEditCell = (row, column) => {
     if (column === 'RollNumber') return;
-    setEditingCell({ rollNumber: row.RollNumber, column });
+    const source = row.__fieldSources?.[column];
+    setSelectedCell({ rollNumber: row.RollNumber, column });
+    setEditingCell({
+      rollNumber: row.RollNumber,
+      column,
+      fieldKey: source?.fieldKey || column,
+      datasetType: source?.datasetType || scope.datasetType || 'CUSTOM',
+    });
     setEditingValue(String(row[column] ?? ''));
   };
 
-  const saveEditingCell = async () => {
-    if (!editingCell) return;
+  const saveEditingCell = async ({ moveDown = false } = {}) => {
+    if (!editingCell || savingCellRef.current) return;
+    savingCellRef.current = true;
+    const savedCell = editingCell;
     try {
       if (editingValue.trim() === '') {
         const confirmed = await requestConfirm({
@@ -545,25 +626,79 @@ const DataBankPage = () => {
         await dataBankApi.clearGridCell({
           classId: selectedClassId,
           rollNumber: editingCell.rollNumber,
-          fieldKey: editingCell.column,
+          fieldKey: editingCell.fieldKey,
+          datasetType: editingCell.datasetType,
         });
       } else {
         await dataBankApi.editGridCell({
           classId: selectedClassId,
           rollNumber: editingCell.rollNumber,
-          fieldKey: editingCell.column,
+          fieldKey: editingCell.fieldKey,
           value: editingValue,
-          datasetType: scope.datasetType || 'CUSTOM',
+          datasetType: editingCell.datasetType,
         });
       }
       setEditingCell(null);
       setEditingValue('');
-      toast.success('Cell saved');
       await loadReferenceData();
+      if (moveDown) {
+        const currentIndex = filteredSpreadsheetRows.findIndex((row) => row.RollNumber === savedCell.rollNumber);
+        const nextRow = filteredSpreadsheetRows[currentIndex + 1];
+        if (nextRow) startEditCell(nextRow, savedCell.column);
+      }
     } catch (err) {
       toast.error(err.message || 'Cell update failed');
+    } finally {
+      savingCellRef.current = false;
     }
   };
+
+  const finishFillDrag = async () => {
+    const drag = fillDragRef.current;
+    fillDragRef.current = null;
+    setFillRange(null);
+    if (!drag || drag.targetIndex === drag.sourceIndex) return;
+
+    const start = Math.min(drag.sourceIndex, drag.targetIndex);
+    const end = Math.max(drag.sourceIndex, drag.targetIndex);
+    const targetRows = filteredSpreadsheetRows
+      .slice(start, end + 1)
+      .filter((_, offset) => start + offset !== drag.sourceIndex);
+    if (!targetRows.length) return;
+
+    const updates = targetRows.map((row) => {
+      const source = row.__fieldSources?.[drag.column];
+      return {
+        rollNumber: row.RollNumber,
+        fieldKey: source?.fieldKey || drag.fieldKey,
+        datasetType: source?.datasetType || drag.datasetType,
+        value: drag.value,
+      };
+    });
+    try {
+      await dataBankApi.editGridCellsBulk({ classId: selectedClassId, updates });
+      setGridDatasets((current) => current.map((dataset) => {
+        const update = updates.find((item) => (
+          item.rollNumber === dataset.rollNumber
+          && item.datasetType === dataset.datasetType
+        ));
+        if (!update || systemColumns.includes(update.fieldKey)) return dataset;
+        return {
+          ...dataset,
+          dynamicFields: { ...dataset.dynamicFields, [update.fieldKey]: update.value },
+        };
+      }));
+      await loadReferenceData();
+    } catch (err) {
+      toast.error(err.message || 'Fill cells failed');
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseUp = () => finishFillDrag();
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, [filteredSpreadsheetRows, selectedClassId]);
 
   const updateSort = (column) => {
     setSortConfig((current) => ({
@@ -585,7 +720,8 @@ const DataBankPage = () => {
     if (!matchedColumn) return toast.error(`Column "${groupColumnInput}" not found`);
     setGroupColumn(matchedColumn);
     setGroupColumnInput(matchedColumn);
-    localStorage.setItem(groupStorageKey, matchedColumn);
+    if (rememberGrouping) localStorage.setItem(groupStorageKey, matchedColumn);
+    else localStorage.removeItem(groupStorageKey);
     toast.success(`Grouped by ${matchedColumn}`);
   };
 
@@ -595,6 +731,36 @@ const DataBankPage = () => {
     localStorage.removeItem(groupStorageKey);
     toast.success('Grouping cleared');
   };
+
+  const applyTemplateColumns = (template) => {
+    const available = new Set(spreadsheetColumns);
+    const selected = (template.selectedColumns || []).filter((column) => available.has(column));
+    const ordered = (template.columnOrder || []).filter((column) => available.has(column));
+    const remaining = spreadsheetColumns.filter((column) => !ordered.includes(column));
+    const orderedColumns = [...ordered, ...remaining];
+    setExportColumns(orderedColumns.length ? orderedColumns : ['RollNumber']);
+    setSelectedExportColumns(
+      selected.includes('RollNumber') ? selected : ['RollNumber', ...selected]
+    );
+  };
+
+  const applyTemplate = (template) => {
+    const templateClassId = template.filters?.classId;
+    if (templateClassId && templateClassId !== selectedClassId) {
+      pendingTemplateRef.current = template;
+      applyClassToScope(templateClassId);
+      return;
+    }
+    applyTemplateColumns(template);
+  };
+
+  useEffect(() => {
+    const pendingTemplate = pendingTemplateRef.current;
+    if (!pendingTemplate || loadingData) return;
+    if (pendingTemplate.filters?.classId !== selectedClassId) return;
+    applyTemplateColumns(pendingTemplate);
+    pendingTemplateRef.current = null;
+  }, [loadingData, selectedClassId, spreadsheetColumns]);
 
   const handleExportColumnDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
@@ -629,8 +795,8 @@ const DataBankPage = () => {
           <p className="mt-1 text-sm text-slate-500">Preview-first Excel import/export with snapshots, field history and rollback controls.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" icon={RefreshCw} onClick={loadReferenceData}>Refresh</Button>
-          <Button icon={RefreshCw} isLoading={busy === 'sync'} onClick={syncSelectedClass}>Sync Class Data</Button>
+          <Button variant="outline" icon={RefreshCw} isLoading={loadingData} onClick={() => loadReferenceData({ showLoading: true })}>Refresh</Button>
+          <Button icon={RefreshCw} isLoading={busy === 'sync'} disabled={loadingData || !selectedClassId} onClick={syncSelectedClass}>Sync Class Data</Button>
         </div>
       </div>
 
@@ -653,7 +819,11 @@ const DataBankPage = () => {
       </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        {[
+        {loadingData ? (
+          <div className="col-span-full flex items-center justify-center rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Data Bank...
+          </div>
+        ) : ([
           ['Datasets', datasets.length],
           ['Import Batches', history.length],
           ['Columns', dynamicColumnKeys.length],
@@ -663,7 +833,7 @@ const DataBankPage = () => {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
             <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
           </div>
-        ))}
+        )))}
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5">
@@ -671,7 +841,7 @@ const DataBankPage = () => {
           <FileSpreadsheet className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-slate-900">Import Workflow</h2>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
           <label className="space-y-1">
             <span className="text-xs font-semibold text-slate-500">Semester</span>
             <input className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value={scope.semester} readOnly />
@@ -683,6 +853,20 @@ const DataBankPage = () => {
           <label className="space-y-1">
             <span className="text-xs font-semibold text-slate-500">ClassCode</span>
             <input className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value={scope.classCode} readOnly placeholder="EXE101_1" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-slate-500">Dataset Type</span>
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={scope.datasetType}
+              onChange={(event) => {
+                setScope((current) => ({ ...current, datasetType: event.target.value }));
+                setPreview(null);
+                setMappings([]);
+              }}
+            >
+              {datasetTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
           </label>
         </div>
 
@@ -808,7 +992,7 @@ const DataBankPage = () => {
             <h2 className="text-lg font-semibold text-slate-900">Export Builder</h2>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" icon={Save} onClick={saveTemplate}>Template</Button>
-              <Button size="sm" icon={Download} isLoading={busy === 'download'} onClick={downloadExport}>Download</Button>
+              <Button size="sm" icon={Download} isLoading={busy === 'download'} disabled={!selectedClassId || filteredSpreadsheetRows.length === 0} onClick={downloadExport}>Download</Button>
             </div>
           </div>
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -826,16 +1010,12 @@ const DataBankPage = () => {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {templates.map((template) => (
-              <button key={template._id} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600" onClick={() => {
-                setExportColumns(template.selectedColumns?.length ? template.selectedColumns : ['RollNumber']);
-                setSelectedExportColumns(template.selectedColumns?.length ? template.selectedColumns : ['RollNumber']);
-                setScope({ ...scope, ...(template.filters || {}) });
-              }}>
+              <button key={template._id} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600" onClick={() => applyTemplate(template)}>
                 {template.name}
               </button>
             ))}
           </div>
-          <Button className="mt-4" variant="outline" icon={RefreshCw} isLoading={busy === 'exportPreview'} onClick={refreshExportPreview}>Preview Export</Button>
+          <Button className="mt-4" variant="outline" icon={RefreshCw} isLoading={busy === 'exportPreview'} disabled={!selectedClassId || filteredSpreadsheetRows.length === 0} onClick={refreshExportPreview}>Preview Export</Button>
           <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-slate-200">
             {exportPreviewRows.length === 0 ? <EmptyState title="No export preview" icon={Download} size="sm" /> : (
               <table className="w-full text-left text-xs">
@@ -875,7 +1055,7 @@ const DataBankPage = () => {
                   </div>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{batch.status}</span>
                 </div>
-                {batch.status === 'COMMITTED' && (
+                {batch._id === latestRollbackBatchId && (
                   <Button className="mt-3" size="xs" variant="outline" icon={busy === `rollback-${batch._id}` ? Loader2 : ArchiveRestore} onClick={() => rollback(batch)}>Rollback</Button>
                 )}
               </div>
@@ -904,11 +1084,21 @@ const DataBankPage = () => {
               <button type="button" onClick={applyGroupColumn} className="h-8 rounded bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-dark">
                 Group
               </button>
+              {groupColumn && (
+                <button type="button" onClick={clearGroupColumn} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                  Clear
+                </button>
+              )}
               <label className="flex items-center gap-1 text-xs font-medium text-slate-600">
                 <input
                   type="checkbox"
-                  checked={Boolean(groupColumn)}
-                  onChange={(e) => { if (e.target.checked) applyGroupColumn(); else clearGroupColumn(); }}
+                  checked={rememberGrouping}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberGrouping(checked);
+                    if (checked && groupColumn) localStorage.setItem(groupStorageKey, groupColumn);
+                    if (!checked) localStorage.removeItem(groupStorageKey);
+                  }}
                 />
                 Remember
               </label>
@@ -919,7 +1109,11 @@ const DataBankPage = () => {
           </div>
         </div>
 
-        {!selectedClassId ? (
+        {loadingData ? (
+          <div className="flex items-center justify-center p-10 text-sm text-slate-500">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading class data...
+          </div>
+        ) : !selectedClassId ? (
           <EmptyState title="Select a class to view Data Bank" icon={FileSpreadsheet} size="sm" />
         ) : filteredSpreadsheetRows.length === 0 ? (
           <div className="p-6">
@@ -956,7 +1150,7 @@ const DataBankPage = () => {
                                     {column}{sortConfig.key === column ? (sortConfig.direction === 'asc' ? ' ASC' : ' DESC') : ''}
                                   </button>
                                 </label>
-                                {!systemColumns.includes(column) && (
+                                {manageableColumnKeys.has(column) && (
                                   <button type="button" className="shrink-0 text-slate-400 hover:text-danger" onClick={() => deleteGridColumn(column)} title="Delete column">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -986,30 +1180,92 @@ const DataBankPage = () => {
                           </button>
                         </div>
                       </td>
-                      {exportColumns.map((column, columnIndex) => (
-                        <td
-                          key={`${row._id}-${column}`}
-                          className={`max-w-72 border-b border-r border-slate-100 px-3 py-2 text-slate-700 ${columnIndex === 0 ? 'sticky left-16 z-10 bg-white font-semibold text-slate-900' : ''}`}
-                          title={String(row[column] ?? '')}
-                          onDoubleClick={() => startEditCell(row, column)}
-                        >
-                          {editingCell?.rollNumber === row.RollNumber && editingCell?.column === column ? (
-                            <input
-                              autoFocus
-                              className="w-full rounded border border-primary-200 px-2 py-1 text-xs"
-                              value={editingValue}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onBlur={saveEditingCell}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveEditingCell();
-                                if (e.key === 'Escape') setEditingCell(null);
-                              }}
-                            />
-                          ) : (
-                            <span className="block truncate">{String(row[column] ?? '')}</span>
-                          )}
-                        </td>
-                      ))}
+                      {exportColumns.map((column, columnIndex) => {
+                        const isSelected = selectedCell?.rollNumber === row.RollNumber && selectedCell?.column === column;
+                        const isEditing = editingCell?.rollNumber === row.RollNumber && editingCell?.column === column;
+                        const isInFillRange = fillRange?.column === column
+                          && rowIndex >= Math.min(fillRange.sourceIndex, fillRange.targetIndex)
+                          && rowIndex <= Math.max(fillRange.sourceIndex, fillRange.targetIndex);
+                        return (
+                          <td
+                            key={`${row._id}-${column}`}
+                            tabIndex={column === 'RollNumber' ? -1 : 0}
+                            className={`relative max-w-72 border-b border-r px-3 py-2 text-slate-700 outline-none ${
+                              columnIndex === 0 ? 'sticky left-16 z-10 bg-white font-semibold text-slate-900' : ''
+                            } ${
+                              isSelected ? 'border-primary bg-primary-50 ring-2 ring-inset ring-primary' : 'border-slate-100'
+                            } ${
+                              isInFillRange && !isSelected ? 'bg-primary-50/70 ring-1 ring-inset ring-primary-200' : ''
+                            }`}
+                            title={String(row[column] ?? '')}
+                            onClick={() => {
+                              if (column !== 'RollNumber') setSelectedCell({ rollNumber: row.RollNumber, column });
+                            }}
+                            onDoubleClick={() => startEditCell(row, column)}
+                            onMouseEnter={() => {
+                              const drag = fillDragRef.current;
+                              if (!drag || drag.column !== column) return;
+                              drag.targetIndex = rowIndex;
+                              setFillRange({
+                                column,
+                                sourceIndex: drag.sourceIndex,
+                                targetIndex: rowIndex,
+                              });
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && !isEditing && column !== 'RollNumber') {
+                                event.preventDefault();
+                                startEditCell(row, column);
+                              }
+                            }}
+                          >
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                className="w-full rounded border border-primary-200 px-2 py-1 text-xs"
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                onBlur={() => saveEditingCell()}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    saveEditingCell({ moveDown: true });
+                                  }
+                                  if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    setEditingCell(null);
+                                    setEditingValue('');
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span className="block truncate">{String(row[column] ?? '')}</span>
+                            )}
+                            {isSelected && !isEditing && column !== 'RollNumber' && String(row[column] ?? '') !== '' && (
+                              <button
+                                type="button"
+                                className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair border border-white bg-primary shadow-sm"
+                                title="Drag to fill cells"
+                                aria-label={`Fill ${column} cells`}
+                                onMouseDown={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const source = row.__fieldSources?.[column];
+                                  fillDragRef.current = {
+                                    sourceIndex: rowIndex,
+                                    targetIndex: rowIndex,
+                                    column,
+                                    fieldKey: source?.fieldKey || column,
+                                    datasetType: source?.datasetType || scope.datasetType || 'CUSTOM',
+                                    value: row[column] ?? '',
+                                  };
+                                  setFillRange({ column, sourceIndex: rowIndex, targetIndex: rowIndex });
+                                }}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

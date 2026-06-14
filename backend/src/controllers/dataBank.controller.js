@@ -116,39 +116,13 @@ exports.getDatasets = async (req, res) => {
 exports.exportPreview = async (req, res) => {
   try {
     const selectedColumns = parseJsonField(req.body.selectedColumns, []);
-    const selectedRollNumbers = parseJsonField(req.body.selectedRollNumbers, []);
+    const selectedRollNumbers = Object.prototype.hasOwnProperty.call(req.body, 'selectedRollNumbers')
+      ? parseJsonField(req.body.selectedRollNumbers, [])
+      : null;
     const datasets = await dataBankService.listDatasets({ filters: req.body.filters || {}, user: req.user });
-    const columns = selectedColumns.length ? selectedColumns : ['RollNumber', 'FullName', 'Email', 'Major'];
-    if (!columns.includes('RollNumber')) columns.unshift('RollNumber');
-    const rowMap = new Map();
-    for (const dataset of datasets) {
-      const rollNumber = dataset.rollNumber;
-      if (!rowMap.has(rollNumber)) {
-        rowMap.set(rollNumber, {
-          RollNumber: rollNumber,
-          FullName: dataset.studentId?.fullName || '',
-          Email: dataset.studentId?.email || '',
-          Major: dataset.studentId?.major || '',
-        });
-      }
-      const row = rowMap.get(rollNumber);
-      for (const col of columns) {
-        if (['RollNumber', 'FullName', 'Email', 'Major'].includes(col)) continue;
-        if ((row[col] === undefined || row[col] === '') && dataset.dynamicFields?.get?.(col) !== undefined) {
-          row[col] = dataset.dynamicFields.get(col);
-        }
-      }
-    }
-    let rows = [...rowMap.values()];
-    if (selectedRollNumbers.length) {
-      const selectedSet = new Set(selectedRollNumbers);
-      const order = new Map(selectedRollNumbers.map((rollNumber, index) => [rollNumber, index]));
-      rows = rows
-        .filter((row) => selectedSet.has(row.RollNumber))
-        .sort((a, b) => (order.get(a.RollNumber) ?? 0) - (order.get(b.RollNumber) ?? 0));
-    }
+    const rows = dataBankService.buildExportRows(datasets, selectedColumns, selectedRollNumbers);
     const previewRows = rows.slice(0, 50);
-    return successResponse(res, { rows: previewRows, total: rowMap.size });
+    return successResponse(res, { rows: previewRows, total: rows.length });
   } catch (err) {
     return handleError(res, err, 'Export preview failed');
   }
@@ -157,7 +131,9 @@ exports.exportPreview = async (req, res) => {
 exports.downloadExport = async (req, res) => {
   try {
     const selectedColumns = parseJsonField(req.body.selectedColumns, []);
-    const selectedRollNumbers = parseJsonField(req.body.selectedRollNumbers, []);
+    const selectedRollNumbers = Object.prototype.hasOwnProperty.call(req.body, 'selectedRollNumbers')
+      ? parseJsonField(req.body.selectedRollNumbers, [])
+      : null;
     const headerAliases = parseJsonField(req.body.headerAliases, {});
     const { workbook } = await dataBankService.exportWorkbook({
       filters: req.body.filters || {},
@@ -200,9 +176,14 @@ exports.rollbackBatch = async (req, res) => {
 
 exports.getFieldHistory = async (req, res) => {
   try {
+    const classId = String(req.query.classId || '').trim();
+    if (!classId) return errorResponse(res, 'classId is required', 400);
+    await dataBankService.assertClassAccess(classId, req.user);
     const query = { rollNumber: String(req.query.rollNumber || '').trim().toUpperCase() };
     if (!query.rollNumber) return errorResponse(res, 'rollNumber is required', 400);
     if (req.query.fieldKey) query.fieldKey = req.query.fieldKey;
+    const batchIds = await dataBankService.getBatchIdsForClass(classId);
+    query.importBatch = { $in: batchIds };
     const history = await DataBankFieldHistory.find(query)
       .populate('importBatch', 'fileName status committedAt')
       .populate('importedBy', 'name email')
@@ -287,6 +268,15 @@ exports.editGridCell = async (req, res) => {
     return successResponse(res, result, 'Cell updated');
   } catch (err) {
     return handleError(res, err, 'Cell update failed');
+  }
+};
+
+exports.editGridCellsBulk = async (req, res) => {
+  try {
+    const result = await dataBankService.editManualCellsBulk({ ...req.body, user: req.user });
+    return successResponse(res, result, 'Cells updated');
+  } catch (err) {
+    return handleError(res, err, 'Bulk cell update failed');
   }
 };
 

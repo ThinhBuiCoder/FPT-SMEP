@@ -22,6 +22,7 @@ router.delete('/grid/columns', ctrl.deleteGridColumn);
 router.post('/grid/rows', ctrl.addGridRow);
 router.delete('/grid/rows', ctrl.deleteGridRow);
 router.patch('/grid/cells', ctrl.editGridCell);
+router.patch('/grid/cells/bulk', ctrl.editGridCellsBulk);
 router.delete('/grid/cells', ctrl.clearGridCell);
 router.get('/imports/history', ctrl.getHistory);
 router.post('/imports/:batchId/rollback', ctrl.rollbackBatch);
