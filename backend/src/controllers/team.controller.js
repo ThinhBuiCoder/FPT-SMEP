@@ -19,10 +19,13 @@ const validateName = (value, label) => {
   return { value: clean, error: null };
 };
 
-const validateDescription = (value) => {
+const validateDescription = (value, { required = false } = {}) => {
   const clean = normalizeText(value);
+  if (required && !clean) {
+    return { value: clean, error: 'Project description is required' };
+  }
   if (clean && (clean.length < 20 || clean.length > 500)) {
-    return { value: clean, error: 'Description must be 20-500 characters when provided' };
+    return { value: clean, error: 'Project description must be 20-500 characters' };
   }
   return { value: clean, error: null };
 };
@@ -143,11 +146,13 @@ exports.createStudentProposal = async (req, res) => {
   const groupValidation = validateName(groupName, 'Group name');
   if (groupValidation.error) return errorResponse(res, groupValidation.error, 400);
 
-  const finalProjectNameRaw = isProjectNameSameAsGroup ? groupValidation.value : projectName;
-  const projectValidation = validateName(finalProjectNameRaw, 'Project name');
+  const finalProjectName = isProjectNameSameAsGroup === true
+    ? groupValidation.value
+    : projectName;
+  const projectValidation = validateName(finalProjectName, 'Project name');
   if (projectValidation.error) return errorResponse(res, projectValidation.error, 400);
 
-  const descriptionValidation = validateDescription(description);
+  const descriptionValidation = validateDescription(description, { required: true });
   if (descriptionValidation.error) return errorResponse(res, descriptionValidation.error, 400);
 
   // Load class
@@ -352,9 +357,26 @@ exports.getTeamsByClass = async (req, res) => {
 
 // ─── PUT /api/teams/:teamId/review ───────────────────────────────────────────
 exports.reviewTeamProposal = async (req, res) => {
-  const { status, rejectReason, newMemberIds } = req.body;
+  const {
+    status,
+    rejectReason,
+    newMemberIds,
+    groupName,
+    projectName,
+    description,
+  } = req.body;
   if (!['APPROVED', 'REJECTED', 'NEEDS_REVISION'].includes(status)) {
     return errorResponse(res, 'Invalid status', 400);
+  }
+  const reviewNote = normalizeText(rejectReason);
+  if (['REJECTED', 'NEEDS_REVISION'].includes(status) && !reviewNote) {
+    return errorResponse(
+      res,
+      status === 'REJECTED'
+        ? 'Rejection reason is required'
+        : 'Revision request is required',
+      400
+    );
   }
 
   const session = await mongoose.startSession();
@@ -383,12 +405,45 @@ exports.reviewTeamProposal = async (req, res) => {
       return errorResponse(res, 'Team is not pending review', 400);
     }
 
+    const groupValidation = validateName(groupName ?? team.groupName, 'Group name');
+    if (groupValidation.error) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, groupValidation.error, 400);
+    }
+    const projectValidation = validateName(projectName ?? team.projectName, 'Project name');
+    if (projectValidation.error) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, projectValidation.error, 400);
+    }
+    const descriptionValidation = validateDescription(
+      description ?? team.description,
+      { required: true }
+    );
+    if (descriptionValidation.error) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, descriptionValidation.error, 400);
+    }
+
+    const conflictingGroup = await Team.findOne({
+      _id: { $ne: team._id },
+      classId: team.classId,
+      groupName: groupValidation.value,
+      status: { $ne: 'REJECTED' }
+    }).session(session);
+    if (conflictingGroup) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, 'Group name is already taken in this class', 400);
+    }
+
     const notificationStudentIds = new Set(team.members.map(m => m.studentId.toString()));
 
+    team.groupName = groupValidation.value;
+    team.projectName = projectValidation.value;
+    team.description = descriptionValidation.value;
     team.status = status;
     team.reviewedBy = req.user._id;
     team.reviewedAt = new Date();
-    team.rejectReason = rejectReason || null;
+    team.rejectReason = reviewNote || null;
 
     if (status === 'REJECTED') {
       // Unassign students
@@ -481,10 +536,24 @@ exports.reviewTeamProposal = async (req, res) => {
         .filter(r => r.email);
 
       if (recipients.length > 0) {
+        const statusCopy = {
+          APPROVED: {
+            title: 'Đề xuất nhóm được chấp nhận',
+            action: 'được chấp nhận',
+          },
+          NEEDS_REVISION: {
+            title: 'Đề xuất nhóm cần chỉnh sửa',
+            action: 'được yêu cầu chỉnh sửa',
+          },
+          REJECTED: {
+            title: 'Đề xuất nhóm bị từ chối',
+            action: 'bị từ chối',
+          },
+        }[status];
         const payload = {
           type: 'TEAM',
-          title: `Đề xuất nhóm ${status === 'APPROVED' ? 'Được chấp nhận' : 'Bị từ chối'}`,
-          message: `Đề xuất cho nhóm "${team.teamName}" - Project: "${team.projectName}" của bạn đã ${status === 'APPROVED' ? 'được chấp nhận' : 'bị từ chối'}. ${rejectReason ? 'Lý do: ' + rejectReason : ''}`,
+          title: statusCopy.title,
+          message: `Đề xuất cho nhóm "${team.groupName}" - Project: "${team.projectName}" đã ${statusCopy.action}.${reviewNote ? ` Phản hồi: ${reviewNote}` : ''}`,
           link: `/student/classes/${team.classId}`,
           data: { teamId: team._id, classId: team.classId, status },
           createdBy: req.user._id

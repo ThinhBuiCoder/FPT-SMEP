@@ -295,6 +295,8 @@ export default function StudentTable({
                         team ? (
                           team.status === 'PENDING' ? (
                             <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700 rounded-full">Pending</span>
+                          ) : team.status === 'NEEDS_REVISION' ? (
+                            <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 rounded-full">Needs revision</span>
                           ) : team.status === 'REJECTED' ? (
                             <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full">Rejected</span>
                           ) : (

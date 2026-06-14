@@ -104,7 +104,7 @@ const getMyChatGroups = async (req, res) => {
       groups.map(async (group) => {
         const lastMsg = await Message.findOne({ chatGroupId: group._id })
           .sort({ createdAt: -1 })
-          .select('text senderName createdAt');
+          .select('text senderName createdAt messageType sticker');
         
         return {
           _id: group._id,
@@ -243,6 +243,13 @@ const uploadChatFile = (req, res) => {
       }, 'File uploaded successfully.');
     } catch (uploadErr) {
       console.error('Cloudinary upload error:', uploadErr);
+      if (uploadErr.code === 'CLOUDINARY_NOT_CONFIGURED') {
+        return errorResponse(
+          res,
+          'File storage is not configured on the server. Please contact the administrator.',
+          503
+        );
+      }
       return errorResponse(res, 'Cloudinary upload failed.', 500);
     }
   });

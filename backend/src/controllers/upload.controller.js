@@ -18,6 +18,13 @@ const uploadFile = async (req, res) => {
     }, 'File uploaded successfully', 201);
   } catch (error) {
     console.error('Upload Error:', error);
+    if (error.code === 'CLOUDINARY_NOT_CONFIGURED') {
+      return errorResponse(
+        res,
+        'File storage is not configured on the server. Please contact the administrator.',
+        503
+      );
+    }
     return errorResponse(res, 'File upload failed', 500);
   }
 };

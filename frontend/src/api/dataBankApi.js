@@ -43,6 +43,7 @@ export const dataBankApi = {
   addGridRow: (payload) => axiosClient.post('/data-bank/grid/rows', payload),
   deleteGridRow: (payload) => axiosClient.delete('/data-bank/grid/rows', { data: payload }),
   editGridCell: (payload) => axiosClient.patch('/data-bank/grid/cells', payload),
+  editGridCellsBulk: (payload) => axiosClient.patch('/data-bank/grid/cells/bulk', payload),
   clearGridCell: (payload) => axiosClient.delete('/data-bank/grid/cells', { data: payload }),
   getHistory: (params) => axiosClient.get('/data-bank/imports/history', { params }),
   rollback: (batchId, payload = {}) => axiosClient.post(`/data-bank/imports/${batchId}/rollback`, payload),

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const dataBankImportBatchSchema = new mongoose.Schema(
   {
     fileName: { type: String, required: true, trim: true },
+    fileChecksum: { type: String, default: null, trim: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
     sheetName: { type: String, default: null, trim: true },

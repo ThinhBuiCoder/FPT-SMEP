@@ -8,8 +8,10 @@ const connectDB = require('./config/db');
 const app = require('./app');
 const Message = require('./models/Message');
 const User = require('./models/User');
+const ChatGroup = require('./models/ChatGroup');
 
 const PORT = process.env.PORT || 5000;
+const MESSAGE_REACTIONS = new Set(['👍', '❤️', '😂', '😮', '😢', '👏']);
 
 // Create HTTP server wrapping express app
 const server = http.createServer(app);
@@ -137,6 +139,7 @@ io.on('connection', (socket) => {
       message.text = '';
       message.attachment = null;
       message.sticker = null;
+      message.reactions = [];
       message.isRevoked = true;
       message.revokedAt = new Date();
       await message.save();
@@ -146,6 +149,52 @@ io.on('connection', (socket) => {
       io.to(message.chatGroupId.toString()).emit('message_revoked', populated);
     } catch (err) {
       console.error('Error handling revoke_message socket event:', err.message);
+    }
+  });
+
+  socket.on('react_message', async (data) => {
+    try {
+      const { messageId, userId, emoji } = data;
+      if (!messageId || !userId || !MESSAGE_REACTIONS.has(emoji)) return;
+
+      const [message, reactingUser] = await Promise.all([
+        Message.findById(messageId),
+        User.findById(userId).select('name role'),
+      ]);
+      if (!message || message.isRevoked || !reactingUser) return;
+
+      const group = await ChatGroup.findById(message.chatGroupId).select('members');
+      if (!group) return;
+      const isMember = reactingUser.role === 'ADMIN' || group.members.some(
+        (member) => member.userId?.toString() === userId.toString()
+      );
+      if (!isMember) return;
+
+      const existingIndex = message.reactions.findIndex(
+        (reaction) => reaction.userId.toString() === userId.toString()
+      );
+
+      if (existingIndex >= 0 && message.reactions[existingIndex].emoji === emoji) {
+        message.reactions.splice(existingIndex, 1);
+      } else if (existingIndex >= 0) {
+        message.reactions[existingIndex].emoji = emoji;
+        message.reactions[existingIndex].userName = reactingUser.name || '';
+      } else {
+        message.reactions.push({
+          userId,
+          emoji,
+          userName: reactingUser.name || '',
+        });
+      }
+
+      await message.save();
+      const populated = await Message.findById(message._id)
+        .populate('senderId', 'name email avatar')
+        .populate('reactions.userId', 'name avatar');
+
+      io.to(message.chatGroupId.toString()).emit('message_reaction_updated', populated);
+    } catch (err) {
+      console.error('Error handling react_message socket event:', err.message);
     }
   });
 

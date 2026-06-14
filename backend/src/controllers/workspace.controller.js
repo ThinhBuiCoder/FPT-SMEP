@@ -582,6 +582,13 @@ exports.uploadPitchDeck = (req, res) => {
       if (dbErr.statusCode === 403) {
         return errorResponse(res, dbErr.message, 403);
       }
+      if (dbErr.code === 'CLOUDINARY_NOT_CONFIGURED') {
+        return errorResponse(
+          res,
+          'File storage is not configured on the server. Please contact the administrator.',
+          503
+        );
+      }
       return errorResponse(res, "Upload/Database error: " + dbErr.message);
     }
   });

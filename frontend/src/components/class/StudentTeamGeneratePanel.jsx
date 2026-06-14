@@ -6,23 +6,49 @@ import { getTeamGroupFromMajor } from '../../constants/majors';
 
 const getTeamSizeSuggestion = (count) => {
   if (count === 0) return '';
-  if (count < 4) return 'Số lượng sinh viên chưa có nhóm dưới 4. Nhóm 3 thành viên cần gửi đề xuất ngoại lệ.';
+  if (count === 1 || count === 2) {
+    return `Còn ${count} sinh viên, chưa đủ để tạo nhóm. Cần điều chỉnh thành viên từ các nhóm khác.`;
+  }
+  if (count === 3) {
+    return 'Còn 3 sinh viên. Có thể gửi đề xuất nhóm ngoại lệ để giảng viên duyệt.';
+  }
+  if (count === 7) {
+    return 'Không thể chia đều thành nhóm 4-6 người. Có thể điều chỉnh thành nhóm 4 và bổ sung 3 sinh viên vào các nhóm khác, hoặc gửi đề xuất ngoại lệ.';
+  }
 
-  const search = (remaining, groups = []) => {
-    if (remaining === 0) return groups;
-    if (remaining < 0) return null;
-    for (const size of [5, 4, 6]) {
-      const found = search(remaining - size, [...groups, size]);
-      if (found) return found;
+  const candidates = [];
+  for (let sixes = 0; sixes <= Math.floor(count / 6); sixes += 1) {
+    for (let fives = 0; fives <= Math.floor(count / 5); fives += 1) {
+      const remainder = count - (sixes * 6) - (fives * 5);
+      if (remainder < 0 || remainder % 4 !== 0) continue;
+      const fours = remainder / 4;
+      candidates.push({
+        sixes,
+        fives,
+        fours,
+        groupCount: sixes + fives + fours,
+      });
     }
-    return null;
-  };
+  }
 
-  const sizes = search(count);
-  if (!sizes) return 'Có thể chia nhóm 4-6 thành viên. Trường hợp dư đặc biệt cần gửi đề xuất ngoại lệ.';
+  candidates.sort((a, b) =>
+    a.groupCount - b.groupCount
+    || b.sixes - a.sixes
+    || b.fives - a.fives
+  );
 
-  const summary = sizes.reduce((acc, size) => ({ ...acc, [size]: (acc[size] || 0) + 1 }), {});
-  return `Gợi ý: ${Object.entries(summary).map(([size, qty]) => `${qty} nhóm x ${size} sinh viên`).join(', ')}.`;
+  const best = candidates[0];
+  if (!best) {
+    return 'Không thể chia đều thành nhóm 4-6 người. Cần điều chỉnh thành viên giữa các nhóm.';
+  }
+
+  const summary = [
+    best.sixes && `${best.sixes} nhóm x 6 sinh viên`,
+    best.fives && `${best.fives} nhóm x 5 sinh viên`,
+    best.fours && `${best.fours} nhóm x 4 sinh viên`,
+  ].filter(Boolean);
+
+  return `Gợi ý: ${summary.join(', ')}. Mỗi nhóm vẫn cần có đủ 2 nhóm chuyên ngành.`;
 };
 
 export default function StudentTeamGeneratePanel({ classId, selected: rawSelected, students: rawStudents, onTeamCreated, currentStudentId }) {
@@ -88,8 +114,10 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
 
     // Form validation
     const isGroupNameValid = groupName.trim().length >= 3 && groupName.trim().length <= 60;
-    const isProjectNameValid = isProjectNameSameAsGroup || (projectName.trim().length >= 3 && projectName.trim().length <= 60);
-    const isDescriptionValid = !description.trim() || (description.trim().length >= 20 && description.trim().length <= 500);
+    const isProjectNameValid = isProjectNameSameAsGroup
+      ? isGroupNameValid
+      : projectName.trim().length >= 3 && projectName.trim().length <= 60;
+    const isDescriptionValid = description.trim().length >= 20 && description.trim().length <= 500;
     const hasCurrentUser = selected.includes(currentStudentId);
 
     const isFormValid = isGroupNameValid && isProjectNameValid && isDescriptionValid && hasCurrentUser;
@@ -116,6 +144,11 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
   } = validation;
 
   const handleSubmit = async () => {
+    if (!isFormValid) {
+      toast.error('Vui lòng nhập đầy đủ tên nhóm, tên dự án và mô tả dự án hợp lệ.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -123,7 +156,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
         groupName: groupName.trim(),
         projectName: isProjectNameSameAsGroup ? groupName.trim() : projectName.trim(),
         description: description.trim(),
-        isProjectNameSameAsGroup
+        isProjectNameSameAsGroup,
       };
       
       const res = await classApi.studentProposeTeam(classId, payload);
@@ -169,9 +202,11 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
               onChange={e => setGroupName(e.target.value)}
               placeholder="VD: Nhóm 1, Alpha Team..."
               className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              required
+              minLength={3}
               maxLength={60}
             />
-            {groupName.trim() && groupName.trim().length < 3 && (
+            {groupName.length > 0 && groupName.trim().length < 3 && (
               <p className="text-xs text-red-500 mt-1">Tên nhóm phải từ 3-60 ký tự</p>
             )}
           </div>
@@ -186,18 +221,23 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
               />
               Dùng Tên Nhóm làm Tên Dự Án (Project Name)
             </label>
-            
+
             {!isProjectNameSameAsGroup && (
               <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Tên Dự Án <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={projectName}
                   onChange={e => setProjectName(e.target.value)}
                   placeholder="Nhập tên dự án..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                  required
+                  minLength={3}
                   maxLength={60}
                 />
-                {projectName.trim() && projectName.trim().length < 3 && (
+                {projectName.length > 0 && projectName.trim().length < 3 && (
                   <p className="text-xs text-red-500 mt-1">Tên dự án phải từ 3-60 ký tự</p>
                 )}
               </div>
@@ -206,18 +246,25 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Mô tả dự án (Tùy chọn)
+              Mô tả dự án <span className="text-red-500">*</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Mô tả ngắn về ý tưởng dự án..."
               className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none h-20"
+              required
+              minLength={20}
               maxLength={500}
             />
-            {description.trim() && description.trim().length < 20 && (
-              <p className="text-xs text-red-500 mt-1">Mô tả cần ít nhất 20 ký tự (nếu có)</p>
-            )}
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <span>
+                {description.length > 0 && description.trim().length < 20 && (
+                  <span className="text-xs text-red-500">Mô tả phải từ 20-500 ký tự</span>
+                )}
+              </span>
+              <span className="text-xs text-slate-400">{description.length}/500</span>
+            </div>
           </div>
         </div>
 

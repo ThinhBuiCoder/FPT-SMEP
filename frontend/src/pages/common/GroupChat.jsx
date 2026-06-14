@@ -6,7 +6,8 @@ import { chatApi } from '../../api/chatApi';
 import {
   MessageSquare, Send, Users, Shield, GraduationCap, Star,
   Search, Loader2, Clock, User, Paperclip, Pencil, X,
-  ChevronRight, BadgeCheck, Menu, Smile, RotateCcw, Check
+  ChevronRight, BadgeCheck, Menu, Smile, RotateCcw, Check,
+  ThumbsUp, PartyPopper, Lightbulb, Heart, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -20,7 +21,56 @@ const roleConfig = {
 };
 
 const normalizeRole = (r = '') => r.toUpperCase();
-const STICKERS = ['👍', '👏', '🔥', '💡', '✅', '🎉', '🚀', '🙌'];
+const getEntityId = (entity) => {
+  if (!entity) return '';
+  if (typeof entity === 'object') {
+    return (entity._id || entity.id || '').toString();
+  }
+  return entity.toString();
+};
+const isEmojiOnly = (text = '') => {
+  const value = text.trim();
+  return Boolean(value) && /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D|\s)+$/u.test(value);
+};
+const STICKER_CATEGORIES = [
+  {
+    key: 'popular',
+    label: 'Popular',
+    icon: Sparkles,
+    stickers: ['👍', '❤️', '😂', '😮', '😢', '😡', '👏', '🔥', '🎉', '✅', '🚀', '💯'],
+  },
+  {
+    key: 'faces',
+    label: 'Faces',
+    icon: Smile,
+    stickers: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😎', '🤩', '🥳', '😭', '😤', '🤔', '🫡', '😴'],
+  },
+  {
+    key: 'reactions',
+    label: 'Reactions',
+    icon: ThumbsUp,
+    stickers: ['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👏', '🙌', '🫶', '💪', '🙏', '☝️', '👀', '💯', '✅', '❌'],
+  },
+  {
+    key: 'celebrate',
+    label: 'Celebrate',
+    icon: PartyPopper,
+    stickers: ['🎉', '🎊', '🥳', '🎂', '🎁', '🏆', '🥇', '⭐', '🌟', '✨', '🔥', '🚀', '🎈', '🍾', '🕺', '💃'],
+  },
+  {
+    key: 'work',
+    label: 'Work',
+    icon: Lightbulb,
+    stickers: ['💡', '📌', '📣', '📝', '📊', '📈', '📉', '🎯', '🧠', '🔍', '⚡', '✅', '⏰', '📅', '💻', '🛠️', '📚', '✍️'],
+  },
+  {
+    key: 'love',
+    label: 'Love',
+    icon: Heart,
+    stickers: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💖', '💗', '💓', '💞', '💕', '💌', '🫶', '😍', '🥰'],
+  },
+];
+const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '👏'];
 
 const roleBadge = (role) => {
   const cfg = roleConfig[normalizeRole(role)] || roleConfig.STUDENT;
@@ -29,6 +79,73 @@ const roleBadge = (role) => {
       {cfg.icon}{cfg.label}
     </span>
   );
+};
+
+function StickerPicker({ activeCategory, onCategoryChange, onSelect }) {
+  const category = STICKER_CATEGORIES.find((item) => item.key === activeCategory)
+    || STICKER_CATEGORIES[0];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="flex items-center border-b border-slate-100 bg-slate-50/80 px-1">
+        {STICKER_CATEGORIES.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onCategoryChange(key)}
+            title={label}
+            aria-label={label}
+            aria-pressed={activeCategory === key}
+            className={`flex h-10 flex-1 items-center justify-center border-b-2 transition-colors ${
+              activeCategory === key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:bg-white hover:text-slate-700'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+          </button>
+        ))}
+      </div>
+
+      <div className="max-h-48 overflow-y-auto p-2">
+        <div className="grid grid-cols-6 gap-1 sm:grid-cols-8">
+          {category.stickers.map((emoji, index) => (
+            <button
+              key={`${category.key}-${emoji}-${index}`}
+              type="button"
+              onClick={() => onSelect({ emoji, label: category.label })}
+              className="flex aspect-square min-h-10 items-center justify-center rounded-lg text-2xl transition-transform hover:bg-slate-100 hover:scale-110 active:scale-95"
+              aria-label={`${category.label} sticker ${index + 1}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const groupReactions = (reactions = [], currentUserId = '') => {
+  const grouped = new Map();
+
+  reactions.forEach((reaction) => {
+    if (!reaction?.emoji) return;
+    const userId = (reaction.userId?._id || reaction.userId || '').toString();
+    const userName = reaction.userId?.name || reaction.userName || 'Member';
+    const current = grouped.get(reaction.emoji) || {
+      emoji: reaction.emoji,
+      count: 0,
+      reactedByMe: false,
+      names: [],
+    };
+    current.count += 1;
+    current.reactedByMe = current.reactedByMe || userId === currentUserId;
+    current.names.push(userName);
+    grouped.set(reaction.emoji, current);
+  });
+
+  return [...grouped.values()];
 };
 
 // ─── Avatar fallback ─────────────────────────────────────────────────────────
@@ -247,6 +364,8 @@ export default function GroupChat() {
   const [channelMembers, setChannelMembers] = useState([]);
   const [editingMessage, setEditingMessage] = useState(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [activeStickerCategory, setActiveStickerCategory] = useState('popular');
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading]       = useState(false);
@@ -256,7 +375,7 @@ export default function GroupChat() {
   const fileInputRef     = useRef(null);
   const selectedChannelRef = useRef(null); // track current channel for reconnect
   const currentUserId = user?._id || user?.id;
-  const currentUserIdString = (currentUserId || '').toString();
+  const currentUserIdString = getEntityId(currentUserId);
 
   function scrollToBottom() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -290,6 +409,10 @@ export default function GroupChat() {
     });
 
     socket.on('message_revoked', (msg) => {
+      setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
+    });
+
+    socket.on('message_reaction_updated', (msg) => {
       setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
     });
 
@@ -327,6 +450,8 @@ export default function GroupChat() {
       setChannelMembers([]);
       setEditingMessage(null);
       setShowStickerPicker(false);
+      setActiveStickerCategory('popular');
+      setReactionPickerMessageId(null);
       try {
         socketRef.current.emit('leave_room', selectedChannel._id);
         // Only join if socket is already connected; connect handler handles the rest
@@ -463,7 +588,7 @@ export default function GroupChat() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSendSticker = (emoji) => {
+  const handleSendSticker = ({ emoji, label }) => {
     if (!selectedChannel || !socketRef.current?.connected || !currentUserIdString) return;
 
     const validRoles = ['ADMIN', 'LECTURER', 'STUDENT', 'MENTOR'];
@@ -476,7 +601,7 @@ export default function GroupChat() {
       senderId: currentUserId,
       senderName: myNickname || user?.name || 'Anonymous',
       senderRole,
-      sticker: { emoji, label: 'sticker' },
+      sticker: { emoji, label: label || 'Sticker' },
     });
     setShowStickerPicker(false);
   };
@@ -494,6 +619,16 @@ export default function GroupChat() {
       messageId: message._id,
       senderId: currentUserId,
     });
+  };
+
+  const handleReactMessage = (messageId, emoji) => {
+    if (!socketRef.current?.connected || !currentUserIdString) return;
+    socketRef.current.emit('react_message', {
+      messageId,
+      userId: currentUserId,
+      emoji,
+    });
+    setReactionPickerMessageId(null);
   };
 
   const filteredChannels = channels.filter(c =>
@@ -561,7 +696,9 @@ export default function GroupChat() {
           ) : (
             filteredChannels.map((c) => {
               const isSelected = selectedChannel?._id === c._id;
-              const lastMsgText = c.lastMessage?.text || 'No messages yet';
+              const lastMsgText = c.lastMessage?.messageType === 'STICKER'
+                ? `${c.lastMessage?.sticker?.emoji || 'Sticker'} Sticker`
+                : c.lastMessage?.text || 'No messages yet';
               const lastMsgSender = c.lastMessage?.senderName ? `${c.lastMessage.senderName}: ` : '';
 
               return (
@@ -663,40 +800,73 @@ export default function GroupChat() {
                   </div>
                 ) : (
                   messages.map((m, index) => {
-                    const isMine = (m.senderId?._id || m.senderId || '').toString() === currentUserIdString;
-                    const senderAvatar = m.senderId?.avatar;
+                    const senderId = getEntityId(m.senderId);
+                    const isMine = Boolean(
+                      currentUserIdString && senderId === currentUserIdString
+                    );
+                    const senderAvatar = typeof m.senderId === 'object'
+                      ? m.senderId?.avatar
+                      : null;
                     const formattedTime = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     // Ưu tiên nickname từ map; fallback về senderName đã lưu
-                    const senderId = (m.senderId?._id || m.senderId || '').toString();
                     const resolvedName = (senderId && nicknameMap[senderId]) || m.senderName;
                     const hasNickname  = senderId && !!nicknameMap[senderId];
                     const canManageMessage = isMine && !m.isRevoked;
+                    const isStickerMessage = !m.isRevoked
+                      && m.messageType === 'STICKER'
+                      && Boolean(m.sticker?.emoji);
+                    const isEmojiOnlyMessage = !m.isRevoked && isEmojiOnly(m.text);
+                    const reactionGroups = groupReactions(m.reactions, currentUserIdString);
 
                     return (
                       <div
                         key={m._id || index}
-                        className={`flex max-w-[92%] gap-2 sm:max-w-[80%] sm:gap-3 ${isMine ? 'ml-auto flex-row-reverse' : ''}`}
+                        className={`flex w-full items-start gap-2 sm:gap-3 ${
+                          isMine ? 'justify-end' : 'justify-start'
+                        }`}
                       >
                         {/* Avatar */}
-                        {senderAvatar ? (
-                          <img src={senderAvatar} alt={resolvedName} className="h-7 w-7 shrink-0 rounded-full border border-slate-100 object-cover sm:h-8 sm:w-8" />
-                        ) : (
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-gradient-to-br from-slate-300 to-slate-400 sm:h-8 sm:w-8">
-                            <User className="h-3.5 w-3.5 text-white sm:h-4 sm:w-4" />
-                          </div>
+                        {!isMine && (
+                          senderAvatar ? (
+                            <img src={senderAvatar} alt={resolvedName} className="h-7 w-7 shrink-0 rounded-full border border-slate-100 object-cover sm:h-8 sm:w-8" />
+                          ) : (
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-gradient-to-br from-slate-300 to-slate-400 sm:h-8 sm:w-8">
+                              <User className="h-3.5 w-3.5 text-white sm:h-4 sm:w-4" />
+                            </div>
+                          )
                         )}
 
                         {/* Bubble */}
-                        <div className="space-y-1">
-                          <div className={`flex items-center gap-1.5 flex-wrap ${isMine ? 'justify-end' : ''}`}>
+                        <div className={`min-w-0 max-w-[92%] space-y-1 sm:max-w-[80%] ${
+                          isStickerMessage ? 'w-fit' : ''
+                        }`}>
+                          <div className={`relative flex items-center gap-1.5 flex-wrap ${isMine ? 'justify-end' : ''}`}>
                             {/* Tên hiển thị: nickname (primary) + tên thật nhỏ bên cạnh */}
-                            <span className={`text-xs font-bold ${hasNickname ? 'text-primary-700' : 'text-slate-800'}`}>
-                              {resolvedName}
-                            </span>
-                            {hasNickname && (
-                              <span className="text-[10px] text-slate-400 font-medium">({m.senderName})</span>
+                            {!isMine && (
+                              <>
+                                <span className={`text-xs font-bold ${hasNickname ? 'text-primary-700' : 'text-slate-800'}`}>
+                                  {resolvedName}
+                                </span>
+                                {hasNickname && (
+                                  <span className="text-[10px] text-slate-400 font-medium">({m.senderName})</span>
+                                )}
+                                {roleBadge(m.senderRole)}
+                              </>
                             )}
-                            {roleBadge(m.senderRole)}
+                            {!m.isRevoked && (
+                              <button
+                                type="button"
+                                onClick={() => setReactionPickerMessageId(
+                                  reactionPickerMessageId === m._id ? null : m._id
+                                )}
+                                className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-amber-500"
+                                title="React to message"
+                                aria-label="React to message"
+                                aria-expanded={reactionPickerMessageId === m._id}
+                              >
+                                <Smile className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             {canManageMessage && (
                               <span className="ml-1 inline-flex overflow-hidden rounded-lg border border-slate-200/60">
                                 {m.text && (
@@ -719,12 +889,36 @@ export default function GroupChat() {
                                 </button>
                               </span>
                             )}
+
+                            {reactionPickerMessageId === m._id && (
+                              <div className={`absolute top-full z-30 mt-1 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl ${
+                                isMine ? 'right-0' : 'left-0'
+                              }`}>
+                                {MESSAGE_REACTIONS.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => handleReactMessage(m._id, emoji)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full text-lg transition-transform hover:scale-125 hover:bg-slate-100"
+                                    aria-label={`React ${emoji}`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
-                          <div className={`rounded-2xl p-2.5 text-sm leading-relaxed break-words sm:p-3 ${
-                            isMine
-                              ? 'bg-primary text-white rounded-tr-none'
-                              : 'bg-white border border-slate-200/60 text-slate-800 rounded-tl-none shadow-3xs'
+                          <div className={`break-words text-sm leading-relaxed ${
+                            isEmojiOnlyMessage ? 'text-center' : ''
+                          } ${
+                            isStickerMessage
+                              ? 'w-fit bg-transparent p-0'
+                              : `rounded-2xl p-2.5 sm:p-3 ${
+                                  isMine
+                                    ? 'rounded-tr-none bg-primary text-white'
+                                    : 'rounded-tl-none border border-slate-200/60 bg-white text-slate-800 shadow-3xs'
+                                }`
                           }`}>
                             {m.isRevoked ? (
                               <p className={`italic ${isMine ? 'text-primary-100' : 'text-slate-400'}`}>
@@ -733,9 +927,18 @@ export default function GroupChat() {
                             ) : (
                               <>
                                 {m.messageType === 'STICKER' && m.sticker?.emoji && (
-                                  <div className="text-4xl leading-none">{m.sticker.emoji}</div>
+                                  <div
+                                    className="inline-flex h-14 min-w-14 items-center justify-center text-[52px] leading-none drop-shadow-sm"
+                                    title={m.sticker.label || 'Sticker'}
+                                  >
+                                    {m.sticker.emoji}
+                                  </div>
                                 )}
-                                {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                                {m.text && (
+                                  <p className={`whitespace-pre-line ${isEmojiOnlyMessage ? 'text-2xl leading-none' : ''}`}>
+                                    {m.text}
+                                  </p>
+                                )}
                               </>
                             )}
 
@@ -767,13 +970,38 @@ export default function GroupChat() {
                               </div>
                             )}
 
-                            <span className={`text-[9px] mt-1.5 block opacity-60 text-right flex items-center justify-end gap-1 ${
-                              isMine ? 'text-primary-100' : 'text-slate-400'
+                            <span className={`flex items-center gap-1 text-[9px] ${
+                              isMine ? 'justify-end text-right' : 'justify-start text-left'
+                            } ${
+                              isStickerMessage ? 'mt-0.5 text-slate-400' : `mt-1.5 opacity-60 ${
+                                isMine ? 'text-primary-100' : 'text-slate-400'
+                              }`
                             }`}>
                               <Clock className="w-2.5 h-2.5" />
                               {formattedTime}{m.isEdited ? ' · edited' : ''}
                             </span>
                           </div>
+
+                          {reactionGroups.length > 0 && (
+                            <div className={`flex flex-wrap gap-1 ${isMine ? 'justify-end' : ''}`}>
+                              {reactionGroups.map((reaction) => (
+                                <button
+                                  key={reaction.emoji}
+                                  type="button"
+                                  onClick={() => handleReactMessage(m._id, reaction.emoji)}
+                                  title={reaction.names.join(', ')}
+                                  className={`inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs transition-colors ${
+                                    reaction.reactedByMe
+                                      ? 'border-primary-200 bg-primary-50 text-primary'
+                                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <span>{reaction.emoji}</span>
+                                  <span className="text-[10px] font-bold">{reaction.count}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -839,18 +1067,11 @@ export default function GroupChat() {
                 </div>
               )}
               {showStickerPicker && (
-                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-                  {STICKERS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => handleSendSticker(emoji)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl hover:bg-slate-100"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+                <StickerPicker
+                  activeCategory={activeStickerCategory}
+                  onCategoryChange={setActiveStickerCategory}
+                  onSelect={handleSendSticker}
+                />
               )}
               {mentionSuggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">

@@ -11,6 +11,7 @@ const dataBankSnapshotSchema = new mongoose.Schema(
       classCode: String,
       datasetType: String,
       rollNumbers: [String],
+      fullScope: { type: Boolean, default: false },
     },
     studentMasters: [{ type: mongoose.Schema.Types.Mixed }],
     academicDatasets: [{ type: mongoose.Schema.Types.Mixed }],
