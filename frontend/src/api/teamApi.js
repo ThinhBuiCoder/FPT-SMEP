@@ -14,6 +14,9 @@ export const teamApi = {
   // ─── Proposal Review (Lecturer/Admin) ────────────────────────────────────
   reviewProposal: (teamId, data) => axiosClient.put(`/teams/${teamId}/review`, data),
 
+  // ─── Member Management (Lecturer/Admin) ──────────────────────────────────
+  updateMembers: (teamId, data) => axiosClient.put(`/teams/${teamId}/members`, data),
+
   // ─── Chat Group ──────────────────────────────────────────────────────────
   getChatGroup: (teamId) => axiosClient.get(`/teams/${teamId}/chat-group`),
 };

@@ -35,10 +35,10 @@ exports.generateTeam = async (req, res) => {
   const { studentIds, mode = 'auto', mentorId } = req.body;
   const { classId } = req.params;
 
-  if (!['auto', 'manual'].includes(mode))
-    return errorResponse(res, 'mode must be "auto" or "manual"', 400);
+  if (!['auto', 'manual', 'exception'].includes(mode))
+    return errorResponse(res, 'mode must be "auto", "manual", or "exception"', 400);
 
-  // 1. Validate students
+  // 1. Validate students — exception mode bypasses size check (allows 3 or 7)
   const { students, error } = await validateTeamStudents(studentIds, classId, mode);
   if (error) return errorResponse(res, error, 400);
 
@@ -69,7 +69,13 @@ exports.generateTeam = async (req, res) => {
   // 4. Generate team code/name
   const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
 
-  // 5. Run inside a transaction for atomicity (Team + ChatGroup)
+  // All lecturer-generated teams start as PENDING and go through review.
+  // Standard teams (4-6 SV) → Lecturer reviews.
+  // Exception teams (3 or 7 SV) → Admin reviews.
+  const isException = mode === 'exception';
+  const initialStatus = 'PENDING';
+
+  // 5. Run inside a transaction for atomicity
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -88,6 +94,7 @@ exports.generateTeam = async (req, res) => {
         lectureId: cls.lectureId || null,
         mentorId: assignedMentorId,
         createdBy: req.user._id,
+        status: initialStatus, // Always PENDING until reviewed
         members: students.map(s => ({ studentId: s._id, roleInTeam: 'Member' })),
       }],
       { session }
@@ -100,16 +107,7 @@ exports.generateTeam = async (req, res) => {
       { session }
     );
 
-    // Auto-create chat group
-    const chatGroup = await createChatGroupForTeam(
-      team._id,
-      { session, createdBy: req.user._id }
-    );
-
-    // Link chat group back to team
-    team.chatGroupId = chatGroup._id;
-    await team.save({ session });
-
+    // Chat group is NOT created until the team is APPROVED via review
     await session.commitTransaction();
     session.endSession();
 
@@ -120,10 +118,53 @@ exports.generateTeam = async (req, res) => {
       { path: 'mentorId', select: 'name email' }
     ]);
 
+    // Send notification to appropriate reviewer
+    try {
+      const { createBulkNotifications } = require('../services/notification.service');
+
+      if (isException) {
+        // Exception → notify Admins
+        const admins = await User.find({ role: 'ADMIN' }).select('email name _id');
+        const recipients = admins.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
+        if (recipients.length > 0) {
+          await createBulkNotifications(recipients, {
+            type: 'TEAM',
+            title: 'Đề xuất nhóm ngoại lệ cần duyệt',
+            message: `Giảng viên đã gửi đề xuất nhóm ngoại lệ (${students.length} thành viên) trong lớp ${cls.classCode} — cần Admin duyệt.`,
+            link: `/classes/${classId}`,
+            data: { teamId: team._id, classId },
+            createdBy: req.user._id,
+          });
+        }
+      } else {
+        // Standard team → notify the Lecturer of this class (or Admins if no lecturer)
+        const reviewerQuery = [];
+        if (cls.lectureId) reviewerQuery.push({ _id: cls.lectureId });
+        else reviewerQuery.push({ role: 'ADMIN' });
+
+        const reviewers = await User.find({ $or: reviewerQuery }).select('email name _id');
+        const recipients = reviewers.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
+        if (recipients.length > 0) {
+          await createBulkNotifications(recipients, {
+            type: 'TEAM',
+            title: 'Có đề xuất nhóm mới cần duyệt',
+            message: `Đề xuất nhóm ${teamName} (${students.length} thành viên) trong lớp ${cls.classCode} đang chờ bạn duyệt.`,
+            link: `/classes/${classId}`,
+            data: { teamId: team._id, classId },
+            createdBy: req.user._id,
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('Failed to notify reviewer about team proposal:', notifErr);
+    }
+
     return successResponse(
       res,
-      { team, chatGroup },
-      `Team "${teamName}" created with chat group successfully`,
+      { team, isException },
+      isException
+        ? `Đề xuất nhóm ngoại lệ "${teamName}" đã gửi lên Admin để duyệt`
+        : `Đề xuất nhóm "${teamName}" đã gửi cho Lecturer duyệt`,
       201
     );
   } catch (err) {
@@ -131,6 +172,123 @@ exports.generateTeam = async (req, res) => {
     session.endSession();
     console.error('Team generation error:', err);
     return errorResponse(res, err.message || 'Failed to create team', 500);
+  }
+};
+
+
+// ─── PUT /api/teams/:teamId/members ──────────────────────────────────────────
+// Lecturer or Admin can add/remove students from any team at any time.
+exports.updateTeamMembers = async (req, res) => {
+  const { addStudentIds = [], removeStudentIds = [] } = req.body;
+  const { teamId } = req.params;
+
+  if (!Array.isArray(addStudentIds) || !Array.isArray(removeStudentIds)) {
+    return errorResponse(res, 'addStudentIds and removeStudentIds must be arrays', 400);
+  }
+  if (addStudentIds.length === 0 && removeStudentIds.length === 0) {
+    return errorResponse(res, 'No changes requested', 400);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const team = await Team.findById(teamId).session(session);
+    if (!team) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, 'Team not found', 404);
+    }
+
+    const cls = await Class.findById(team.classId).session(session);
+    if (!cls) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, 'Class not found', 404);
+    }
+
+    // Permission check
+    if (req.user.role === 'LECTURER' && cls.lectureId?.toString() !== req.user._id.toString()) {
+      await session.abortTransaction(); session.endSession();
+      return errorResponse(res, 'You do not have permission to manage this team', 403);
+    }
+
+    const uniqueAddIds = [...new Set(addStudentIds.map(String))];
+    const uniqueRemoveIds = [...new Set(removeStudentIds.map(String))];
+
+    // Validate students to add
+    if (uniqueAddIds.length > 0) {
+      const studentsToAdd = await Student.find({
+        _id: { $in: uniqueAddIds },
+        classId: team.classId
+      }).session(session);
+
+      if (studentsToAdd.length !== uniqueAddIds.length) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'One or more students to add do not belong to this class', 400);
+      }
+
+      // Check if any student is already in another team
+      const assignedElsewhere = studentsToAdd.filter(
+        s => s.teamId && s.teamId.toString() !== teamId
+      );
+      if (assignedElsewhere.length > 0) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(
+          res,
+          `These students are already in another team: ${assignedElsewhere.map(s => s.fullName).join(', ')}`,
+          400
+        );
+      }
+
+      // Add students to team
+      const currentMemberIds = team.members.map(m => m.studentId.toString());
+      const newMemberIds = uniqueAddIds.filter(id => !currentMemberIds.includes(id));
+
+      if (newMemberIds.length > 0) {
+        team.members.push(...newMemberIds.map(id => ({ studentId: id, roleInTeam: 'Member' })));
+        await Student.updateMany(
+          { _id: { $in: newMemberIds } },
+          { $set: { teamId: team._id } },
+          { session }
+        );
+      }
+    }
+
+    // Validate students to remove
+    if (uniqueRemoveIds.length > 0) {
+      const currentMemberIds = team.members.map(m => m.studentId.toString());
+      const notInTeam = uniqueRemoveIds.filter(id => !currentMemberIds.includes(id));
+      if (notInTeam.length > 0) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Some students to remove are not in this team', 400);
+      }
+
+      // Remove students from team
+      team.members = team.members.filter(
+        m => !uniqueRemoveIds.includes(m.studentId.toString())
+      );
+      await Student.updateMany(
+        { _id: { $in: uniqueRemoveIds } },
+        { $set: { teamId: null } },
+        { session }
+      );
+    }
+
+    await team.save({ session });
+    await session.commitTransaction();
+    session.endSession();
+
+    await team.populate([
+      { path: 'members.studentId', select: 'fullName email rollNumber major avatarUrl' },
+      { path: 'lectureId', select: 'name email' },
+      { path: 'mentorId', select: 'name email' }
+    ]);
+
+    return successResponse(res, { team }, 'Team members updated successfully');
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('updateTeamMembers error:', err);
+    return errorResponse(res, err.message || 'Failed to update team members', 500);
   }
 };
 

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Users, Trash2, MessageSquare, MessageSquareDashed, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Users, Trash2, MessageSquare, MessageSquareDashed, ChevronDown, ChevronRight, Loader2, UserCog } from 'lucide-react';
 import { teamApi } from '../../api/teamApi';
+import TeamMemberEditModal from './TeamMemberEditModal';
 
 const majorColor = (major) => {
   const palette = ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-cyan-50 text-cyan-700', 'bg-orange-50 text-orange-700', 'bg-pink-50 text-pink-700'];
@@ -20,12 +21,13 @@ const safeName = (ref) => {
 
 const normalizeTeamText = (value) => (typeof value === 'string' ? value.trim() : '');
 
-function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId }) {
+function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId, classStudents = [] }) {
   const navigate = useNavigate();
   const [expanded,  setExpanded]  = useState(false);
   const [deleting,  setDeleting]  = useState(false);
   const [editing,   setEditing]   = useState(false);
   const [saving,    setSaving]    = useState(false);
+  const [showEditMembers, setShowEditMembers] = useState(false);
   const [formData,  setFormData]  = useState({
     teamName: team.teamName || '',
     groupName: team.groupName || '',
@@ -163,6 +165,18 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
               className="px-2.5 py-1 text-xs font-semibold border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all shadow-sm"
             >
               Review
+            </button>
+          )}
+
+          {/* Edit Members button — Lecturer/Admin only */}
+          {canManageInfo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowEditMembers(true); }}
+              title="Chỉnh sửa thành viên nhóm"
+              className="px-2.5 py-1 text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all shadow-sm flex items-center gap-1"
+            >
+              <UserCog className="w-3.5 h-3.5" />
+              Thành viên
             </button>
           )}
 
@@ -327,11 +341,21 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
           )}
         </div>
       )}
+
+      {/* Edit Members Modal */}
+      {showEditMembers && (
+        <TeamMemberEditModal
+          team={team}
+          classStudents={classStudents}
+          onClose={() => setShowEditMembers(false)}
+          onRefresh={onRefresh}
+        />
+      )}
     </div>
   );
 }
 
-export default function TeamList({ teams, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId }) {
+export default function TeamList({ teams, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId, classStudents = [] }) {
   // Guard: teams might be null/undefined
   const safeTeams = Array.isArray(teams) ? teams : [];
 
@@ -356,6 +380,7 @@ export default function TeamList({ teams, onRefresh, onReview, canDelete = true,
           canDelete={canDelete}
           canManageInfo={canManageInfo}
           currentStudentId={currentStudentId}
+          classStudents={classStudents}
         />
       ))}
     </div>

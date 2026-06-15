@@ -452,6 +452,7 @@ export default function ClassDetail() {
             onReview={(team) => setReviewTeam(team)}
             canDelete={isAdminOrLecturer}
             canManageInfo={isAdminOrLecturer}
+            classStudents={safeStudents}
           />
         )}
       </motion.div>

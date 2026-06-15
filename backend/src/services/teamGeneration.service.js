@@ -14,7 +14,7 @@ const { getTeamGroupFromMajor } = require('../constants/majors');
  *
  * @param {string[]} studentIds
  * @param {string}   classId
- * @param {'auto'|'manual'} mode
+ * @param {'auto'|'manual'|'exception'} mode
  * @returns {{ students: Student[], error: string|null }}
  */
 const validateTeamStudents = async (studentIds, classId, mode) => {
@@ -37,9 +37,14 @@ const validateTeamStudents = async (studentIds, classId, mode) => {
     return { students: [], error: `These students are already in a team: ${names}` };
   }
 
-  // Size validation: 4–6 members
-  if (students.length < 4 || students.length > 6) {
+  // Size validation: 4–6 members (skip for exception mode)
+  if (mode !== 'exception' && (students.length < 4 || students.length > 6)) {
     return { students: [], error: 'Team size must be between 4 and 6 students' };
+  }
+
+  // Exception mode: only 3 or 7 members are allowed as exceptions
+  if (mode === 'exception' && students.length !== 3 && students.length !== 7) {
+    return { students: [], error: 'Trường hợp ngoại lệ chỉ cho phép 3 hoặc 7 thành viên' };
   }
 
   // ── Major group validation ───────────────────────────────────────────────────

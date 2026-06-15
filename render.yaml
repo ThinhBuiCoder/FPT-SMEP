@@ -22,13 +22,6 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      # Required for persistent image/file uploads. Set these in Render Dashboard.
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
 
   # Frontend Web Service (Static Site)
   - type: web # Using web instead of static because VITE_API_URL needs the backend URL dynamically

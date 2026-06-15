@@ -1,36 +1,11 @@
 const cloudinary = require('cloudinary').v2;
 
-const cloudinaryCredentialKeys = [
-  'CLOUDINARY_CLOUD_NAME',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-];
-
-const getMissingCloudinaryConfig = () => {
-  if (process.env.CLOUDINARY_URL) return [];
-  return cloudinaryCredentialKeys.filter((key) => !process.env[key]);
-};
-
-const explicitCredentialsAvailable = getMissingCloudinaryConfig().length === 0;
-if (!process.env.CLOUDINARY_URL && explicitCredentialsAvailable) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-}
-
-const assertCloudinaryConfigured = () => {
-  const missingKeys = getMissingCloudinaryConfig();
-  if (missingKeys.length === 0) return;
-
-  const error = new Error(
-    `Cloudinary is not configured. Set CLOUDINARY_URL or: ${missingKeys.join(', ')}`
-  );
-  error.code = 'CLOUDINARY_NOT_CONFIGURED';
-  throw error;
-};
+// Configure Cloudinary using credentials from .env
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /**
  * Uploads a file buffer to Cloudinary
@@ -39,8 +14,6 @@ const assertCloudinaryConfigured = () => {
  * @returns {Promise<Object>} - The Cloudinary upload result
  */
 const uploadToCloudinary = (buffer, folder = 'fpt_smep') => {
-  assertCloudinaryConfigured();
-
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -74,5 +47,4 @@ module.exports = {
   cloudinary,
   uploadToCloudinary,
   deleteFromCloudinary,
-  assertCloudinaryConfigured,
 };
