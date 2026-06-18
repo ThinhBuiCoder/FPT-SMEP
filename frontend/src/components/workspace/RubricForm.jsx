@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import PerformanceLevelBadge from '../evaluation/PerformanceLevelBadge';
 
 const DEFAULT_CRITERIA = [
@@ -16,6 +17,26 @@ const LEVEL_OPTIONS = [
   { value: 'FAIR', label: 'Fair', score: 6.0, range: '5.0–6.9' },
   { value: 'POOR', label: 'Poor', score: 4.0, range: '< 5.0' },
 ];
+
+const getLevelColor = (level) => {
+  switch (level) {
+    case 'EXCELLENT': return 'bg-emerald-50/60 border-emerald-200 text-emerald-700 hover:bg-emerald-100/60';
+    case 'GOOD': return 'bg-blue-50/60 border-blue-200 text-blue-700 hover:bg-blue-100/60';
+    case 'FAIR': return 'bg-amber-50/60 border-amber-200 text-amber-700 hover:bg-amber-100/60';
+    case 'POOR': return 'bg-rose-50/60 border-rose-200 text-rose-700 hover:bg-rose-100/60';
+    default: return 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
+  }
+};
+
+const getActiveLevelColor = (level) => {
+  switch (level) {
+    case 'EXCELLENT': return 'bg-emerald-600 border-emerald-600 text-white ring-2 ring-emerald-500/20';
+    case 'GOOD': return 'bg-blue-600 border-blue-600 text-white ring-2 ring-blue-500/20';
+    case 'FAIR': return 'bg-amber-500 border-amber-500 text-white ring-2 ring-amber-500/20';
+    case 'POOR': return 'bg-rose-600 border-rose-600 text-white ring-2 ring-rose-500/20';
+    default: return '';
+  }
+};
 
 const normalizeCriteria = (criteria = []) => {
   const source = Array.isArray(criteria) && criteria.length > 0 ? criteria : DEFAULT_CRITERIA;
@@ -46,7 +67,7 @@ const initialRows = (criteria, initialData) => {
           currentScore = meta.score;
         } else {
           // prefer empty / zero when no prior level exists
-          currentScore = 0;
+          currentScore = '';
         }
       } else {
         currentScore = '';
@@ -77,6 +98,8 @@ export default function RubricForm({
   const [rubricScores, setRubricScores] = useState(() => initialRows(criteria, initialData));
   const [overallFeedback, setOverallFeedback] = useState('');
   const isSubmitted = initialData?.status === 'SUBMITTED' || initialData?.status === 'PUBLISHED';
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   useEffect(() => {
     // Reset the form when switching checkpoint or loading a newer evaluation version.
@@ -111,6 +134,14 @@ export default function RubricForm({
   };
 
   const handleLevelChange = (index, level) => {
+    if (!level) {
+      updateRow(index, {
+        selectedLevel: '',
+        scoreMode: 'LEVEL',
+        score: '',
+      });
+      return;
+    }
     const meta = selectedLevelMeta(level);
     updateRow(index, {
       selectedLevel: level,
@@ -172,10 +203,7 @@ export default function RubricForm({
     [rubricScores]
   );
 
-  const handleSubmit = (e, status) => {
-    e.preventDefault();
-    if (readOnly || !onSubmit) return;
-
+  const executeSubmit = (status) => {
     onSubmit({
       checkpointNumber,
       checkpointTitle,
@@ -183,6 +211,36 @@ export default function RubricForm({
       overallFeedback,
       status: isSubmitted ? initialData.status : status,
     });
+  };
+
+  const handleConfirmSaveAnyway = () => {
+    setShowConfirmModal(false);
+    if (pendingStatus) {
+      executeSubmit(pendingStatus);
+      setPendingStatus(null);
+    }
+  };
+
+  const handleCancelSaveAnyway = () => {
+    setShowConfirmModal(false);
+    setPendingStatus(null);
+  };
+
+  const handleSubmit = (e, status) => {
+    e.preventDefault();
+    if (readOnly || !onSubmit) return;
+
+    const hasUncompleted = rubricScores.some(
+      (item) => !item.selectedLevel || item.score === '' || item.score == null
+    );
+
+    if (hasUncompleted) {
+      setPendingStatus(status);
+      setShowConfirmModal(true);
+      return;
+    }
+
+    executeSubmit(status);
   };
 
   return (
@@ -213,91 +271,114 @@ export default function RubricForm({
       )}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50">
-            <tr className="text-left text-slate-500">
-              <th className="px-4 py-3 font-semibold">Criterion</th>
-              <th className="px-4 py-3 font-semibold w-24">Weight</th>
-              <th className="px-4 py-3 font-semibold w-40">Level</th>
-              {/* Score and Weighted columns hidden for Mentor */}
+      <div className="space-y-6 mb-8">
+        {rubricScores.map((item, index) => (
+          <div
+            key={`${item.criterionKey}-${index}`}
+            className="bg-slate-50/40 rounded-2xl border border-slate-200/80 p-5 sm:p-6 space-y-5 transition-all hover:shadow-md hover:border-slate-300/60"
+          >
+            {/* Card Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-base font-bold text-slate-800">{item.criterionName}</h4>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    Weight: {item.weight}%
+                  </span>
+                </div>
+                {item.description && <p className="text-xs text-slate-500 mt-1">{item.description}</p>}
+              </div>
               {!hideSensitiveScores && (
-                <>
-                  <th className="px-4 py-3 font-semibold w-28">Score</th>
-                  <th className="px-4 py-3 font-semibold w-32">Weighted</th>
-                </>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Weighted:</span>
+                  <span className="text-lg font-black text-blue-600 bg-blue-50/50 border border-blue-100 px-3 py-1 rounded-xl">
+                    {Number(item.weightedScore || 0).toFixed(2)}
+                  </span>
+                </div>
               )}
-              <th className="px-4 py-3 font-semibold">Comment</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {rubricScores.map((item, index) => (
-              <tr key={`${item.criterionKey}-${index}`} className="align-top">
-                <td className="px-4 py-4">
-                  <div className="font-semibold text-slate-900">{item.criterionName}</div>
-                  {item.description && <div className="mt-1 text-xs text-slate-500">{item.description}</div>}
-                </td>
-                <td className="px-4 py-4">
-                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{item.weight}%</span>
-                </td>
-                <td className="px-4 py-4">
-                  {hideSensitiveScores ? (
-                    /* Mentor: show level as read-only badge */
+            </div>
+
+            {/* Grid Inputs */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Level Selection Section */}
+              <div className="lg:col-span-7 space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Performance Level
+                </label>
+                {hideSensitiveScores ? (
+                  <div className="py-2">
                     <PerformanceLevelBadge
                       level={item.level || 'Unscored'}
                       label={item.label || ''}
-                      size="sm"
+                      size="md"
                     />
-                  ) : (
-                    /* Lecturer/Admin: interactive dropdown */
-                    <select
-                      value={item.selectedLevel}
-                      onChange={(e) => handleLevelChange(index, e.target.value)}
-                      disabled={readOnly}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50"
-                    >
-                      <option value="">-- Select --</option>
-                      {item.levels.map((level) => (
-                        <option key={level.value || level.key} value={level.value || level.key}>
-                          {level.label} ({level.range})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </td>
-                {/* Score and Weighted — hidden for Mentor */}
-                {!hideSensitiveScores && (
-                  <>
-                    <td className="px-4 py-4">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={item.score ?? ''}
-                        onChange={(e) => handleScoreChange(index, e.target.value)}
-                        disabled={readOnly}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 text-center"
-                      />
-                      <p className="mt-1 text-[11px] text-slate-400">Manual override</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-bold text-blue-700">{Number(item.weightedScore || 0).toFixed(2)}</div>
-                    </td>
-                  </>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {item.levels.map((level) => {
+                      const val = level.value || level.key;
+                      const isActive = item.selectedLevel === val;
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          disabled={readOnly}
+                          onClick={() => handleLevelChange(index, val)}
+                          className={`px-3 py-2.5 rounded-xl border text-center transition-all ${
+                            isActive ? getActiveLevelColor(val) : getLevelColor(val)
+                          } text-xs font-bold shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none`}
+                        >
+                          <div>{level.label}</div>
+                          <div className={`text-[10px] mt-0.5 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
+                            {level.range}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-                <td className="px-4 py-4">
-                  <textarea
-                    rows={4}
-                    placeholder="Criterion comment"
-                    value={item.comment}
-                    onChange={(e) => handleCommentChange(index, e.target.value)}
-                    disabled={readOnly || hideSensitiveScores}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 resize-y"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+
+              {/* Manual Score Section */}
+              {!hideSensitiveScores && (
+                <div className="lg:col-span-5 space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Manual Score Override
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.score ?? ''}
+                      onChange={(e) => handleScoreChange(index, e.target.value)}
+                      disabled={readOnly}
+                      placeholder="Enter score (0-10)"
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-4 pr-12 py-2.5 text-sm font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 transition-all text-slate-900"
+                    />
+                    <span className="absolute right-4 text-xs font-semibold text-slate-400">
+                      / 10
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Comment Section */}
+              <div className="lg:col-span-12 space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Criterion Feedback & Comments
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Provide specific feedback or observations for this criterion..."
+                  value={item.comment}
+                  onChange={(e) => handleCommentChange(index, e.target.value)}
+                  disabled={readOnly || hideSensitiveScores}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 resize-y transition-all text-slate-700"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Bottom score summary cards — hidden for Mentor */}
@@ -351,6 +432,65 @@ export default function RubricForm({
           >
             {isSubmitted ? 'Save Changes' : 'Submit Evaluation'}
           </button>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={handleCancelSaveAnyway}
+          />
+
+          {/* Modal Container */}
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-slate-100 transform transition-all p-6">
+            <div className="text-center">
+              {/* Alert Icon */}
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-50 border border-amber-200 text-amber-500 mb-4">
+                <svg
+                  className="h-6 w-6 animate-bounce"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              
+              <h3 className="text-lg font-bold text-slate-900 mb-2">
+                Incomplete Grades
+              </h3>
+              
+              <p className="text-sm text-slate-500 mb-6">
+                You have not finished entering all grades for this checkpoint. Do you want to save anyway?
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <button
+                type="button"
+                onClick={handleCancelSaveAnyway}
+                className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200/60 rounded-xl hover:bg-slate-100 hover:text-slate-800 transition-colors"
+              >
+                Continue Entering
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSaveAnyway}
+                className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/95 transition-colors"
+              >
+                Save Anyway
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
