@@ -11,6 +11,7 @@ router.use(protect);
 // ─── Class CRUD ─────────────────────────────────────────────────────────────
 // Bulk-create multiple classes at once (Admin and Lecturer)
 router.post('/bulk-create',  authorize('ADMIN', 'LECTURER'), ctrl.bulkCreateClasses);
+router.post('/report-code-conflict', authorize('LECTURER'), ctrl.reportClassCodeConflict);
 // List classes (Admin = all, Lecturer = assigned + 3-semester window)
 router.get('/',              ctrl.getClasses);
 // Student specific endpoints (must be above dynamic parameter routes)
@@ -28,7 +29,7 @@ router.put('/:id',           authorize('ADMIN', 'LECTURER'), ctrl.updateClass);
 // Rename class code (Admin or assigned Lecturer)
 router.put('/:id/rename',    authorize('ADMIN', 'LECTURER'), ctrl.renameClass);
 // Soft-delete (disable) class
-router.delete('/:id',        authorize('ADMIN'), ctrl.deleteClass);
+router.delete('/:id',        authorize('ADMIN', 'LECTURER'), ctrl.deleteClass);
 
 // ─── Lecturer Assignment & Schedule ──────────────────────────────────────────
 router.put('/:id/assign-lecture', authorize('ADMIN'), ctrl.assignLecture);

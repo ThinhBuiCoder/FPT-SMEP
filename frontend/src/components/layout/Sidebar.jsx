@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../utils/cn';
 import {
   LayoutDashboard, Users, GraduationCap, Trophy, CalendarDays,
-  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, X, MessageSquare, Database
+  Kanban, Brain, Video, Rocket, LogOut, Plus, Sparkles, X, MessageSquare, Database, BookOpen
 } from 'lucide-react';
 
 const iconMap = {
@@ -21,6 +21,7 @@ const iconMap = {
   video_chat: Video,
   chat: MessageSquare,
   database: Database,
+  book_open: BookOpen,
 };
 
 const Sidebar = ({ mobileOpen, onMobileClose }) => {
@@ -38,6 +39,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
   const navItems = {
     ADMIN: [
       { path: '/admin', icon: 'dashboard', label: 'Overview' },
+      { path: '/admin/subjects', icon: 'book_open', label: 'Subject Management' },
       { path: '/admin/users', icon: 'group', label: 'Users' },
       { path: '/admin/classes', icon: 'school', label: 'Classes' },
       { path: '/lecturer/data-bank', icon: 'database', label: 'Data Bank' },

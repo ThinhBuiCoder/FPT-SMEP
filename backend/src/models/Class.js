@@ -5,15 +5,16 @@ const classSchema = new mongoose.Schema(
   {
     // Auto-generated: EXE101_1, EXE101_2 ...
     classCode:   { type: String, required: true, trim: true, uppercase: true },
-    // EXE101 | EXE201
-    subjectCode: { type: String, required: true, enum: ['EXE101', 'EXE201'], uppercase: true },
-    // Numeric index within the batch: 1, 2, 3 ...
+    // EXE101 | EXE201 ... dynamic validation in controller
+    subjectCode: { type: String, required: true, uppercase: true, trim: true },
+    // Numeric index within subject + semester + year: 1, 2, 3 ...
     classIndex:  { type: Number, required: true, min: 1 },
     // SP | SU | FA
     semester:    { type: String, required: true, enum: ['SP', 'SU', 'FA'] },
     year:        { type: Number, required: true },
     // Assigned lecturer (User with role LECTURER)
     lectureId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     mentorIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -35,7 +36,9 @@ const classSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound unique: same classCode cannot exist in same semester + year
+// Class codes are shared by Admin and Lecturer within the same semester/year.
+// A later semester can reuse EXE101_1, EXE101_2, ...
 classSchema.index({ classCode: 1, semester: 1, year: 1 }, { unique: true });
+classSchema.index({ subjectCode: 1, semester: 1, year: 1, classIndex: 1 }, { unique: true });
 
 module.exports = mongoose.model('Class', classSchema);

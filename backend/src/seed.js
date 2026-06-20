@@ -12,6 +12,7 @@ const Evaluation       = require('./models/Evaluation');
 const AiAnalysis       = require('./models/AiAnalysis');
 const MentoringSession = require('./models/MentoringSession');
 const Milestone        = require('./models/Milestone');
+const Subject          = require('./models/Subject');
 
 const seed = async () => {
   try {
@@ -23,35 +24,51 @@ const seed = async () => {
       User.deleteMany(), Class.deleteMany(), Student.deleteMany(), Team.deleteMany(),
       StartupIdea.deleteMany(), Evaluation.deleteMany(),
       AiAnalysis.deleteMany(), MentoringSession.deleteMany(), Milestone.deleteMany(),
+      Subject.deleteMany(),
     ]);
     console.log('🗑️  Cleared existing data');
+
+    // ── SUBJECTS ──────────────────────────────────────────
+    await Subject.create([
+      {
+        subjectCode: 'EXE101',
+        subjectName: 'Experiential Entrepreneurship 1 - Trải nghiệm khởi nghiệp 1',
+        status: 'active',
+      },
+      {
+        subjectCode: 'EXE201',
+        subjectName: 'Experiential Entrepreneurship 2 - Trải nghiệm khởi nghiệp 2',
+        status: 'active',
+      },
+    ]);
+    console.log('✅ Subjects created (2)');
 
     // ── USERS ─────────────────────────────────────────────
     // NOTE: password pre-save hook sẽ tự hash
     const [admin, lecturer, mentor, u1, u2, u3] = await User.create([
       {
         name: 'Admin FPT', email: 'admin@fpt.edu.vn', password: '123456',
-        role: 'ADMIN', bio: 'System Administrator',
+        role: 'ADMIN', bio: 'System Administrator', isVerified: true,
       },
       {
         name: 'TS. Nguyễn Văn Minh', email: 'lecturer@fpt.edu.vn', password: '123456',
-        role: 'LECTURER', bio: 'Giảng viên Khởi nghiệp - ĐH FPT', phone: '0901234567',
+        role: 'LECTURER', bio: 'Giảng viên Khởi nghiệp - ĐH FPT', phone: '0901234567', isVerified: true,
       },
       {
         name: 'Nguyễn Mentor', email: 'mentor@fpt.edu.vn', password: '123456',
-        role: 'MENTOR', bio: 'Expert Startup Mentor - 10 years experience', phone: '0908889999',
+        role: 'MENTOR', bio: 'Expert Startup Mentor - 10 years experience', phone: '0908889999', isVerified: true,
       },
       {
         name: 'Trần Thị Lan', email: 'student1@fpt.edu.vn', password: '123456',
-        role: 'STUDENT', studentId: 'SE171234', bio: 'Software Engineering - K17',
+        role: 'STUDENT', studentId: 'SE171234', bio: 'Software Engineering - K17', isVerified: true,
       },
       {
         name: 'Lê Văn Hùng', email: 'student2@fpt.edu.vn', password: '123456',
-        role: 'STUDENT', studentId: 'SE171235', bio: 'Software Engineering - K17',
+        role: 'STUDENT', studentId: 'SE171235', bio: 'Software Engineering - K17', isVerified: true,
       },
       {
         name: 'Phạm Thị Mai', email: 'student3@fpt.edu.vn', password: '123456',
-        role: 'STUDENT', studentId: 'BA171236', bio: 'Business Administration - K17',
+        role: 'STUDENT', studentId: 'BA171236', bio: 'Business Administration - K17', isVerified: true,
       },
     ]);
     console.log('✅ Users created (6)');

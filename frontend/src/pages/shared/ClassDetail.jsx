@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GraduationCap, Users, BookOpen,
-  Upload, Download, UserPlus, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock
+  Upload, Download, UserPlus, Loader2, Calendar, Pencil, ShieldCheck, Lock, Unlock, Trash2
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -49,6 +49,8 @@ export default function ClassDetail() {
   const [exporting, setExporting] = useState(false);
   const [togglingLock, setTogglingLock] = useState(false);
   const [removingStudent, setRemovingStudent] = useState(false);
+  const [showDeleteClass, setShowDeleteClass] = useState(false);
+  const [deletingClass, setDeletingClass] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -152,6 +154,20 @@ export default function ClassDetail() {
     }
   };
 
+  const confirmDeleteClass = async () => {
+    setDeletingClass(true);
+    try {
+      await classApi.delete(id);
+      toast.success('Class deleted successfully');
+      navigate(user?.role === 'ADMIN' ? '/admin/classes' : '/lecturer/classes');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to delete class');
+    } finally {
+      setDeletingClass(false);
+      setShowDeleteClass(false);
+    }
+  };
+
   if (loading) return <LoadingSkeleton />;
   if (!cls)    return <div className="text-center py-20 text-slate-400">Class not found.</div>;
 
@@ -160,6 +176,12 @@ export default function ClassDetail() {
   const unassignedCount = safeStudents.filter(s => !s.teamId).length;
   
   const isAdminOrLecturer = user?.role === 'ADMIN' || (user?.role === 'LECTURER' && cls.lectureId?._id?.toString() === user._id);
+  const createdById = cls.createdBy?._id?.toString() || cls.createdBy?.toString();
+  const lecturerId = cls.lectureId?._id?.toString() || cls.lectureId?.toString();
+  const canDeleteClass = user?.role === 'ADMIN' || (
+    user?.role === 'LECTURER' &&
+    (createdById === user._id || (!createdById && lecturerId === user._id))
+  );
 
   const getUniqueMentors = () => {
     const classMentors = cls?.mentorIds || [];
@@ -294,6 +316,14 @@ export default function ClassDetail() {
                 cls.isMajorLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />
               )}
               {cls.isMajorLocked ? 'Mở khóa cập nhật' : 'Khóa cập nhật CN'}
+            </button>
+          )}
+          {canDeleteClass && (
+            <button
+              onClick={() => setShowDeleteClass(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-xl text-sm hover:bg-red-50 transition-all font-medium"
+            >
+              <Trash2 className="w-4 h-4" /> Delete Class
             </button>
           )}
         </div>
@@ -546,6 +576,17 @@ export default function ClassDetail() {
         }
         confirmText="Xóa sinh viên"
         cancelText="Hủy"
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteClass}
+        onClose={() => setShowDeleteClass(false)}
+        onConfirm={confirmDeleteClass}
+        isSubmitting={deletingClass}
+        title="Delete this class?"
+        description={`Class "${cls.classCode}" will be removed from active class lists. Student and team data will remain in the system.`}
+        confirmText="Delete class"
+        cancelText="Cancel"
       />
     </div>
   );

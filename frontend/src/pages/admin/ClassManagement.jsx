@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,17 +9,44 @@ import {
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
 import { userApi } from '../../api/userApi';
+import { subjectApi } from '../../api/subjectApi';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import BulkCreateModal from '../../components/class/BulkCreateModal';
 import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 
 const SEMESTERS = ['SP', 'SU', 'FA'];
-const SUBJECTS  = ['EXE101', 'EXE201'];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 1 + i);
 
 const semesterColor = { SP: 'bg-green-100 text-green-700', SU: 'bg-amber-100 text-amber-700', FA: 'bg-blue-100 text-blue-700' };
+const semesterOrder = { SP: 1, SU: 2, FA: 3 };
+const classCodeCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+const sortClasses = (list) => [...list].sort((a, b) => {
+  const subjectCompare = (a.subjectCode || '').localeCompare(b.subjectCode || '');
+  if (subjectCompare !== 0) return subjectCompare;
+
+  if ((b.year || 0) !== (a.year || 0)) return (b.year || 0) - (a.year || 0);
+
+  const semesterCompare = (semesterOrder[a.semester] || 99) - (semesterOrder[b.semester] || 99);
+  if (semesterCompare !== 0) return semesterCompare;
+
+  if ((a.classIndex || 0) !== (b.classIndex || 0)) return (a.classIndex || 0) - (b.classIndex || 0);
+
+  return classCodeCollator.compare(a.classCode || '', b.classCode || '');
+});
+
+const groupClassesBySubject = (list) => sortClasses(list).reduce((groups, cls) => {
+  const subjectCode = cls.subjectCode || 'Unknown Subject';
+  const group = groups.find(item => item.subjectCode === subjectCode);
+  if (group) {
+    group.classes.push(cls);
+  } else {
+    groups.push({ subjectCode, classes: [cls] });
+  }
+  return groups;
+}, []);
 
 export default function ClassManagement() {
   const { user } = useContext(AuthContext);
@@ -30,6 +57,7 @@ export default function ClassManagement() {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [lecturers,  setLecturers]  = useState([]);
+  const [subjects,   setSubjects]   = useState([]);
 
   // Filters
   const [search,     setSearch]     = useState('');
@@ -65,6 +93,28 @@ export default function ClassManagement() {
     }
   };
 
+  useEffect(() => {
+    const loadInitialConfig = async () => {
+      try {
+        const [subjRes, semRes] = await Promise.all([
+          subjectApi.getActive(),
+          subjectApi.getCurrentSemester(),
+        ]);
+        const list = subjRes.data?.subjects || subjRes.subjects || [];
+        setSubjects(list.map(s => s.subjectCode));
+
+        const activeSem = semRes.data?.currentSemester || semRes.currentSemester;
+        if (activeSem) {
+          setFilterSem(activeSem.semester);
+          setFilterYear(String(activeSem.year));
+        }
+      } catch (err) {
+        console.error('Failed to load initial config', err);
+      }
+    };
+    loadInitialConfig();
+  }, []);
+
   useEffect(() => { fetchAll(); }, [filterSem, filterYear, filterSubj]); // eslint-disable-line
 
   const handleSearch = (e) => {
@@ -82,6 +132,10 @@ export default function ClassManagement() {
     setImportTarget(null);
     fetchAll();
   };
+
+  const sortedClasses = useMemo(() => sortClasses(classes), [classes]);
+  const subjectGroups = useMemo(() => groupClassesBySubject(classes), [classes]);
+  const showSubjectGroups = !filterSubj;
 
   if (loading) return <LoadingSkeleton />;
 
@@ -131,7 +185,7 @@ export default function ClassManagement() {
             className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="">All Subjects</option>
-            {SUBJECTS.map(s => <option key={s}>{s}</option>)}
+            {subjects.map(s => <option key={s}>{s}</option>)}
           </select>
           <select
             value={filterSem}
@@ -169,9 +223,18 @@ export default function ClassManagement() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <AnimatePresence>
-            {classes.map((cls, i) => (
+            {sortedClasses.map((cls, i) => (
+              <div key={cls._id} className="contents">
+                {showSubjectGroups && (i === 0 || sortedClasses[i - 1]?.subjectCode !== cls.subjectCode) && (
+                  <div className="col-span-full flex items-center gap-3 pt-2 first:pt-0">
+                    <h2 className="text-lg font-bold text-slate-900">{cls.subjectCode || 'Unknown Subject'}</h2>
+                    <span className="h-px flex-1 bg-slate-200" />
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                      {subjectGroups.find(group => group.subjectCode === (cls.subjectCode || 'Unknown Subject'))?.classes.length || 0} classes
+                    </span>
+                  </div>
+                )}
               <motion.div
-                key={cls._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
@@ -290,6 +353,7 @@ export default function ClassManagement() {
                   )}
                 </div>
               </motion.div>
+              </div>
             ))}
           </AnimatePresence>
         </div>
