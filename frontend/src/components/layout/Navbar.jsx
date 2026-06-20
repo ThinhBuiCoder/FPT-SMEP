@@ -1,16 +1,18 @@
 import { useAuth } from '../../hooks/useAuth';
-import { Search, ChevronDown, User, LogOut, Menu, Settings, Moon, Sun } from 'lucide-react';
+import { Search, ChevronDown, User, LogOut, Menu, Settings, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Badge from '../ui/Badge';
 import NotificationDropdown from './NotificationDropdown';
 import { useTheme } from '../../context/ThemeContext';
+import { notificationApi } from '../../api/notificationApi';
 
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [classConflictAlert, setClassConflictAlert] = useState(null);
   const menuRef = useRef(null);
 
   // Close menu on outside click
@@ -26,8 +28,6 @@ const Navbar = ({ onMenuClick }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showProfileMenu]);
 
-  if (!user) return null;
-
   const roleLabels = {
     ADMIN: 'Administrator',
     LECTURER: 'Lecturer',
@@ -42,8 +42,46 @@ const Navbar = ({ onMenuClick }) => {
     STUDENT: 'Reviewed',
   };
 
-  const rawRole = user.role?.toUpperCase() || 'STUDENT';
+  const rawRole = user?.role?.toUpperCase() || 'STUDENT';
   const role = rawRole === 'USER' ? 'STUDENT' : rawRole;
+
+  useEffect(() => {
+    if (role !== 'LECTURER') return;
+
+    const loadClassConflictAlert = async () => {
+      try {
+        const res = await notificationApi.getAll();
+        const list = res.data || res || [];
+        const alert = Array.isArray(list)
+          ? list.find(n => !n.isRead && n.data?.action === 'CLASS_CODE_CONFLICT_REVIEW')
+          : null;
+        if (alert) setClassConflictAlert(alert);
+      } catch (err) {
+        console.error('Failed to load class conflict alert:', err);
+      }
+    };
+
+    loadClassConflictAlert();
+  }, [role]);
+
+  const closeClassConflictAlert = async (goToClasses = false) => {
+    const alert = classConflictAlert;
+    setClassConflictAlert(null);
+
+    if (alert?._id) {
+      try {
+        await notificationApi.markRead(alert._id);
+      } catch (err) {
+        console.error('Failed to mark class conflict alert as read:', err);
+      }
+    }
+
+    if (goToClasses) {
+      navigate('/lecturer/classes');
+    }
+  };
+
+  if (!user) return null;
 
   return (
     <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6 gap-4">
@@ -143,6 +181,44 @@ const Navbar = ({ onMenuClick }) => {
           )}
         </div>
       </div>
+
+      {classConflictAlert && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-amber-200 shadow-float p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Please verify your class code</h2>
+                <p className="text-sm text-slate-600 mt-1">{classConflictAlert.message}</p>
+                {classConflictAlert.data?.classCode && (
+                  <p className="text-xs font-semibold text-slate-500 mt-2">
+                    {classConflictAlert.data.classCode} - {classConflictAlert.data.semester} {classConflictAlert.data.year}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => closeClassConflictAlert(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 transition-all"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => closeClassConflictAlert(true)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-700 transition-all"
+              >
+                Check classes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

@@ -4,6 +4,8 @@ const Class   = require('../models/Class');
 const Student = require('../models/Student');
 const Team    = require('../models/Team');
 const User    = require('../models/User');
+const Subject = require('../models/Subject');
+const notificationService = require('../services/notification.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
@@ -53,17 +55,21 @@ const getLecturerSemesterFilter = async (lecturerId) => {
 
 // ─── POST /api/classes/bulk-create ────────────────────────────────────────────
 exports.bulkCreateClasses = async (req, res) => {
-  const { subjectCode, count, numberOfClasses, semester, year, lecturerIds, lectureId, mentorIds } = req.body;
+  const { subjectCode, count, numberOfClasses, semester, year, lecturerIds, lectureId, mentorIds, classIndices } = req.body;
   const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'LECTURE';
 
   // --- Validate inputs ---
   if (!subjectCode) return errorResponse(res, 'subjectCode is required', 400);
-  if (!['EXE101', 'EXE201'].includes(subjectCode?.toUpperCase()))
-    return errorResponse(res, 'subjectCode must be EXE101 or EXE201', 400);
+
+  const activeSubjectsList = await Subject.find({ status: 'active' }).select('subjectCode');
+  const activeSubjects = new Set(activeSubjectsList.map(s => s.subjectCode.toUpperCase()));
+
+  if (!activeSubjects.has(subjectCode?.toUpperCase()))
+    return errorResponse(res, `subjectCode must be a valid active subject (e.g. ${Array.from(activeSubjects).join(', ')})`, 400);
   if (!semester || !['SP', 'SU', 'FA'].includes(semester?.toUpperCase()))
     return errorResponse(res, 'semester must be SP, SU or FA', 400);
   const numCount = parseInt(count || numberOfClasses, 10);
-  if (!numCount || numCount < 1 || numCount > 100)
+  if (!isLecturer && (!numCount || numCount < 1 || numCount > 100))
     return errorResponse(res, 'count must be between 1 and 100', 400);
   const numYear = parseInt(year, 10);
   if (!numYear || numYear < 2020 || numYear > 2100)
@@ -109,14 +115,60 @@ exports.bulkCreateClasses = async (req, res) => {
   }
 
   try {
-    // Find highest existing classIndex for this subject/semester/year to continue numbering
-    const lastClass = await Class.findOne({ subjectCode: subjectUpper, semester: semUpper, year: numYear })
-      .sort({ classIndex: -1 });
-    const startIndex = lastClass ? lastClass.classIndex + 1 : 1;
+    const requestedIndices = isLecturer
+      ? [...new Set((Array.isArray(classIndices) ? classIndices : [])
+        .map(idx => parseInt(idx, 10))
+        .filter(idx => Number.isInteger(idx) && idx > 0 && idx <= 999))]
+      : [];
+
+    if (isLecturer && requestedIndices.length === 0) {
+      return errorResponse(res, 'classIndices is required for lecturer class creation', 400);
+    }
+
+    const indicesToCreate = isLecturer
+      ? requestedIndices
+      : (() => {
+          // Continue numbering per subject within the same semester/year.
+          // Admin and Lecturer share this sequence, but a new semester can start again at _1.
+          const n = numCount;
+          return { n };
+        })();
+
+    let finalIndices = indicesToCreate;
+    if (!isLecturer) {
+      const lastClass = await Class.findOne({ subjectCode: subjectUpper, semester: semUpper, year: numYear })
+        .sort({ classIndex: -1 });
+      const startIndex = lastClass ? lastClass.classIndex + 1 : 1;
+      finalIndices = Array.from({ length: indicesToCreate.n }, (_, i) => startIndex + i);
+    }
+
+    const requestedClassCodes = finalIndices.map(idx => `${subjectUpper}_${idx}`);
+    const existingClasses = await Class.find({
+      classCode: { $in: requestedClassCodes },
+      semester: semUpper,
+      year: numYear,
+    }).populate('lectureId', 'name email role');
+
+    if (existingClasses.length > 0) {
+      const conflict = existingClasses[0];
+      return errorResponse(res, `Class ${conflict.classCode} already exists for ${semUpper} ${numYear}`, 409, {
+        conflict: {
+          classId: conflict._id,
+          classCode: conflict.classCode,
+          semester: conflict.semester,
+          year: conflict.year,
+          lecturer: conflict.lectureId ? {
+            id: conflict.lectureId._id,
+            name: conflict.lectureId.name,
+            email: conflict.lectureId.email,
+          } : null,
+        },
+      });
+    }
 
     const toCreate = [];
-    for (let i = 0; i < numCount; i++) {
-      const idx = startIndex + i;
+    for (let i = 0; i < finalIndices.length; i++) {
+      const idx = finalIndices[i];
       
       // Round-robin lecturer assignment
       let assignedLecturerId = null;
@@ -131,6 +183,7 @@ exports.bulkCreateClasses = async (req, res) => {
         semester:    semUpper,
         year:        numYear,
         lectureId:   assignedLecturerId,
+        createdBy:   req.user._id,
         mentorIds:   uniqueMentorIds,
         status:      'active',
       });
@@ -166,6 +219,65 @@ exports.bulkCreateClasses = async (req, res) => {
   }
 };
 
+exports.reportClassCodeConflict = async (req, res) => {
+  try {
+    const { classCode, semester, year, reason } = req.body;
+    if (!classCode || !semester || !year) {
+      return errorResponse(res, 'classCode, semester and year are required', 400);
+    }
+
+    if (!['LECTURER', 'LECTURE'].includes(req.user.role)) {
+      return errorResponse(res, 'Only lecturers can report class code conflicts', 403);
+    }
+
+    const normalizedCode = classCode.trim().toUpperCase();
+    const normalizedSemester = semester.trim().toUpperCase();
+    const normalizedYear = parseInt(year, 10);
+
+    const conflictClass = await Class.findOne({
+      classCode: normalizedCode,
+      semester: normalizedSemester,
+      year: normalizedYear,
+    }).populate('lectureId', 'name email role');
+
+    if (!conflictClass || !conflictClass.lectureId) {
+      return errorResponse(res, 'Conflicting class or lecturer was not found', 404);
+    }
+
+    if (conflictClass.lectureId._id.toString() === req.user._id.toString()) {
+      return errorResponse(res, 'This class already belongs to you', 400);
+    }
+
+    await notificationService.createNotification({
+      recipientId: conflictClass.lectureId._id,
+      recipientEmail: conflictClass.lectureId.email,
+      type: 'CLASS',
+      title: `Please verify ${normalizedCode}`,
+      message: `${req.user.name || req.user.email} reported that ${normalizedCode} (${normalizedSemester} ${normalizedYear}) may have been created by the wrong lecturer. Please check your assigned class code.`,
+      link: '/lecturer/classes',
+      data: {
+        action: 'CLASS_CODE_CONFLICT_REVIEW',
+        classId: conflictClass._id,
+        classCode: normalizedCode,
+        semester: normalizedSemester,
+        year: normalizedYear,
+        reportedBy: {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+        },
+        reason: reason || 'reported_by_other_lecturer',
+      },
+      createdBy: req.user._id,
+    });
+
+    return successResponse(res, { notified: true }, 'Conflict report sent');
+  } catch (err) {
+    console.error('reportClassCodeConflict error:', err);
+    return errorResponse(res, 'Failed to report class code conflict', 500);
+  }
+};
+
 // ─── GET /api/classes ─────────────────────────────────────────────────────────
 exports.getClasses = async (req, res) => {
   try {
@@ -188,6 +300,7 @@ exports.getClasses = async (req, res) => {
     if (year)        andConditions.push({ year: parseInt(year, 10) });
     if (subjectCode) andConditions.push({ subjectCode: subjectCode.toUpperCase() });
     if (status)      andConditions.push({ status });
+    else             andConditions.push({ status: { $ne: 'disabled' } });
     if (search) {
       andConditions.push({ classCode: { $regex: search, $options: 'i' } });
     }
@@ -197,7 +310,7 @@ exports.getClasses = async (req, res) => {
     const classes = await Class.find(query)
       .populate('lectureId', 'name email avatar role')
       .populate('mentorIds', 'name email avatar role')
-      .sort({ year: -1, semester: 1, classIndex: 1 });
+      .sort({ year: -1, semester: 1, subjectCode: 1, classIndex: 1, classCode: 1 });
 
     // Attach student & team counts
     const classIds = classes.map(c => c._id);
@@ -233,6 +346,7 @@ exports.getClassById = async (req, res) => {
   try {
     const cls = await Class.findById(req.params.id)
       .populate('lectureId', 'name email avatar role bio')
+      .populate('createdBy', 'name email role')
       .populate('mentorIds', 'name email avatar role bio');
     if (!cls) return errorResponse(res, 'Class not found', 404);
 
@@ -297,6 +411,18 @@ exports.deleteClass = async (req, res) => {
   try {
     const cls = await Class.findById(req.params.id);
     if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (req.user.role === 'LECTURER' || req.user.role === 'LECTURE') {
+      const createdById = cls.createdBy?.toString();
+      const lectureId = cls.lectureId?.toString();
+      const userId = req.user._id.toString();
+      const canDeleteOwnCreatedClass = createdById === userId;
+      const canDeleteLegacyOwnClass = !createdById && lectureId === userId;
+
+      if (!canDeleteOwnCreatedClass && !canDeleteLegacyOwnClass) {
+        return errorResponse(res, 'You can only delete classes you created', 403);
+      }
+    }
 
     // Soft delete — set status to disabled
     cls.status = 'disabled';
@@ -470,7 +596,7 @@ exports.getMyClasses = async (req, res) => {
       const classes = await Class.find()
         .populate('lectureId', 'name email avatar role bio')
         .populate('mentorIds', 'name email avatar role bio')
-        .sort({ year: -1, semester: 1, classIndex: 1 });
+        .sort({ year: -1, semester: 1, subjectCode: 1, classIndex: 1, classCode: 1 });
       return successResponse(res, { classes });
     }
 
@@ -478,7 +604,7 @@ exports.getMyClasses = async (req, res) => {
       const classes = await Class.find({ lectureId: req.user._id })
         .populate('lectureId', 'name email avatar role bio')
         .populate('mentorIds', 'name email avatar role bio')
-        .sort({ year: -1, semester: 1, classIndex: 1 });
+        .sort({ year: -1, semester: 1, subjectCode: 1, classIndex: 1, classCode: 1 });
       return successResponse(res, { classes });
     }
 
@@ -493,7 +619,7 @@ exports.getMyClasses = async (req, res) => {
       })
         .populate('lectureId', 'name email avatar role bio')
         .populate('mentorIds', 'name email avatar role bio')
-        .sort({ year: -1, semester: 1, classIndex: 1 });
+        .sort({ year: -1, semester: 1, subjectCode: 1, classIndex: 1, classCode: 1 });
       return successResponse(res, { classes });
     }
 
@@ -513,7 +639,7 @@ exports.getMyClasses = async (req, res) => {
     const classes = await Class.find({ _id: { $in: classIds }, status: { $ne: 'disabled' } })
       .populate('lectureId', 'name email avatar role bio')
       .populate('mentorIds', 'name email avatar role bio')
-      .sort({ year: -1, semester: 1, classIndex: 1 });
+      .sort({ year: -1, semester: 1, subjectCode: 1, classIndex: 1, classCode: 1 });
 
     return successResponse(res, { classes });
   } catch (err) {
@@ -855,7 +981,7 @@ exports.renameClass = async (req, res) => {
       return errorResponse(res, 'You do not have permission to rename this class', 403);
     }
 
-    // Check uniqueness: (classCode, semester, year)
+    // Check uniqueness within the same semester/year.
     if (newCode !== cls.classCode) {
       const conflict = await Class.findOne({
         classCode: newCode,

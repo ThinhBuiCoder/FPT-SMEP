@@ -6,6 +6,7 @@ export const classApi = {
   getAll:      (params) => axiosClient.get('/classes', { params }),
   getById:     (id)     => axiosClient.get(`/classes/${id}`),
   bulkCreate:  (data)   => axiosClient.post('/classes/bulk-create', data),
+  reportCodeConflict: (data) => axiosClient.post('/classes/report-code-conflict', data),
   update:      (id, data) => axiosClient.put(`/classes/${id}`, data),
   rename:      (id, classCode) => axiosClient.put(`/classes/${id}/rename`, { classCode }),
   delete:      (id)     => axiosClient.delete(`/classes/${id}`),

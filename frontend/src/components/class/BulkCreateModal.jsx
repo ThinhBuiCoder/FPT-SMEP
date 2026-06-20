@@ -1,51 +1,89 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, AlertTriangle } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 import { userApi } from '../../api/userApi';
+import { subjectApi } from '../../api/subjectApi';
 
-const SEMESTERS   = ['SP', 'SU', 'FA'];
-const SUBJECTS    = ['EXE101', 'EXE201'];
 const CURRENT_YR  = new Date().getFullYear();
-const YEARS       = Array.from({ length: 6 }, (_, i) => CURRENT_YR - 1 + i);
 
 export default function BulkCreateModal({ lecturers: initialLecturers = [], isLecturer = false, onClose, onCreated }) {
   const [form, setForm] = useState({
-    subjectCode: 'EXE101',
+    subjectCode: '',
     semester:    'SP',
     year:        String(CURRENT_YR),
     count:       '5',
+    classIndicesText: '',
     lecturerIds: [],
     mentorIds:   [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [preview,    setPreview]    = useState([]);
+  const [classConflict, setClassConflict] = useState(null);
 
   const [allLecturers, setAllLecturers] = useState(initialLecturers);
   const [allMentors, setAllMentors] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [subjects, setSubjects] = useState([]);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchUsersAndSubjects = async () => {
       try {
-        const [lectRes, mentorRes] = await Promise.all([
+        const [lectRes, mentorRes, subjRes, semRes] = await Promise.all([
           allLecturers.length === 0 ? userApi.getAll({ role: 'LECTURER', limit: 200 }) : Promise.resolve(null),
-          userApi.getAll({ role: 'MENTOR', limit: 200 })
+          userApi.getAll({ role: 'MENTOR', limit: 200 }),
+          subjectApi.getActive(),
+          subjectApi.getCurrentSemester()
         ]);
         if (lectRes) {
           setAllLecturers(lectRes?.data?.users || lectRes?.users || []);
         }
         setAllMentors(mentorRes?.data?.users || mentorRes?.users || []);
-      } catch (err) {
-        toast.error('Failed to load user lists');
+        
+        const list = subjRes?.data?.subjects || subjRes?.subjects || [];
+        setSubjects(list);
+        
+        const activeSem = semRes?.data?.currentSemester || semRes?.currentSemester || { semester: 'SP', year: new Date().getFullYear() };
+
+        let defaultSubj = '';
+        if (list.length > 0) {
+          defaultSubj = list[0].subjectCode;
+        }
+
+        setForm(prev => ({
+          ...prev,
+          subjectCode: defaultSubj,
+          semester: activeSem.semester,
+          year: String(activeSem.year)
+        }));
+
+        if (defaultSubj && !isLecturer) {
+          setPreview(Array.from({ length: Math.min(parseInt(form.count, 10), 5) }, (_, i) => `${defaultSubj}_${i + 1}`));
+        }
+      } catch {
+        toast.error('Failed to load active subjects, active semester or users list');
       } finally {
         setLoadingUsers(false);
       }
     };
-    fetchUsers();
+    fetchUsersAndSubjects();
   }, []);
 
+  const parseClassIndices = (value) => {
+    const numbers = String(value || '')
+      .split(/[,\s]+/)
+      .map(item => parseInt(item.trim(), 10))
+      .filter(num => Number.isInteger(num));
+    return [...new Set(numbers)];
+  };
+
   const buildPreview = (f) => {
+    if (isLecturer) {
+      return parseClassIndices(f.classIndicesText)
+        .slice(0, 8)
+        .map(idx => `${f.subjectCode}_${idx}`);
+    }
+
     const n = parseInt(f.count, 10);
     if (!n || n < 1) return [];
     return Array.from({ length: Math.min(n, 5) }, (_, i) => `${f.subjectCode}_${i + 1}`);
@@ -54,7 +92,7 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
   const handleChange = (k, v) => {
     const next = { ...form, [k]: v };
     setForm(next);
-    if (k === 'subjectCode' || k === 'count') {
+    if (k === 'subjectCode' || k === 'count' || k === 'classIndicesText') {
       setPreview(buildPreview(next));
     }
   };
@@ -62,8 +100,14 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
   const validate = () => {
     if (!form.subjectCode) return 'Subject code is required';
     if (!['SP','SU','FA'].includes(form.semester)) return 'Invalid semester';
-    const n = parseInt(form.count, 10);
-    if (!n || n < 1 || n > 100) return 'Count must be between 1 and 100';
+    if (isLecturer) {
+      const indices = parseClassIndices(form.classIndicesText);
+      if (indices.length === 0) return 'Assign Class is required';
+      if (indices.some(idx => idx < 1 || idx > 999)) return 'Class numbers must be between 1 and 999';
+    } else {
+      const n = parseInt(form.count, 10);
+      if (!n || n < 1 || n > 100) return 'Count must be between 1 and 100';
+    }
     const y = parseInt(form.year, 10);
     if (!y || y < 2020) return 'Invalid year';
     return null;
@@ -74,20 +118,52 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
     if (err) { toast.error(err); return; }
 
     setSubmitting(true);
+    setClassConflict(null);
     try {
       const res = await classApi.bulkCreate({
         subjectCode: form.subjectCode,
         semester:    form.semester,
         year:        parseInt(form.year, 10),
-        count:       parseInt(form.count, 10),
-        lecturerIds: form.lecturerIds.length > 0 ? form.lecturerIds : undefined,
-        mentorIds:   form.mentorIds.length > 0 ? form.mentorIds : undefined,
+        count:       isLecturer ? undefined : parseInt(form.count, 10),
+        classIndices: isLecturer ? parseClassIndices(form.classIndicesText) : undefined,
+        lecturerIds: !isLecturer && form.lecturerIds.length > 0 ? form.lecturerIds : undefined,
+        mentorIds:   !isLecturer && form.mentorIds.length > 0 ? form.mentorIds : undefined,
       });
-      const count = res?.data?.count || res?.count || parseInt(form.count, 10);
+      const count = res?.data?.count || res?.count || (isLecturer ? parseClassIndices(form.classIndicesText).length : parseInt(form.count, 10));
       toast.success(`${count} classes created successfully!`);
       onCreated();
     } catch (e) {
+      const conflict = e?.data?.conflict;
+      if (isLecturer && e?.status === 409 && conflict) {
+        setClassConflict(conflict);
+        return;
+      }
       toast.error(e?.message || 'Failed to create classes');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConflictMine = () => {
+    setClassConflict(null);
+    toast('Please check and enter your assigned class number again.');
+  };
+
+  const handleConflictOtherLecturer = async () => {
+    if (!classConflict) return;
+
+    setSubmitting(true);
+    try {
+      await classApi.reportCodeConflict({
+        classCode: classConflict.classCode,
+        semester: classConflict.semester,
+        year: classConflict.year,
+        reason: 'other_lecturer_may_have_created_wrong_class',
+      });
+      toast.success('The lecturer has been notified to verify this class code.');
+      setClassConflict(null);
+    } catch (e) {
+      toast.error(e?.message || 'Failed to send conflict report');
     } finally {
       setSubmitting(false);
     }
@@ -116,6 +192,21 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
 
         {/* Body */}
         <div className="p-6 space-y-4">
+          {/* Locked semester info banner */}
+          {form.semester && form.year && (
+            <div className="flex items-center gap-3 p-3 bg-primary-50 border border-primary-100 rounded-xl">
+              <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-primary">{form.semester}</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-primary">Active Semester Locked</p>
+                <p className="text-[11px] text-primary/70">
+                  Classes will be created for <strong>{form.semester} {form.year}</strong>. Change via Subject &amp; Semester settings.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Subject + Semester */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -125,43 +216,58 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
                 onChange={(e) => handleChange('subjectCode', e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
-                {SUBJECTS.map(s => <option key={s}>{s}</option>)}
+                {subjects.map(s => (
+                  <option key={s.subjectCode} value={s.subjectCode}>
+                    {s.subjectCode}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Semester *</label>
-              <select
-                value={form.semester}
-                onChange={(e) => handleChange('semester', e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                {SEMESTERS.map(s => <option key={s}>{s}</option>)}
-              </select>
+              <input
+                type="text"
+                disabled
+                value={`${form.semester} (Active Semester)`}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-slate-50 text-slate-500 font-medium"
+              />
             </div>
           </div>
 
-          {/* Year + Count */}
+          {/* Year + Count / Assign Class */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Year *</label>
-              <select
-                value={form.year}
-                onChange={(e) => handleChange('year', e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                {YEARS.map(y => <option key={y}>{y}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Number of Classes *</label>
               <input
-                type="number"
-                min="1" max="100"
-                value={form.count}
-                onChange={(e) => handleChange('count', e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                type="text"
+                disabled
+                value={form.year}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none bg-slate-50 text-slate-500 font-medium"
               />
             </div>
+            {isLecturer ? (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Assign Class *</label>
+                <input
+                  type="text"
+                  value={form.classIndicesText}
+                  onChange={(e) => handleChange('classIndicesText', e.target.value)}
+                  placeholder="e.g. 4, 6, 7"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Number of Classes *</label>
+                <input
+                  type="number"
+                  min="1" max="100"
+                  value={form.count}
+                  onChange={(e) => handleChange('count', e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            )}
           </div>
 
           {loadingUsers ? (
@@ -211,6 +317,7 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
               )}
 
               {/* Mentors */}
+              {!isLecturer && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Assign Mentors (optional)</label>
                 <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5">
@@ -239,18 +346,21 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
                   )}
                 </div>
               </div>
+              )}
             </>
           )}
 
           {/* Preview */}
           {preview.length > 0 && (
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-2">Preview (first {preview.length} of {form.count})</p>
+              <p className="text-xs font-semibold text-slate-500 mb-2">
+                {isLecturer ? 'Preview' : `Preview (first ${preview.length} of ${form.count})`}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {preview.map(code => (
                   <span key={code} className="px-2 py-0.5 bg-primary-50 text-primary text-xs font-mono rounded-lg">{code}</span>
                 ))}
-                {parseInt(form.count, 10) > 5 && (
+                {!isLecturer && parseInt(form.count, 10) > 5 && (
                   <span className="px-2 py-0.5 text-slate-400 text-xs">+{parseInt(form.count, 10) - 5} more</span>
                 )}
               </div>
@@ -271,6 +381,49 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
             {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create Classes'}
           </button>
         </div>
+
+        {classConflict && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm rounded-2xl">
+            <div className="w-full max-w-sm bg-white border border-amber-200 rounded-2xl shadow-float p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Class code already exists</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {classConflict.classCode} has already been created by {classConflict.lecturer?.name || 'another lecturer'}.
+                  </p>
+                  {classConflict.lecturer?.email && (
+                    <p className="text-xs text-slate-400 mt-1">{classConflict.lecturer.email}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 mt-4">
+                Please decide whether the issue is on your side or whether the other lecturer should verify their assigned class code.
+              </p>
+
+              <div className="grid grid-cols-1 gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={handleConflictMine}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50 transition-all"
+                >
+                  Issue is on my side
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConflictOtherLecturer}
+                  disabled={submitting}
+                  className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-all"
+                >
+                  Issue is on the other lecturer side
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
