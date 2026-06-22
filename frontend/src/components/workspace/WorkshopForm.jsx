@@ -46,6 +46,49 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
   const [offlinePage, setOfflinePage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  const todayStr = useMemo(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  const minStartDate = useMemo(() => {
+    if (!workshop) return todayStr;
+    if (workshop.startDate) {
+      const start = new Date(workshop.startDate).toISOString().split('T')[0];
+      if (start < todayStr) {
+        return start;
+      }
+    }
+    return todayStr;
+  }, [workshop, todayStr]);
+
+  const minEndDate = useMemo(() => {
+    if (startDate) return startDate;
+    return minStartDate;
+  }, [startDate, minStartDate]);
+
+  const minCheckInDeadline = useMemo(() => {
+    const nowLocalStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    if (!workshop) return nowLocalStr;
+    if (workshop.checkInDeadline) {
+      const deadline = new Date(workshop.checkInDeadline).toISOString().slice(0, 16);
+      if (deadline < nowLocalStr) {
+        return deadline;
+      }
+    }
+    return nowLocalStr;
+  }, [workshop]);
+
+  const maxCheckInDeadline = useMemo(() => {
+    if (endDate && endTime) {
+      return `${endDate}T${endTime}`;
+    }
+    return undefined;
+  }, [endDate, endTime]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -247,9 +290,62 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
       return false;
     }
 
-    if (new Date(startDate) > new Date(endDate)) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const checkStartDate = new Date(startDate);
+    checkStartDate.setHours(0, 0, 0, 0);
+
+    const checkEndDate = new Date(endDate);
+    checkEndDate.setHours(0, 0, 0, 0);
+
+    const originalStart = workshop?.startDate ? new Date(workshop.startDate) : null;
+    if (originalStart) originalStart.setHours(0, 0, 0, 0);
+
+    const originalEnd = workshop?.endDate ? new Date(workshop.endDate) : null;
+    if (originalEnd) originalEnd.setHours(0, 0, 0, 0);
+
+    const isNew = !workshop?._id;
+    const isStartChanged = originalStart && checkStartDate.getTime() !== originalStart.getTime();
+    const isEndChanged = originalEnd && checkEndDate.getTime() !== originalEnd.getTime();
+
+    if ((isNew || isStartChanged) && checkStartDate < today) {
+      toast.error('Start Date cannot be in the past');
+      return false;
+    }
+
+    if ((isNew || isEndChanged) && checkEndDate < today) {
+      toast.error('End Date cannot be in the past');
+      return false;
+    }
+
+    if (checkStartDate > checkEndDate) {
       toast.error('Start Date must be before or equal to End Date');
       return false;
+    }
+
+    if (startDate === endDate && startTime >= endTime) {
+      toast.error('Start Time must be before End Time when on the same day');
+      return false;
+    }
+
+    if (checkInDeadline) {
+      const deadlineDate = new Date(checkInDeadline);
+      const now = new Date();
+      
+      const originalDeadline = workshop?.checkInDeadline ? new Date(workshop.checkInDeadline) : null;
+      const isDeadlineChanged = !originalDeadline || deadlineDate.getTime() !== originalDeadline.getTime();
+
+      if ((isNew || isDeadlineChanged) && deadlineDate < now) {
+        toast.error('Check-in Deadline cannot be in the past');
+        return false;
+      }
+
+      const workshopEnd = new Date(`${endDate}T${endTime}`);
+      if (deadlineDate > workshopEnd) {
+        toast.error('Check-in Deadline cannot be after the Workshop End Time');
+        return false;
+      }
     }
 
     if (targetAudience === 'CLASS' || targetAudience === 'TEAM' || targetAudience === 'LECTURER' || targetAudience === 'MENTOR') {
@@ -259,9 +355,22 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
       }
     }
 
+    if (targetAudience === 'TEAM' && teamIds.length === 0) {
+      toast.error('Please select at least one team');
+      return false;
+    }
+
     if (onlineClassIds.length > 0 && !meetingLink) {
       toast.error('Meeting Link is required for online classes');
       return false;
+    }
+
+    if (meetingLink) {
+      const urlPattern = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i;
+      if (!urlPattern.test(meetingLink)) {
+        toast.error('Please enter a valid URL for Meeting Link (starting with http:// or https://)');
+        return false;
+      }
     }
 
     if (offlineClassIds.length > 0 && !location) {
@@ -461,6 +570,7 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
                       <input
                         type="date"
                         value={startDate}
+                        min={minStartDate}
                         onChange={e => setStartDate(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                         required
@@ -473,6 +583,7 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
                       <input
                         type="date"
                         value={endDate}
+                        min={minEndDate}
                         onChange={e => setEndDate(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                         required
@@ -542,6 +653,8 @@ const WorkshopForm = ({ isOpen, onClose, workshop, onSave }) => {
                       <input
                         type="datetime-local"
                         value={checkInDeadline}
+                        min={minCheckInDeadline}
+                        max={maxCheckInDeadline}
                         onChange={e => setCheckInDeadline(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                       />
