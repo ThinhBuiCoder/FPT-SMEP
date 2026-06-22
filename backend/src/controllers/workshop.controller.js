@@ -147,6 +147,41 @@ const createWorkshop = async (req, res) => {
       return errorResponse(res, 'Vui lòng cung cấp các trường bắt buộc (Tiêu đề, ngày, giờ).', 400);
     }
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+      return errorResponse(res, 'Ngày bắt đầu không được ở trong quá khứ.', 400);
+    }
+    if (end < today) {
+      return errorResponse(res, 'Ngày kết thúc không được ở trong quá khứ.', 400);
+    }
+    if (start > end) {
+      return errorResponse(res, 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.', 400);
+    }
+
+    if (startDate === endDate && startTime >= endTime) {
+      return errorResponse(res, 'Giờ bắt đầu phải trước giờ kết thúc khi diễn ra trong cùng một ngày.', 400);
+    }
+
+    if (checkInDeadline) {
+      const deadline = new Date(checkInDeadline);
+      const now = new Date();
+      if (deadline < now) {
+        return errorResponse(res, 'Hạn chót check-in không được ở trong quá khứ.', 400);
+      }
+      const workshopEnd = new Date(`${endDate}T${endTime}`);
+      if (deadline > workshopEnd) {
+        return errorResponse(res, 'Hạn chót check-in không được sau giờ kết thúc của buổi hội thảo.', 400);
+      }
+    }
+
     const onIds = onlineClassIds || [];
     const offIds = offlineClassIds || [];
 
@@ -161,9 +196,19 @@ const createWorkshop = async (req, res) => {
       return errorResponse(res, 'Phải chọn ít nhất 1 lớp online hoặc offline.', 400);
     }
 
+    if (targetAudience === 'TEAM' && (!teamIds || teamIds.length === 0)) {
+      return errorResponse(res, 'Vui lòng chọn ít nhất một nhóm.', 400);
+    }
+
     // Validate required fields based on class groups
     if (onIds.length > 0 && !meetingLink) {
       return errorResponse(res, 'Meeting URL là bắt buộc khi có lớp Online.', 400);
+    }
+    if (meetingLink) {
+      const urlPattern = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i;
+      if (!urlPattern.test(meetingLink)) {
+        return errorResponse(res, 'Vui lòng nhập URL hợp lệ cho Meeting Link (bắt đầu bằng http:// hoặc https://).', 400);
+      }
     }
     if (offIds.length > 0 && !location) {
       return errorResponse(res, 'Địa điểm là bắt buộc khi có lớp Offline.', 400);
@@ -250,6 +295,82 @@ const updateWorkshop = async (req, res) => {
       const overlap = onIds.filter(id => offIds.includes(id));
       if (overlap.length > 0) {
         return errorResponse(res, 'Một lớp không được xuất hiện trong cả Online và Offline.', 400);
+      }
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const newStart = startDate ? new Date(startDate) : new Date(ws.startDate);
+    newStart.setHours(0, 0, 0, 0);
+
+    const newEnd = endDate ? new Date(endDate) : new Date(ws.endDate);
+    newEnd.setHours(0, 0, 0, 0);
+
+    const oldStart = new Date(ws.startDate);
+    oldStart.setHours(0, 0, 0, 0);
+
+    const oldEnd = new Date(ws.endDate);
+    oldEnd.setHours(0, 0, 0, 0);
+
+    // Only validate that start date is not in the past if it has been changed
+    if (startDate && newStart.getTime() !== oldStart.getTime() && newStart < today) {
+      return errorResponse(res, 'Ngày bắt đầu không được ở trong quá khứ.', 400);
+    }
+    // Only validate that end date is not in the past if it has been changed
+    if (endDate && newEnd.getTime() !== oldEnd.getTime() && newEnd < today) {
+      return errorResponse(res, 'Ngày kết thúc không được ở trong quá khứ.', 400);
+    }
+
+    if (newStart > newEnd) {
+      return errorResponse(res, 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.', 400);
+    }
+
+    const finalStartDateStr = startDate || ws.startDate.toISOString().split('T')[0];
+    const finalEndDateStr = endDate || ws.endDate.toISOString().split('T')[0];
+    const finalStartTime = startTime || ws.startTime;
+    const finalEndTime = endTime || ws.endTime;
+
+    if (finalStartDateStr === finalEndDateStr && finalStartTime >= finalEndTime) {
+      return errorResponse(res, 'Giờ bắt đầu phải trước giờ kết thúc khi diễn ra trong cùng một ngày.', 400);
+    }
+
+    if (checkInDeadline !== undefined) {
+      if (checkInDeadline) {
+        const deadline = new Date(checkInDeadline);
+        const now = new Date();
+        const oldDeadline = ws.checkInDeadline ? new Date(ws.checkInDeadline) : null;
+
+        // Only validate that deadline is not in the past if it was changed
+        const isDeadlineChanged = !oldDeadline || deadline.getTime() !== oldDeadline.getTime();
+        if (isDeadlineChanged && deadline < now) {
+          return errorResponse(res, 'Hạn chót check-in không được ở trong quá khứ.', 400);
+        }
+
+        const workshopEnd = new Date(`${finalEndDateStr}T${finalEndTime}`);
+        if (deadline > workshopEnd) {
+          return errorResponse(res, 'Hạn chót check-in không được sau giờ kết thúc của buổi hội thảo.', 400);
+        }
+      }
+    } else if (ws.checkInDeadline) {
+      const deadline = new Date(ws.checkInDeadline);
+      const workshopEnd = new Date(`${finalEndDateStr}T${finalEndTime}`);
+      if (deadline > workshopEnd) {
+        return errorResponse(res, 'Hạn chót check-in không được sau giờ kết thúc của buổi hội thảo.', 400);
+      }
+    }
+
+    const finalAudience = targetAudience || ws.targetAudience;
+    const finalTeamIds = teamIds !== undefined ? teamIds : ws.teamIds;
+    if (finalAudience === 'TEAM' && (!finalTeamIds || finalTeamIds.length === 0)) {
+      return errorResponse(res, 'Vui lòng chọn ít nhất một nhóm.', 400);
+    }
+
+    const finalMeetingLink = meetingLink !== undefined ? meetingLink : ws.meetingLink;
+    if (finalMeetingLink) {
+      const urlPattern = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i;
+      if (!urlPattern.test(finalMeetingLink)) {
+        return errorResponse(res, 'Vui lòng nhập URL hợp lệ cho Meeting Link (bắt đầu bằng http:// hoặc https://).', 400);
       }
     }
 
