@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, AlertTriangle, CheckCircle2, Loader2, Info, AlertCircle, Send } from 'lucide-react';
+import { Users, AlertTriangle, CheckCircle2, Loader2, AlertCircle, Send } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 import { getTeamGroupFromMajor } from '../../constants/majors';
+import TeamSuggestionTooltip from './TeamSuggestionTooltip';
 
 const getTeamSizeSuggestion = (count) => {
   if (count === 0) return '';
@@ -60,6 +61,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
   const [projectName, setProjectName] = useState('');
   const [description, setDescription] = useState('');
   const [isProjectNameSameAsGroup, setIsProjectNameSameAsGroup] = useState(true);
+  const [selectedLeaderId, setSelectedLeaderId] = useState('');
 
   const suggestionInfo = useMemo(() => {
     const unassignedCount = students.filter(s => !s.teamId).length;
@@ -120,7 +122,8 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
     const isDescriptionValid = description.trim().length >= 20 && description.trim().length <= 500;
     const hasCurrentUser = selected.includes(currentStudentId);
 
-    const isFormValid = isGroupNameValid && isProjectNameValid && isDescriptionValid && hasCurrentUser;
+    const hasLeader = selected.includes(selectedLeaderId);
+    const isFormValid = isGroupNameValid && isProjectNameValid && isDescriptionValid && hasCurrentUser && hasLeader;
 
     return {
       selectedStudents,
@@ -133,15 +136,17 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
       canPropose,
       missingMajorCount,
       isFormValid,
-      hasCurrentUser
+      hasCurrentUser,
+      hasLeader,
     };
-  }, [selected, students, groupName, projectName, description, isProjectNameSameAsGroup, currentStudentId]);
+  }, [selected, students, groupName, projectName, description, isProjectNameSameAsGroup, currentStudentId, selectedLeaderId]);
 
   const {
-    studentCount, uniqueMajors,
+    selectedStudents, studentCount, uniqueMajors,
     hasGroup1, hasGroup2, isFullyValid, canPropose,
-    missingMajorCount, isFormValid, hasCurrentUser
+    missingMajorCount, isFormValid, hasCurrentUser, hasLeader
   } = validation;
+  const canSubmit = isFormValid && (isFullyValid || canPropose);
 
   const handleSubmit = async () => {
     if (!isFormValid) {
@@ -157,6 +162,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
         projectName: isProjectNameSameAsGroup ? groupName.trim() : projectName.trim(),
         description: description.trim(),
         isProjectNameSameAsGroup,
+        leaderStudentId: selectedLeaderId,
       };
       
       const res = await classApi.studentProposeTeam(classId, payload);
@@ -167,6 +173,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
       setProjectName('');
       setDescription('');
       setIsProjectNameSameAsGroup(true);
+      setSelectedLeaderId('');
       onTeamCreated();
     } catch (e) {
       toast.error(e?.response?.data?.message || e?.message || 'Lỗi khi tạo nhóm');
@@ -177,15 +184,12 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
 
   return (
     <div className="bg-white rounded-2xl border p-4 shadow-sm">
-      <div className="mb-4 pb-4 border-b border-slate-100 flex flex-col gap-2">
-        <h3 className="font-bold text-lg text-slate-800">Tạo nhóm của bạn</h3>
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <h3 className="font-bold text-lg text-slate-800">Tạo nhóm</h3>
         {suggestionInfo && (
-          <div className="flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 px-3 py-2 rounded-xl w-fit">
-            <Info className="w-4 h-4 shrink-0" />
-            <span>
+          <TeamSuggestionTooltip>
               Lớp có {suggestionInfo.unassigned} SV chưa có nhóm. {suggestionInfo.suggestion}
-            </span>
-          </div>
+          </TeamSuggestionTooltip>
         )}
       </div>
 
@@ -194,7 +198,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Tên Nhóm (Group Name) <span className="text-red-500">*</span>
+              Tên nhóm <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -212,6 +216,22 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
           </div>
 
           <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              Team Leader <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selected.includes(selectedLeaderId) ? selectedLeaderId : ''}
+              onChange={(event) => setSelectedLeaderId(event.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+            >
+              <option value="">Select a team member</option>
+              {selectedStudents.map(student => (
+                <option key={student._id} value={student._id}>{student.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
               <input
                 type="checkbox"
@@ -219,13 +239,13 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
                 onChange={e => setIsProjectNameSameAsGroup(e.target.checked)}
                 className="rounded border-slate-300 text-primary focus:ring-primary"
               />
-              Dùng Tên Nhóm làm Tên Dự Án (Project Name)
+              Dùng tên nhóm làm tên dự án
             </label>
 
             {!isProjectNameSameAsGroup && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Tên Dự Án <span className="text-red-500">*</span>
+                  Tên dự án <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -275,7 +295,7 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
               <Users className="w-4 h-4" /> Thành viên đã chọn ({studentCount})
             </h4>
             
-            <div className="flex flex-col gap-2 text-xs mb-4">
+            <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2 text-xs">
               <span className={`flex items-center gap-1.5 font-medium ${(studentCount >= 4 && studentCount <= 6) ? 'text-green-600' : studentCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${(studentCount >= 4 && studentCount <= 6) ? 'bg-green-500' : studentCount > 0 ? 'bg-red-400' : 'bg-slate-300'}`}>
                   {(studentCount >= 4 && studentCount <= 6) ? '✓' : '✗'}
@@ -302,6 +322,13 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
                   {hasCurrentUser ? '✓' : '✗'}
                 </span>
                 <span>Bạn phải nằm trong danh sách nhóm</span>
+              </span>
+
+              <span className={`flex items-center gap-1.5 font-medium ${hasLeader ? 'text-green-600' : 'text-red-500'}`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] shrink-0 ${hasLeader ? 'bg-green-500' : 'bg-red-400'}`}>
+                  {hasLeader ? '✓' : '×'}
+                </span>
+                <span>Đã chọn Team Leader</span>
               </span>
             </div>
 
@@ -333,17 +360,23 @@ export default function StudentTeamGeneratePanel({ classId, selected: rawSelecte
           <div>
             <button
               onClick={handleSubmit}
-              disabled={submitting || !isFormValid || (!isFullyValid && !canPropose)}
-              className={`w-full py-2.5 rounded-xl text-sm font-bold flex justify-center items-center gap-2 transition-all disabled:opacity-50
-                ${isFullyValid 
-                  ? 'bg-green-500 text-white hover:bg-green-600' 
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
+              disabled={submitting || !canSubmit}
+              className={`w-full py-2.5 rounded-xl text-sm font-bold flex justify-center items-center gap-2 transition-all
+                ${!canSubmit
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                  : isFullyValid
+                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
                 }`}
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 
                 (isFullyValid ? <CheckCircle2 className="w-4 h-4" /> : <Send className="w-4 h-4" />)
               }
-              {isFullyValid ? 'Tạo Nhóm Chính Thức' : 'Gửi Đề Xuất Duyệt'}
+              {isFullyValid
+                ? 'Tạo nhóm'
+                : canPropose
+                  ? 'Gửi đề xuất duyệt'
+                  : 'Chưa đủ điều kiện tạo nhóm'}
             </button>
           </div>
         </div>

@@ -14,6 +14,7 @@ import TeamList from '../../components/class/TeamList';
 import ImportStudentsModal from '../../components/class/ImportStudentsModal';
 import TeamGeneratePanel from '../../components/class/TeamGeneratePanel';
 import StudentTeamGeneratePanel from '../../components/class/StudentTeamGeneratePanel';
+import TeamSuggestionTooltip from '../../components/class/TeamSuggestionTooltip';
 import ReviewTeamProposalModal from '../../components/class/ReviewTeamProposalModal';
 import EditScheduleModal from '../../components/class/EditScheduleModal';
 import AssignMentorsModal from '../../components/class/AssignMentorsModal';
@@ -426,7 +427,7 @@ export default function ClassDetail() {
       </div>
 
       {/* ── Team Generation Panel (always visible when students exist) ── */}
-      {safeStudents.length > 0 && (
+      {safeStudents.length > 0 && selected.length > 0 && (
         <div className="sticky top-20 z-40 shadow-xl rounded-2xl bg-white/80 backdrop-blur-md">
           {user?.role === 'STUDENT' ? (
             <StudentTeamGeneratePanel
@@ -474,6 +475,29 @@ export default function ClassDetail() {
             onSelectionChange={setSelected}
             onRefresh={fetchData}
             onDeleteStudent={isAdminOrLecturer ? handleRemoveStudent : undefined}
+            toolbarAction={selected.length === 0 ? (
+              user?.role === 'STUDENT' ? (
+                <TeamSuggestionTooltip label="Xem hướng dẫn tạo nhóm">
+                  <div className="space-y-2">
+                    <p className="font-semibold text-white">
+                      {unassignedCount} sinh viên chưa có nhóm
+                    </p>
+                    <p className="text-slate-200">
+                      Chọn chính bạn và các thành viên trong bảng để bắt đầu tạo nhóm.
+                      Nhóm cần 4–6 thành viên, có ít nhất một sinh viên nhóm BBA và một sinh viên nhóm BIT.
+                    </p>
+                  </div>
+                </TeamSuggestionTooltip>
+              ) : (
+                <TeamGeneratePanel
+                  classId={id}
+                  selected={selected}
+                  students={safeStudents}
+                  classMentors={cls.mentorIds || []}
+                  onTeamCreated={handleTeamCreated}
+                />
+              )
+            ) : null}
           />
         ) : (
           <TeamList

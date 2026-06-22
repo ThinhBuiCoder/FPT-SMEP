@@ -31,6 +31,17 @@ const teamSchema = new mongoose.Schema(
     groupExe201: { type: String, default: "" },
     projectName: { type: String, default: "" },
     description: { type: String, default: "" },
+    projectDirection: { type: String, default: "", trim: true },
+    projectDirectionUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    projectDirectionUpdatedAt: { type: Date, default: null },
+    projectDirectionStatus: {
+      type: String,
+      enum: ['NOT_SUBMITTED', 'PENDING', 'APPROVED', 'CHANGES_REQUESTED'],
+      default: 'NOT_SUBMITTED',
+    },
+    projectDirectionReviewComment: { type: String, default: '', trim: true },
+    projectDirectionReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    projectDirectionReviewedAt: { type: Date, default: null },
 
     // Proposal fields
     status:       { type: String, enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'NEEDS_REVISION'], default: 'APPROVED' },

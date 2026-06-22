@@ -4,6 +4,7 @@ import { Users, Shield, MessageSquare, AlertCircle, Calendar, Star, Loader2, Spa
 import toast from 'react-hot-toast';
 import { classApi } from '../../api/classApi';
 import EmptyState from '../../components/ui/EmptyState';
+import { getDisplayTeamName } from '../../utils/teamDisplay';
 
 const majorColor = (major) => {
   const palette = [
@@ -54,6 +55,7 @@ export default function MyTeam() {
   const chatGroup = data?.chatGroup || data?.team?.chatGroupId || data?.team?.chatGroup;
   const lecturer  = team?.lectureId;
   const mentor    = team?.mentorId;
+  const displayTeamName = getDisplayTeamName(team) || 'Unnamed Team';
 
   if (!team) {
     return (
@@ -104,7 +106,7 @@ export default function MyTeam() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 leading-tight">{team.teamName}</h2>
+                <h2 className="text-2xl font-bold text-slate-900 leading-tight">{displayTeamName}</h2>
                 <p className="text-xs text-slate-400 font-mono mt-0.5 tracking-wider">{team.teamCode}</p>
               </div>
             </div>

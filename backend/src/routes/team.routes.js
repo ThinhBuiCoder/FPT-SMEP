@@ -25,6 +25,7 @@ router.put('/:teamId/review', authorize('ADMIN', 'LECTURER'), ctrl.reviewTeamPro
 router.delete('/:teamId',    authorize('ADMIN', 'LECTURER'), ctrl.deleteTeam);
 // Assign mentor to a team
 router.put('/:teamId/assign-mentor', authorize('ADMIN', 'LECTURER'), ctrl.assignMentor);
+router.put('/:teamId/assign-leader', authorize('ADMIN', 'LECTURER'), ctrl.assignLeader);
 // Update team members (add/remove students) — Lecturer or Admin
 router.put('/:teamId/members', authorize('ADMIN', 'LECTURER'), ctrl.updateTeamMembers);
 // View chat group for a team

@@ -6,6 +6,7 @@ import { classApi } from '../../api/classApi';
 import TeamList from '../../components/class/TeamList';
 import StudentTable from '../../components/class/StudentTable';
 import StudentTeamGeneratePanel from '../../components/class/StudentTeamGeneratePanel';
+import TeamSuggestionTooltip from '../../components/class/TeamSuggestionTooltip';
 import { useAuth } from '../../hooks/useAuth';
 
 const semesterLabel = (sem) => {
@@ -60,6 +61,7 @@ export default function StudentClassDetail() {
     return (studentUserId && studentUserId === currentUserId)
       || (user?.email && s.email?.toLowerCase() === user.email.toLowerCase());
   });
+  const hasTeam = Boolean(currentStudent?.teamId);
 
   const handleTeamCreated = async () => {
     setSelected([]);
@@ -125,7 +127,7 @@ export default function StudentClassDetail() {
         </div>
       </div>
 
-      {students.length > 0 && (
+      {students.length > 0 && !hasTeam && selected.length > 0 && (
         <div className="sticky top-20 z-30 rounded-2xl bg-white/80 shadow-xl backdrop-blur-md">
           <StudentTeamGeneratePanel
             classId={id}
@@ -171,6 +173,18 @@ export default function StudentClassDetail() {
           onSelectionChange={setSelected}
           onRefresh={fetchClassDetail}
           maxSelection={7}
+          selectionDisabled={hasTeam}
+          toolbarAction={!hasTeam && selected.length === 0 ? (
+            <TeamSuggestionTooltip label="Xem hướng dẫn tạo nhóm">
+              <div className="space-y-2">
+                <p className="font-semibold text-white">Hướng dẫn tạo nhóm</p>
+                <p className="text-slate-200">
+                  Chọn chính bạn và các thành viên trong bảng để bắt đầu. Nhóm cần 4–6 thành viên,
+                  có ít nhất một sinh viên nhóm BBA và một sinh viên nhóm BIT.
+                </p>
+              </div>
+            </TeamSuggestionTooltip>
+          ) : null}
         />
       ) : (
         <TeamList

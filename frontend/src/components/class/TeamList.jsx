@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Users, Trash2, MessageSquare, MessageSquareDashed, ChevronDown, ChevronRight, Loader2, UserCog } from 'lucide-react';
 import { teamApi } from '../../api/teamApi';
 import TeamMemberEditModal from './TeamMemberEditModal';
+import { getDisplayGroupName, getDisplayTeamName } from '../../utils/teamDisplay';
 
 const majorColor = (major) => {
   const palette = ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-cyan-50 text-cyan-700', 'bg-orange-50 text-orange-700', 'bg-pink-50 text-pink-700'];
@@ -23,22 +24,23 @@ const normalizeTeamText = (value) => (typeof value === 'string' ? value.trim() :
 
 function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo = true, currentStudentId, classStudents = [] }) {
   const navigate = useNavigate();
+  const displayTeamName = getDisplayTeamName(team) || 'Unnamed Team';
   const [expanded,  setExpanded]  = useState(false);
   const [deleting,  setDeleting]  = useState(false);
   const [editing,   setEditing]   = useState(false);
   const [saving,    setSaving]    = useState(false);
   const [showEditMembers, setShowEditMembers] = useState(false);
   const [formData,  setFormData]  = useState({
-    teamName: team.teamName || '',
-    groupName: team.groupName || '',
+    teamName: getDisplayTeamName(team),
+    groupName: getDisplayGroupName(team),
     projectName: team.projectName || '',
     description: team.description || '',
   });
 
   const resetFormData = () => {
     setFormData({
-      teamName: team.teamName || '',
-      groupName: team.groupName || '',
+      teamName: getDisplayTeamName(team),
+      groupName: getDisplayGroupName(team),
       projectName: team.projectName || '',
       description: team.description || '',
     });
@@ -50,11 +52,11 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete ${team.teamName || 'this team'}? This will also remove the chat group.`)) return;
+    if (!confirm(`Delete ${displayTeamName}? This will also remove the chat group.`)) return;
     setDeleting(true);
     try {
       await teamApi.delete(team._id);
-      toast.success(`${team.teamName || 'Team'} deleted`);
+      toast.success(`${displayTeamName} deleted`);
       onRefresh();
     } catch (e) {
       toast.error(e?.message || 'Failed to delete team');
@@ -106,7 +108,7 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
   const members = Array.isArray(team.members) ? team.members : [];
   const lecturerName = safeName(team.lectureId);
   const mentorName   = safeName(team.mentorId);
-  const teamNameText = team.teamName || 'Unnamed Team';
+  const teamNameText = displayTeamName;
   const teamNumberMatch = teamNameText.match(/\bTeam\s*(\d+)\b/i);
   const teamBadge = teamNumberMatch?.[1] || teamNameText.trim().charAt(0)?.toUpperCase() || '?';
   
@@ -270,11 +272,11 @@ function TeamCard({ team, onRefresh, onReview, canDelete = true, canManageInfo =
               <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                 <div>
                   <p className="text-[10px] uppercase font-semibold text-slate-400">Team Name</p>
-                  <p className="text-sm text-slate-700 font-medium">{team.teamName || 'Not set'}</p>
+                  <p className="text-sm text-slate-700 font-medium">{teamNameText}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-semibold text-slate-400">Group Name</p>
-                  <p className="text-sm text-slate-700 font-medium">{team.groupName || 'Not set'}</p>
+                  <p className="text-sm text-slate-700 font-medium">{getDisplayGroupName(team) || 'Not set'}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-[10px] uppercase font-semibold text-slate-400">Project Name</p>

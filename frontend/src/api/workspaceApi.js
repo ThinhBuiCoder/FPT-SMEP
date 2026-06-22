@@ -5,6 +5,15 @@ export const workspaceApi = {
   getMyWorkspace: () => axiosClient.get('/workspace/my-team'),
   getAccessibleTeams: () => axiosClient.get('/workspace/accessible-teams'),
   getTeamWorkspace: (teamId) => axiosClient.get(`/workspace/teams/${teamId}`),
+  updateProjectDirection: (teamId, projectDirection) => axiosClient.put(
+    `/workspace/teams/${teamId}/project-direction`,
+    { projectDirection }
+  ),
+  getClassProjectDirections: (classId) => axiosClient.get(`/workspace/classes/${classId}/project-directions`),
+  reviewProjectDirection: (teamId, decision, comment) => axiosClient.put(
+    `/workspace/teams/${teamId}/project-direction/review`,
+    { decision, comment }
+  ),
   
   createProposal: (teamId, payload) => axiosClient.post(`/workspace/teams/${teamId}/proposal`, payload),
   getProposal: (teamId) => axiosClient.get(`/workspace/teams/${teamId}/proposal`),
