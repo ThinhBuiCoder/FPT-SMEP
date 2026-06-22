@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { Search, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import EmptyState from '../ui/EmptyState';
 import { getMajorName, TEAM_MAJOR_GROUPS } from '../../constants/majors';
+import { getDisplayGroupName } from '../../utils/teamDisplay';
 
 /**
  * Get display label for a major code.
@@ -43,6 +44,8 @@ export default function StudentTable({
   selected,
   onSelectionChange,
   onDeleteStudent,
+  toolbarAction,
+  selectionDisabled = false,
   maxSelection = 6,
 }) {
   const students = useMemo(() => (Array.isArray(rawStudents) ? rawStudents : []), [rawStudents]);
@@ -106,6 +109,7 @@ export default function StudentTable({
   }, [teams]);
 
   const toggleSelect = (id) => {
+    if (selectionDisabled) return;
     onSelectionChange(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
       if (prev.length >= maxSelection) {
@@ -117,6 +121,7 @@ export default function StudentTable({
   };
 
   const toggleAll = () => {
+    if (selectionDisabled) return;
     const unassigned = filtered.filter(s => !s.teamId).map(s => s._id);
     const allSelected = unassigned.length > 0 && unassigned.every(id => selected.includes(id));
     if (allSelected) {
@@ -138,7 +143,7 @@ export default function StudentTable({
     }
   };
 
-  const canSelect = (s) => !s.teamId;
+  const canSelect = (s) => !selectionDisabled && !s.teamId;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -189,6 +194,7 @@ export default function StudentTable({
             {selected.length} selected
           </span>
         )}
+        {toolbarAction}
       </div>
 
       {filtered.length === 0 ? (
@@ -200,14 +206,16 @@ export default function StudentTable({
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    className="rounded"
-                    checked={filtered.filter(s => !s.teamId).length > 0 && filtered.filter(s => !s.teamId).every(s => selected.includes(s._id))}
-                    onChange={toggleAll}
-                  />
-                </th>
+                {!selectionDisabled && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="rounded"
+                      checked={filtered.filter(s => !s.teamId).length > 0 && filtered.filter(s => !s.teamId).every(s => selected.includes(s._id))}
+                      onChange={toggleAll}
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[240px]">Student</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Roll No.</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Major</th>
@@ -238,11 +246,13 @@ export default function StudentTable({
 
                 return (
                   <tr key={s._id} onClick={() => selectable && toggleSelect(s._id)} className={rowClass}>
-                    <td className="px-4 py-3">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary' : 'border-slate-300'} ${!selectable ? 'opacity-30' : ''}`}>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                      </div>
-                    </td>
+                    {!selectionDisabled && (
+                      <td className="px-4 py-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary' : 'border-slate-300'} ${!selectable ? 'opacity-30' : ''}`}>
+                          {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+                      </td>
+                    )}
 
                     <td className="px-4 py-3 min-w-[240px]">
                       <div className="flex items-center gap-3">
@@ -275,7 +285,7 @@ export default function StudentTable({
                     </td>
 
                     <td className="px-4 py-3 text-slate-500 hidden lg:table-cell font-medium text-xs">
-                      {(!s.teamId || isFirstInTeam) ? (team?.groupName || '—') : ''}
+                      {(!s.teamId || isFirstInTeam) ? (getDisplayGroupName(team) || '—') : ''}
                     </td>
 
                     {!hideProjectName && (

@@ -10,6 +10,7 @@ export const teamApi = {
 
   // ─── Assignment ──────────────────────────────────────────────────────────
   assignMentor: (teamId, mentorId) => axiosClient.put(`/teams/${teamId}/assign-mentor`, { mentorId }),
+  assignLeader: (teamId, leaderStudentId) => axiosClient.put(`/teams/${teamId}/assign-leader`, { leaderStudentId }),
 
   // ─── Proposal Review (Lecturer/Admin) ────────────────────────────────────
   reviewProposal: (teamId, data) => axiosClient.put(`/teams/${teamId}/review`, data),

@@ -12,6 +12,7 @@ const PitchDeck = require("../models/PitchDeck");
 const CheckpointSubmission = require("../models/CheckpointSubmission");
 const workspacePerm = require("../utils/workspacePermission");
 const workspaceAccess = require("../services/workspaceAccess.service");
+const { createBulkNotifications } = require("../services/notification.service");
 
 // Use memory storage for Cloudinary
 const storage = multer.memoryStorage();
@@ -184,7 +185,9 @@ exports.getTeamWorkspace = async (req, res) => {
 exports.getTeamWorkspaceDetails = async (teamId) => {
   const team = await Team.findById(teamId)
     .populate("mentorId", "name email avatar role")
-    .populate("lectureId", "name email avatar role");
+    .populate("lectureId", "name email avatar role")
+    .populate("projectDirectionUpdatedBy", "name email role")
+    .populate("projectDirectionReviewedBy", "name email role");
     
   if (!team) {
     throw new Error("Team not found");
@@ -195,6 +198,15 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
     .populate("mentorIds", "name email avatar role");
 
   const students = await Student.find({ teamId }).populate("userId", "name email avatar role");
+  const roleByStudentId = new Map(
+    (team.members || []).map((member) => [String(member.studentId), member.roleInTeam || "Member"])
+  );
+  const workspaceMembers = students.map((student) => ({
+    ...student.toObject(),
+    roleInTeam: String(team.leaderId || "") === String(student._id)
+      ? "Leader"
+      : (roleByStudentId.get(String(student._id)) || "Member"),
+  }));
 
   const proposal = await Proposal.findOne({ teamId });
   const lineageTeamIds = team.lineageId
@@ -220,7 +232,7 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
   return {
     team,
     class: cls,
-    members: students,
+    members: workspaceMembers,
     lecturer: cls?.lectureId || team?.lectureId || null,
     mentor: team?.mentorId || (cls?.mentorIds && cls.mentorIds[0]) || null,
     proposal,
@@ -228,6 +240,136 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
     latestDeck,
     versions
   };
+};
+
+// Only the current team leader may write the team's project direction.
+exports.updateProjectDirection = async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const direction = typeof req.body?.projectDirection === "string"
+      ? req.body.projectDirection.trim()
+      : "";
+    const wordCount = direction ? direction.split(/\s+/u).length : 0;
+
+    if (wordCount < 30 || wordCount > 500) {
+      return errorResponse(res, "Project direction must contain 30-500 words.", 400);
+    }
+
+    await workspacePerm.assertCanAccessTeamWorkspace(req.user, teamId);
+    await workspaceAccess.assertCanMutateWorkspace(req.user, teamId);
+
+    const team = await Team.findById(teamId);
+    if (!team) return errorResponse(res, "Team not found", 404);
+
+    const student = await workspacePerm.getStudentForTeam(req.user, team);
+    const isLeader = student && String(team.leaderId || "") === String(student._id);
+    if (!isLeader) {
+      return errorResponse(res, "Only the team leader can update project direction.", 403);
+    }
+
+    team.projectDirection = direction;
+    team.projectDirectionUpdatedBy = req.user._id;
+    team.projectDirectionUpdatedAt = new Date();
+    team.projectDirectionStatus = "PENDING";
+    await team.save();
+
+    await team.populate("projectDirectionUpdatedBy", "name email role");
+    return successResponse(res, {
+      projectDirection: team.projectDirection,
+      projectDirectionUpdatedBy: team.projectDirectionUpdatedBy,
+      projectDirectionUpdatedAt: team.projectDirectionUpdatedAt,
+      projectDirectionStatus: team.projectDirectionStatus,
+      wordCount,
+    }, "Project direction saved.");
+  } catch (err) {
+    if (err.statusCode === 403) return errorResponse(res, err.message, 403);
+    console.error("updateProjectDirection error:", err);
+    return errorResponse(res, "Server error: " + err.message);
+  }
+};
+
+exports.getClassProjectDirections = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.classId).select("classCode subjectCode semester year lectureId");
+    if (!cls) return errorResponse(res, "Class not found", 404);
+
+    const role = String(req.user?.role || "").toUpperCase();
+    const isAssignedLecturer = ["LECTURER", "LECTURE"].includes(role)
+      && String(cls.lectureId || "") === String(req.user._id);
+    if (!isAssignedLecturer && role !== "ADMIN") {
+      return errorResponse(res, "You do not have permission to review this class.", 403);
+    }
+
+    const teams = await Team.find({ classId: cls._id, status: { $ne: "REJECTED" } })
+      .populate("leaderId", "fullName email rollNumber")
+      .populate("projectDirectionUpdatedBy", "name email")
+      .populate("projectDirectionReviewedBy", "name email")
+      .sort({ projectName: 1, teamName: 1 });
+
+    return successResponse(res, { class: cls, teams });
+  } catch (err) {
+    console.error("getClassProjectDirections error:", err);
+    return errorResponse(res, "Server error: " + err.message);
+  }
+};
+
+exports.reviewProjectDirection = async (req, res) => {
+  try {
+    const { decision, comment } = req.body || {};
+    const normalizedDecision = String(decision || "").toUpperCase();
+    const cleanComment = typeof comment === "string" ? comment.trim() : "";
+
+    if (!["APPROVED", "CHANGES_REQUESTED"].includes(normalizedDecision)) {
+      return errorResponse(res, "Decision must be APPROVED or CHANGES_REQUESTED.", 400);
+    }
+    if (cleanComment.length < 3 || cleanComment.length > 1000) {
+      return errorResponse(res, "Review comment must contain 3-1000 characters.", 400);
+    }
+
+    const team = await Team.findById(req.params.teamId);
+    if (!team) return errorResponse(res, "Team not found", 404);
+    if (!team.projectDirection) return errorResponse(res, "This team has not submitted a project direction.", 400);
+
+    const cls = await Class.findById(team.classId).select("classCode lectureId");
+    const role = String(req.user?.role || "").toUpperCase();
+    const isAssignedLecturer = ["LECTURER", "LECTURE"].includes(role)
+      && String(cls?.lectureId || "") === String(req.user._id);
+    if (!isAssignedLecturer) {
+      return errorResponse(res, "Only the assigned lecturer can review this project direction.", 403);
+    }
+
+    team.projectDirectionStatus = normalizedDecision;
+    team.projectDirectionReviewComment = cleanComment;
+    team.projectDirectionReviewedBy = req.user._id;
+    team.projectDirectionReviewedAt = new Date();
+    await team.save();
+
+    const students = await Student.find({ teamId: team._id }).select("userId email");
+    const recipients = students
+      .filter((student) => student.email)
+      .map((student) => ({ id: student.userId || null, email: student.email }));
+    const decisionText = normalizedDecision === "APPROVED" ? "approved" : "requested changes for";
+
+    await createBulkNotifications(recipients, {
+      type: "TEAM",
+      title: "Project direction reviewed",
+      message: `${req.user.name || "Your lecturer"} ${decisionText} your team's project direction. Comment: ${cleanComment}`,
+      link: `/workspace/teams/${team._id}`,
+      data: {
+        action: "PROJECT_DIRECTION_REVIEWED",
+        teamId: team._id,
+        classId: team.classId,
+        status: normalizedDecision,
+      },
+      createdBy: req.user._id,
+    });
+
+    await team.populate("projectDirectionReviewedBy", "name email role");
+    return successResponse(res, { team }, "Project direction reviewed.");
+  } catch (err) {
+    console.error("reviewProjectDirection error:", err);
+    return errorResponse(res, "Server error: " + err.message);
+  }
 };
 
 // ─── POST /api/workspace/teams/:teamId/proposal ────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
-  X, UserPlus, UserMinus, Users, AlertTriangle, CheckCircle2, Loader2, Search
+  X, UserPlus, UserMinus, Users, AlertTriangle, CheckCircle2, Loader2, Search, UserCheck
 } from 'lucide-react';
 import { teamApi } from '../../api/teamApi';
 import { getTeamGroupFromMajor } from '../../constants/majors';
@@ -30,6 +30,9 @@ const majorColor = (major) => {
 export default function TeamMemberEditModal({ team, classStudents, onClose, onRefresh }) {
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const initialLeaderId = (team.leaderId?._id || team.leaderId || '').toString();
+  const [selectedLeaderId, setSelectedLeaderId] = useState(initialLeaderId);
+  const [showLeaderConfirmation, setShowLeaderConfirmation] = useState(false);
 
   // Build initial member ID set from the team
   const initialMemberIds = useMemo(() => {
@@ -110,6 +113,7 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
   };
 
   const toggleRemove = (id) => {
+    if (selectedLeaderId === id) setSelectedLeaderId('');
     if (!initialMemberIds.has(id)) {
       // It was a pending add — just cancel the add
       setPendingAddIds(prev => {
@@ -127,21 +131,32 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
     });
   };
 
-  const hasChanges = pendingAddIds.size > 0 || pendingRemoveIds.size > 0;
+  const hasMemberChanges = pendingAddIds.size > 0 || pendingRemoveIds.size > 0;
+  const hasLeaderChange = selectedLeaderId !== initialLeaderId;
+  const hasChanges = hasMemberChanges || hasLeaderChange;
 
-  const handleSave = async () => {
+  const persistChanges = async () => {
     if (!hasChanges) {
       toast.error('Chưa có thay đổi nào');
+      return;
+    }
+    if (!selectedLeaderId || !effectiveMemberIds.has(selectedLeaderId)) {
+      toast.error('Please select a leader from the team members');
       return;
     }
 
     setSubmitting(true);
     try {
-      await teamApi.updateMembers(team._id, {
-        addStudentIds: [...pendingAddIds],
-        removeStudentIds: [...pendingRemoveIds],
-      });
-      toast.success('Cập nhật thành viên nhóm thành công!');
+      if (hasMemberChanges) {
+        await teamApi.updateMembers(team._id, {
+          addStudentIds: [...pendingAddIds],
+          removeStudentIds: [...pendingRemoveIds],
+        });
+      }
+      if (hasLeaderChange) {
+        await teamApi.assignLeader(team._id, selectedLeaderId);
+      }
+      toast.success(hasLeaderChange ? 'Team leader confirmed and team notified' : 'Team members updated');
       onRefresh();
       onClose();
     } catch (e) {
@@ -151,7 +166,15 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
     }
   };
 
-  const leaderId = (team.leaderId?._id || team.leaderId || '').toString();
+  const handleSave = () => {
+    if (hasLeaderChange) {
+      setShowLeaderConfirmation(true);
+      return;
+    }
+    persistChanges();
+  };
+
+  const selectedLeader = validation.members.find(student => student._id === selectedLeaderId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -205,7 +228,7 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {validation.members.map(s => {
-                  const isLeader = s._id === leaderId;
+                  const isLeader = s._id === selectedLeaderId;
                   const isBeingRemoved = pendingRemoveIds.has(s._id);
                   const isNewlyAdded = pendingAddIds.has(s._id);
                   return (
@@ -219,6 +242,16 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
                           : 'bg-slate-50 border-slate-200'
                       }`}
                     >
+                      {!isBeingRemoved && (
+                        <input
+                          type="radio"
+                          name={`leader-${team._id}`}
+                          checked={isLeader}
+                          onChange={() => setSelectedLeaderId(s._id)}
+                          title="Set as Team Leader"
+                          className="h-4 w-4 shrink-0 border-slate-300 text-primary focus:ring-primary"
+                        />
+                      )}
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/70 to-secondary flex items-center justify-center text-white text-xs font-bold shrink-0">
                         {s.fullName?.charAt(0)?.toUpperCase() || '?'}
                       </div>
@@ -350,6 +383,40 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
           </div>
         </div>
       </div>
+
+      {showLeaderConfirmation && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <UserCheck className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold text-slate-900">Confirm Team Leader</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Assign <strong>{selectedLeader?.fullName || 'this member'}</strong> as the Team Leader?
+              The whole team will receive an in-system notification after confirmation.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLeaderConfirmation(false)}
+                disabled={submitting}
+                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={persistChanges}
+                disabled={submitting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

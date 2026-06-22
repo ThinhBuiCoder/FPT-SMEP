@@ -9,6 +9,7 @@ import {
   FilePenLine,
 } from 'lucide-react';
 import { teamApi } from '../../api/teamApi';
+import { getDisplayGroupName } from '../../utils/teamDisplay';
 import { getTeamGroupFromMajor } from '../../constants/majors';
 
 export default function ReviewTeamProposalModal({ team, classStudents, onClose, onRefresh }) {
@@ -16,7 +17,7 @@ export default function ReviewTeamProposalModal({ team, classStudents, onClose, 
   const [status, setStatus] = useState('APPROVED');
   const [reviewNote, setReviewNote] = useState('');
   const [teamInfo, setTeamInfo] = useState({
-    groupName: team.groupName || '',
+    groupName: getDisplayGroupName(team),
     projectName: team.projectName || '',
     description: team.description || '',
   });

@@ -32,7 +32,7 @@ const validateDescription = (value, { required = false } = {}) => {
 
 // ─── POST /api/classes/:classId/teams/generate ───────────────────────────────
 exports.generateTeam = async (req, res) => {
-  const { studentIds, mode = 'auto', mentorId } = req.body;
+  const { studentIds, mode = 'auto', mentorId, leaderStudentId } = req.body;
   const { classId } = req.params;
 
   if (!['auto', 'manual', 'exception'].includes(mode))
@@ -41,6 +41,8 @@ exports.generateTeam = async (req, res) => {
   // 1. Validate students — exception mode bypasses size check (allows 3 or 7)
   const { students, error } = await validateTeamStudents(studentIds, classId, mode);
   if (error) return errorResponse(res, error, 400);
+  const selectedLeader = students.find(s => s._id.toString() === String(leaderStudentId || ''));
+  if (!selectedLeader) return errorResponse(res, 'Please select a leader from the team members', 400);
 
   // 2. Load class for teamCode generation
   const cls = await Class.findById(classId);
@@ -81,7 +83,7 @@ exports.generateTeam = async (req, res) => {
 
   try {
     // Create team
-    const groupName = cls.classCode; // e.g., EXE201_11
+    const groupName = teamName;
     const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`; // e.g., EXE201g_11G1
 
     const [team] = await Team.create(
@@ -94,8 +96,12 @@ exports.generateTeam = async (req, res) => {
         lectureId: cls.lectureId || null,
         mentorId: assignedMentorId,
         createdBy: req.user._id,
+        leaderId: selectedLeader._id,
         status: initialStatus, // Always PENDING until reviewed
-        members: students.map(s => ({ studentId: s._id, roleInTeam: 'Member' })),
+        members: students.map(s => ({
+          studentId: s._id,
+          roleInTeam: s._id.toString() === selectedLeader._id.toString() ? 'Leader' : 'Member'
+        })),
       }],
       { session }
     );
@@ -294,7 +300,7 @@ exports.updateTeamMembers = async (req, res) => {
 
 // ─── POST /api/classes/:classId/teams/student-proposal ───────────────────────
 exports.createStudentProposal = async (req, res) => {
-  const { studentIds, groupName, projectName, description, isProjectNameSameAsGroup } = req.body;
+  const { studentIds, groupName, projectName, description, isProjectNameSameAsGroup, leaderStudentId } = req.body;
   const { classId } = req.params;
 
   if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
@@ -350,6 +356,8 @@ exports.createStudentProposal = async (req, res) => {
   if (students.length !== uniqueIds.length) {
     return errorResponse(res, 'One or more students do not belong to this class', 400);
   }
+  const selectedLeader = students.find(s => s._id.toString() === String(leaderStudentId || ''));
+  if (!selectedLeader) return errorResponse(res, 'Please select a leader from the team members', 400);
 
   // Check if any student already has a team
   const alreadyAssigned = students.filter(s => s.teamId);
@@ -396,13 +404,13 @@ exports.createStudentProposal = async (req, res) => {
   try {
     const membersList = students.map(s => ({
       studentId: s._id,
-      roleInTeam: s._id.toString() === currentStudent._id.toString() ? 'Leader' : 'Member'
+      roleInTeam: s._id.toString() === selectedLeader._id.toString() ? 'Leader' : 'Member'
     }));
 
     const [team] = await Team.create(
       [{
         classId,
-        teamName,
+        teamName: projectValidation.value,
         teamCode,
         groupName: groupValidation.value,
         projectName: projectValidation.value,
@@ -410,7 +418,7 @@ exports.createStudentProposal = async (req, res) => {
         groupExe201,
         lectureId: cls.lectureId || null,
         createdBy: req.user._id,
-        leaderId: currentStudent._id,
+        leaderId: selectedLeader._id,
         status: initialStatus,
         members: membersList,
       }],
@@ -597,6 +605,9 @@ exports.reviewTeamProposal = async (req, res) => {
 
     team.groupName = groupValidation.value;
     team.projectName = projectValidation.value;
+    if (/^Team\s+\d+$/i.test(team.teamName || '')) {
+      team.teamName = projectValidation.value;
+    }
     team.description = descriptionValidation.value;
     team.status = status;
     team.reviewedBy = req.user._id;
@@ -787,6 +798,9 @@ exports.updateTeam = async (req, res) => {
       const projectValidation = validateName(projectName, 'Project name');
       if (projectValidation.error) return errorResponse(res, projectValidation.error, 400);
       team.projectName = projectValidation.value;
+      if (/^Team\s+\d+$/i.test(team.teamName || '')) {
+        team.teamName = projectValidation.value;
+      }
     }
     if (description !== undefined) {
       const descriptionValidation = validateDescription(description);
@@ -864,6 +878,61 @@ exports.assignMentor = async (req, res) => {
 };
 
 // ─── GET /api/teams/:teamId/chat-group ───────────────────────────────────────
+exports.assignLeader = async (req, res) => {
+  const { leaderStudentId } = req.body;
+  if (!leaderStudentId) return errorResponse(res, 'leaderStudentId is required', 400);
+
+  try {
+    const team = await Team.findById(req.params.teamId);
+    if (!team) return errorResponse(res, 'Team not found', 404);
+
+    const cls = await Class.findById(team.classId).select('classCode lectureId');
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+    if (req.user.role === 'LECTURER' && String(cls.lectureId || '') !== String(req.user._id)) {
+      return errorResponse(res, 'You do not have permission to manage this team', 403);
+    }
+
+    const leader = await Student.findOne({ _id: leaderStudentId, classId: team.classId });
+    const isMember = leader && (
+      String(leader.teamId || '') === String(team._id)
+      || team.members.some(member => String(member.studentId) === String(leader._id))
+    );
+    if (!isMember) return errorResponse(res, 'Leader must be a current team member', 400);
+
+    team.leaderId = leader._id;
+    team.members = team.members.map(member => ({
+      studentId: member.studentId,
+      roleInTeam: String(member.studentId) === String(leader._id) ? 'Leader' : 'Member',
+    }));
+    await team.save();
+
+    const students = await Student.find({ teamId: team._id }).select('userId email');
+    const recipients = students
+      .filter(student => student.email)
+      .map(student => ({ id: student.userId || null, email: student.email }));
+    const { createBulkNotifications } = require('../services/notification.service');
+    await createBulkNotifications(recipients, {
+      type: 'TEAM',
+      title: 'Team leader confirmed',
+      message: `${leader.fullName} has been confirmed as the leader of your team in ${cls.classCode}.`,
+      link: `/workspace/teams/${team._id}`,
+      data: {
+        action: 'TEAM_LEADER_CONFIRMED',
+        teamId: team._id,
+        classId: team.classId,
+        leaderStudentId: leader._id,
+      },
+      createdBy: req.user._id,
+    });
+
+    await team.populate('leaderId', 'fullName email rollNumber avatarUrl');
+    return successResponse(res, { team }, 'Team leader assigned and team notified');
+  } catch (err) {
+    console.error('assignLeader error:', err);
+    return errorResponse(res, 'Server error', 500);
+  }
+};
+
 exports.getChatGroup = async (req, res) => {
   try {
     const team = await Team.findById(req.params.teamId);
