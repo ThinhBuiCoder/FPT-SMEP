@@ -1,9 +1,9 @@
 // src/controllers/team.controller.js — Full Team Management (Module 2)
-const mongoose  = require('mongoose');
-const Team      = require('../models/Team');
-const Class     = require('../models/Class');
-const Student   = require('../models/Student');
-const User      = require('../models/User');
+const mongoose = require('mongoose');
+const Team = require('../models/Team');
+const Class = require('../models/Class');
+const Student = require('../models/Student');
+const User = require('../models/User');
 const ChatGroup = require('../models/ChatGroup');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { validateTeamStudents, generateTeamCode } = require('../services/teamGeneration.service');
@@ -66,113 +66,124 @@ exports.generateTeam = async (req, res) => {
     }
   }
 
-  // 4. Generate team code/name
-  const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
-
-  // All lecturer-generated teams start as PENDING and go through review.
-  // Standard teams (4-6 SV) → Lecturer reviews.
-  // Exception teams (3 or 7 SV) → Admin reviews.
+  // 4. Generate team code/name and 5. Run inside a transaction
+  let team;
+  let retryCount = 0;
+  let lastError;
   const isException = mode === 'exception';
   const initialStatus = 'PENDING';
 
-  // 5. Run inside a transaction for atomicity
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  while (retryCount < 3) {
+    const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
 
-  try {
-    // Create team
-    const groupName = cls.classCode; // e.g., EXE201_11
-    const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`; // e.g., EXE201g_11G1
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const [team] = await Team.create(
-      [{
-        classId,
-        teamName,
-        teamCode,
-        groupName,
-        groupExe201,
-        lectureId: cls.lectureId || null,
-        mentorId: assignedMentorId,
-        createdBy: req.user._id,
-        status: initialStatus, // Always PENDING until reviewed
-        members: students.map(s => ({ studentId: s._id, roleInTeam: 'Member' })),
-      }],
-      { session }
-    );
-
-    // Update each student's teamId
-    await Student.updateMany(
-      { _id: { $in: students.map(s => s._id) } },
-      { $set: { teamId: team._id } },
-      { session }
-    );
-
-    // Chat group is NOT created until the team is APPROVED via review
-    await session.commitTransaction();
-    session.endSession();
-
-    // Populate for response
-    await team.populate([
-      { path: 'members.studentId', select: 'fullName email rollNumber major' },
-      { path: 'lectureId', select: 'name email' },
-      { path: 'mentorId', select: 'name email' }
-    ]);
-
-    // Send notification to appropriate reviewer
     try {
-      const { createBulkNotifications } = require('../services/notification.service');
+      const groupName = cls.classCode; // e.g., EXE201_11
+      const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`; // e.g., EXE201g_11G1
 
-      if (isException) {
-        // Exception → notify Admins
-        const admins = await User.find({ role: 'ADMIN' }).select('email name _id');
-        const recipients = admins.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
-        if (recipients.length > 0) {
-          await createBulkNotifications(recipients, {
-            type: 'TEAM',
-            title: 'Đề xuất nhóm ngoại lệ cần duyệt',
-            message: `Giảng viên đã gửi đề xuất nhóm ngoại lệ (${students.length} thành viên) trong lớp ${cls.classCode} — cần Admin duyệt.`,
-            link: `/classes/${classId}`,
-            data: { teamId: team._id, classId },
-            createdBy: req.user._id,
-          });
-        }
-      } else {
-        // Standard team → notify the Lecturer of this class (or Admins if no lecturer)
-        const reviewerQuery = [];
-        if (cls.lectureId) reviewerQuery.push({ _id: cls.lectureId });
-        else reviewerQuery.push({ role: 'ADMIN' });
+      [team] = await Team.create(
+        [{
+          classId,
+          teamName,
+          teamCode,
+          groupName,
+          groupExe201,
+          lectureId: cls.lectureId || null,
+          mentorId: assignedMentorId,
+          createdBy: req.user._id,
+          status: initialStatus, // Always PENDING until reviewed
+          members: students.map(s => ({ studentId: s._id, roleInTeam: 'Member' })),
+        }],
+        { session }
+      );
 
-        const reviewers = await User.find({ $or: reviewerQuery }).select('email name _id');
-        const recipients = reviewers.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
-        if (recipients.length > 0) {
-          await createBulkNotifications(recipients, {
-            type: 'TEAM',
-            title: 'Có đề xuất nhóm mới cần duyệt',
-            message: `Đề xuất nhóm ${teamName} (${students.length} thành viên) trong lớp ${cls.classCode} đang chờ bạn duyệt.`,
-            link: `/classes/${classId}`,
-            data: { teamId: team._id, classId },
-            createdBy: req.user._id,
-          });
-        }
+      // Update each student's teamId
+      await Student.updateMany(
+        { _id: { $in: students.map(s => s._id) } },
+        { $set: { teamId: team._id } },
+        { session }
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+      break; // Success
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      if (err.code === 11000) {
+        retryCount++;
+        lastError = err;
+        continue;
       }
-    } catch (notifErr) {
-      console.error('Failed to notify reviewer about team proposal:', notifErr);
+      console.error('Team generation error:', err);
+      return errorResponse(res, err.message || 'Failed to create team', 500);
     }
-
-    return successResponse(
-      res,
-      { team, isException },
-      isException
-        ? `Đề xuất nhóm ngoại lệ "${teamName}" đã gửi lên Admin để duyệt`
-        : `Đề xuất nhóm "${teamName}" đã gửi cho Lecturer duyệt`,
-      201
-    );
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Team generation error:', err);
-    return errorResponse(res, err.message || 'Failed to create team', 500);
   }
+
+  if (!team) {
+    console.error('Team generation error after retries:', lastError);
+    return errorResponse(res, 'Hệ thống đang bận tạo nhóm, vui lòng thử lại', 500);
+  }
+
+  // Populate for response
+  await team.populate([
+    { path: 'members.studentId', select: 'fullName email rollNumber major' },
+    { path: 'lectureId', select: 'name email' },
+    { path: 'mentorId', select: 'name email' }
+  ]);
+
+  // Send notification to appropriate reviewer
+  try {
+    const { createBulkNotifications } = require('../services/notification.service');
+
+    if (isException) {
+      // Exception → notify Admins
+      const admins = await User.find({ role: 'ADMIN' }).select('email name _id');
+      const recipients = admins.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
+      if (recipients.length > 0) {
+        await createBulkNotifications(recipients, {
+          type: 'TEAM',
+          title: 'Đề xuất nhóm ngoại lệ cần duyệt',
+          message: `Giảng viên đã gửi đề xuất nhóm ngoại lệ (${students.length} thành viên) trong lớp ${cls.classCode} — cần Admin duyệt.`,
+          link: `/classes/${classId}`,
+          data: { teamId: team._id, classId },
+          createdBy: req.user._id,
+        });
+      }
+    } else {
+      // Standard team → notify the Lecturer of this class (or Admins if no lecturer)
+      const reviewerQuery = [];
+      if (cls.lectureId) reviewerQuery.push({ _id: cls.lectureId });
+      else reviewerQuery.push({ role: 'ADMIN' });
+
+      const reviewers = await User.find({ $or: reviewerQuery }).select('email name _id');
+      const recipients = reviewers.filter(u => u.email).map(u => ({ id: u._id, email: u.email }));
+      if (recipients.length > 0) {
+        await createBulkNotifications(recipients, {
+          type: 'TEAM',
+          title: 'Có đề xuất nhóm mới cần duyệt',
+          message: `Đề xuất nhóm ${teamName} (${students.length} thành viên) trong lớp ${cls.classCode} đang chờ bạn duyệt.`,
+          link: `/classes/${classId}`,
+          data: { teamId: team._id, classId },
+          createdBy: req.user._id,
+        });
+      }
+    }
+  } catch (notifErr) {
+    console.error('Failed to notify reviewer about team proposal:', notifErr);
+  }
+
+  return successResponse(
+    res,
+    { team, isException },
+    isException
+      ? `Đề xuất nhóm ngoại lệ "${teamName}" đã gửi lên Admin để duyệt`
+      : `Đề xuất nhóm "${teamName}" đã gửi cho Lecturer duyệt`,
+    201
+  );
+
 };
 
 
@@ -273,6 +284,28 @@ exports.updateTeamMembers = async (req, res) => {
       );
     }
 
+    const finalStudentIds = team.members.map(m => m.studentId.toString());
+    const finalStudents = await Student.find({ _id: { $in: finalStudentIds } }).populate('userId', 'major').session(session);
+    if (finalStudents.length > 0) {
+      if (finalStudents.length < 4 || finalStudents.length > 6) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Số lượng thành viên nhóm phải từ 4-6', 400);
+      }
+      const { getTeamGroupFromMajor } = require('../constants/majors');
+      const groupsPresent = new Set();
+      for (const s of finalStudents) {
+        const major = s.major || (s.userId && s.userId.major) || null;
+        if (major) {
+          const group = getTeamGroupFromMajor(major);
+          if (group) groupsPresent.add(group);
+        }
+      }
+      if (!groupsPresent.has('GROUP_1') || !groupsPresent.has('GROUP_2')) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Nhóm phải có sinh viên từ cả 2 nhóm ngành (Nhóm 1 BBA và Nhóm 2 BIT)', 400);
+      }
+    }
+
     await team.save({ session });
     await session.commitTransaction();
     session.endSession();
@@ -329,7 +362,7 @@ exports.createStudentProposal = async (req, res) => {
 
   // Deduplicate studentIds
   const uniqueIds = [...new Set(studentIds.map(String))];
-  
+
   // Ensure the creator is among the selected students
   // Find current student record
   const currentStudent = await Student.findOne({
@@ -360,7 +393,7 @@ exports.createStudentProposal = async (req, res) => {
 
   // Validation Rules
   let isValidSize = students.length >= 4 && students.length <= 6;
-  
+
   // Major check
   const groupsPresent = new Set();
   const { getTeamGroupFromMajor } = require('../constants/majors');
@@ -385,100 +418,114 @@ exports.createStudentProposal = async (req, res) => {
   const initialStatus = isFullyValid ? 'APPROVED' : 'PENDING';
 
   // Generate teamCode
+  // Generate teamCode and wrap in retry loop for duplicate errors
   const { generateTeamCode } = require('../services/teamGeneration.service');
-  const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
-  
-  const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`; // e.g., EXE201g_11G1
-
   const session = await mongoose.startSession();
-  session.startTransaction();
 
-  try {
-    const membersList = students.map(s => ({
-      studentId: s._id,
-      roleInTeam: s._id.toString() === currentStudent._id.toString() ? 'Leader' : 'Member'
-    }));
+  let team = null;
+  let retryCount = 0;
+  let lastError;
+  const membersList = students.map(s => ({
+    studentId: s._id,
+    roleInTeam: s._id.toString() === currentStudent._id.toString() ? 'Leader' : 'Member'
+  }));
 
-    const [team] = await Team.create(
-      [{
-        classId,
-        teamName,
-        teamCode,
-        groupName: groupValidation.value,
-        projectName: projectValidation.value,
-        description: descriptionValidation.value,
-        groupExe201,
-        lectureId: cls.lectureId || null,
-        createdBy: req.user._id,
-        leaderId: currentStudent._id,
-        status: initialStatus,
-        members: membersList,
-      }],
-      { session }
-    );
+  while (retryCount < 3) {
+    const { teamCode, teamName, teamIndex } = await generateTeamCode(cls.classCode, classId);
+    const groupExe201 = `${cls.subjectCode}g_${cls.classIndex}G${teamIndex}`;
 
-    // If APPROVED automatically, assign students immediately.
-    // If PENDING, we still assign them so they don't get double booked?
-    // Wait, if PENDING, should we assign teamId to students? Yes, otherwise they can create another team.
-    await Student.updateMany(
-      { _id: { $in: uniqueIds } },
-      { $set: { teamId: team._id } },
-      { session }
-    );
+    session.startTransaction();
+    try {
+      [team] = await Team.create(
+        [{
+          classId,
+          teamName,
+          teamCode,
+          groupName: groupValidation.value,
+          projectName: projectValidation.value,
+          description: descriptionValidation.value,
+          groupExe201,
+          lectureId: cls.lectureId || null,
+          createdBy: req.user._id,
+          leaderId: currentStudent._id,
+          status: initialStatus,
+          members: membersList,
+        }],
+        { session }
+      );
 
-    // Only create chat group if APPROVED
-    let chatGroup = null;
-    if (initialStatus === 'APPROVED') {
-      const { createChatGroupForTeam } = require('../services/chatGroup.service');
-      chatGroup = await createChatGroupForTeam(team._id, { session, createdBy: req.user._id });
-      team.chatGroupId = chatGroup._id;
-      await team.save({ session });
-    }
+      // Assign teamId to students
+      await Student.updateMany(
+        { _id: { $in: uniqueIds } },
+        { $set: { teamId: team._id } },
+        { session }
+      );
 
-    await session.commitTransaction();
-    session.endSession();
-
-    // Populate for response
-    await team.populate([
-      { path: 'members.studentId', select: 'fullName email rollNumber major avatarUrl' },
-      { path: 'leaderId', select: 'fullName email avatarUrl' }
-    ]);
-
-    if (initialStatus === 'PENDING') {
-      try {
-        const { createBulkNotifications } = require('../services/notification.service');
-        const reviewerQuery = [{ role: 'ADMIN' }];
-        if (cls.lectureId) reviewerQuery.push({ _id: cls.lectureId });
-        const reviewers = await User.find({ $or: reviewerQuery }).select('email name');
-        const recipients = reviewers
-          .filter(u => u.email)
-          .map(u => ({ id: u._id, email: u.email }));
-
-        await createBulkNotifications(recipients, {
-          type: 'TEAM',
-          title: 'Có đề xuất nhóm cần duyệt',
-          message: `Nhóm "${team.groupName}" đã gửi đề xuất ngoại lệ (${students.length} thành viên) cho lớp ${cls.classCode}.`,
-          link: `/classes/${classId}`,
-          data: { teamId: team._id, classId },
-          createdBy: req.user._id
-        });
-      } catch (notifErr) {
-        console.error('Failed to notify reviewers about team proposal:', notifErr);
+      // Only create chat group if APPROVED
+      let chatGroup = null;
+      if (initialStatus === 'APPROVED') {
+        const { createChatGroupForTeam } = require('../services/chatGroup.service');
+        chatGroup = await createChatGroupForTeam(team._id, { session, createdBy: req.user._id });
+        team.chatGroupId = chatGroup._id;
+        await team.save({ session });
       }
-    }
 
-    return successResponse(
-      res,
-      { team, isFullyValid },
-      isFullyValid ? 'Tạo nhóm thành công' : 'Đã gửi đề xuất nhóm chờ duyệt',
-      201
-    );
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Student Proposal Error:', err);
-    return errorResponse(res, err.message || 'Failed to create team proposal', 500);
+      await session.commitTransaction();
+      session.endSession();
+      break; // Success
+    } catch (err) {
+      await session.abortTransaction();
+      if (err.code === 11000) {
+        retryCount++;
+        lastError = err;
+        continue;
+      }
+      session.endSession();
+      console.error('Student Proposal Error:', err);
+      return errorResponse(res, err.message || 'Failed to create team proposal', 500);
+    }
   }
+
+  if (!team) {
+    console.error('Student Proposal Error after retries:', lastError);
+    return errorResponse(res, 'Hệ thống đang bận tạo nhóm, vui lòng thử lại', 500);
+  }
+
+  // Populate for response
+  await team.populate([
+    { path: 'members.studentId', select: 'fullName email rollNumber major avatarUrl' },
+    { path: 'leaderId', select: 'fullName email avatarUrl' }
+  ]);
+
+  if (initialStatus === 'PENDING') {
+    try {
+      const { createBulkNotifications } = require('../services/notification.service');
+      const reviewerQuery = [{ role: 'ADMIN' }];
+      if (cls.lectureId) reviewerQuery.push({ _id: cls.lectureId });
+      const reviewers = await User.find({ $or: reviewerQuery }).select('email name');
+      const recipients = reviewers
+        .filter(u => u.email)
+        .map(u => ({ id: u._id, email: u.email }));
+
+      await createBulkNotifications(recipients, {
+        type: 'TEAM',
+        title: 'Có đề xuất nhóm cần duyệt',
+        message: `Nhóm "${team.groupName}" đã gửi đề xuất ngoại lệ (${students.length} thành viên) cho lớp ${cls.classCode}.`,
+        link: `/classes/${classId}`,
+        data: { teamId: team._id, classId },
+        createdBy: req.user._id
+      });
+    } catch (notifErr) {
+      console.error('Failed to notify reviewers about team proposal:', notifErr);
+    }
+  }
+
+  return successResponse(
+    res,
+    { team, isFullyValid },
+    isFullyValid ? 'Tạo nhóm thành công' : 'Đã gửi đề xuất nhóm chờ duyệt',
+    201
+  );
 };
 
 // ─── GET /api/classes/:classId/teams ─────────────────────────────────────────
@@ -612,19 +659,43 @@ exports.reviewTeamProposal = async (req, res) => {
       );
       // We keep the Team document for history, or delete it? We'll keep it as REJECTED.
     } else if (status === 'APPROVED') {
-      // If new members were provided by lecturer, update them
-      if (newMemberIds && Array.isArray(newMemberIds)) {
-        const uniqueNewMemberIds = [...new Set(newMemberIds.map(String))];
-        const nextStudents = await Student.find({
-          _id: { $in: uniqueNewMemberIds },
-          classId: team.classId
-        }).session(session);
+      const isUpdatingMembers = newMemberIds && Array.isArray(newMemberIds);
+      const memberIdsToCheck = isUpdatingMembers
+        ? [...new Set(newMemberIds.map(String))]
+        : team.members.map(m => m.studentId.toString());
 
-        if (nextStudents.length !== uniqueNewMemberIds.length) {
+      const nextStudents = await Student.find({
+        _id: { $in: memberIdsToCheck },
+        classId: team.classId
+      }).session(session);
+
+      if (nextStudents.length !== memberIdsToCheck.length) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Một hoặc nhiều sinh viên không thuộc lớp này', 400);
+      }
+
+      if (nextStudents.length > 0) {
+        if (nextStudents.length < 4 || nextStudents.length > 6) {
           await session.abortTransaction(); session.endSession();
-          return errorResponse(res, 'One or more selected students do not belong to this class', 400);
+          return errorResponse(res, 'Số lượng thành viên nhóm phải từ 4-6', 400);
         }
+        const { getTeamGroupFromMajor } = require('../constants/majors');
+        const groupsPresent = new Set();
+        for (const s of nextStudents) {
+          const major = s.major || (s.userId && s.userId.major) || null;
+          if (major) {
+            const group = getTeamGroupFromMajor(major);
+            if (group) groupsPresent.add(group);
+          }
+        }
+        if (!groupsPresent.has('GROUP_1') || !groupsPresent.has('GROUP_2')) {
+          await session.abortTransaction(); session.endSession();
+          return errorResponse(res, 'Nhóm phải có sinh viên từ cả 2 nhóm ngành (Nhóm 1 BBA và Nhóm 2 BIT)', 400);
+        }
+      }
 
+      if (isUpdatingMembers) {
+        const uniqueNewMemberIds = memberIdsToCheck;
         const assignedElsewhere = nextStudents.filter(s => (
           s.teamId && s.teamId.toString() !== team._id.toString()
         ));
@@ -632,14 +703,13 @@ exports.reviewTeamProposal = async (req, res) => {
           await session.abortTransaction(); session.endSession();
           return errorResponse(
             res,
-            `These students are already in another team: ${assignedElsewhere.map(s => s.fullName).join(', ')}`,
+            `Các sinh viên này đã có nhóm khác: ${assignedElsewhere.map(s => s.fullName).join(', ')}`,
             400
           );
         }
 
         uniqueNewMemberIds.forEach(id => notificationStudentIds.add(id));
 
-        // Find current members
         const currentIds = team.members.map(m => m.studentId.toString());
         const idsToAdd = uniqueNewMemberIds.filter(id => !currentIds.includes(id));
         const idsToRemove = currentIds.filter(id => !uniqueNewMemberIds.includes(id));
@@ -659,7 +729,6 @@ exports.reviewTeamProposal = async (req, res) => {
           );
         }
 
-    // Rebuild members array
         team.members = uniqueNewMemberIds.map(id => ({
           studentId: id,
           roleInTeam: id === team.leaderId?.toString() ? 'Leader' : 'Member'
@@ -738,6 +807,10 @@ exports.updateTeam = async (req, res) => {
     const team = await Team.findById(req.params.teamId);
     if (!team) return errorResponse(res, 'Team not found', 404);
 
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'LECTURER' && req.user.role !== 'STUDENT') {
+      return errorResponse(res, 'Không có quyền thực hiện thao tác', 403);
+    }
+
     if (req.user.role === 'LECTURER') {
       const cls = await Class.findById(team.classId);
       if (!cls) return errorResponse(res, 'Class not found', 404);
@@ -793,7 +866,7 @@ exports.updateTeam = async (req, res) => {
       if (descriptionValidation.error) return errorResponse(res, descriptionValidation.error, 400);
       team.description = descriptionValidation.value;
     }
-    
+
     await team.save();
 
     return successResponse(res, { team }, 'Team updated');
@@ -809,6 +882,20 @@ exports.deleteTeam = async (req, res) => {
   try {
     const team = await Team.findById(req.params.teamId).session(session);
     if (!team) { await session.abortTransaction(); session.endSession(); return errorResponse(res, 'Team not found', 404); }
+
+    const cls = await Class.findById(team.classId).session(session);
+    if (!cls) { await session.abortTransaction(); session.endSession(); return errorResponse(res, 'Class not found', 404); }
+
+    if (req.user.role !== 'ADMIN') {
+      if (req.user.role !== 'LECTURER') {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Không có quyền thực hiện thao tác', 403);
+      }
+      if (cls.lectureId?.toString() !== req.user._id.toString()) {
+        await session.abortTransaction(); session.endSession();
+        return errorResponse(res, 'Không có quyền thực hiện thao tác', 403);
+      }
+    }
 
     // Unassign students
     await Student.updateMany(
@@ -844,7 +931,7 @@ exports.assignMentor = async (req, res) => {
       Team.findById(req.params.teamId),
       User.findById(mentorId),
     ]);
-    if (!team)   return errorResponse(res, 'Team not found', 404);
+    if (!team) return errorResponse(res, 'Team not found', 404);
     if (!mentor) return errorResponse(res, 'Mentor not found', 404);
     if (mentor.role !== 'MENTOR') return errorResponse(res, 'User is not a MENTOR', 400);
 
@@ -881,8 +968,8 @@ exports.getChatGroup = async (req, res) => {
 };
 
 // ─── Keep legacy routes functional (old Class.members-based system) ────────────
-exports.createTeam  = async (req, res) => errorResponse(res, 'Use POST /api/classes/:classId/teams/generate', 400);
-exports.getTeams    = async (req, res) => {
+exports.createTeam = async (req, res) => errorResponse(res, 'Use POST /api/classes/:classId/teams/generate', 400);
+exports.getTeams = async (req, res) => {
   // Redirect to class-scoped query if classId provided
   const { classId } = req.query;
   if (classId) {
@@ -909,7 +996,7 @@ exports.getTeamById = async (req, res) => {
     return errorResponse(res, 'Server error', 500);
   }
 };
-exports.addMember    = async (req, res) => errorResponse(res, 'Use team generation API', 400);
+exports.addMember = async (req, res) => errorResponse(res, 'Use team generation API', 400);
 exports.removeMember = async (req, res) => errorResponse(res, 'Use team generation API', 400);
 
 // ─── POST /api/classes/:classId/backfill-chats ───────────────────────────────
