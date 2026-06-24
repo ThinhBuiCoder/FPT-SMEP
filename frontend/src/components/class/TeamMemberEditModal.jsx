@@ -84,7 +84,8 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
       if (effectiveMemberIds.has(id)) return false; // already in team
       // Can add if they have no team or are being removed from their current team
       if (!s.teamId) return true;
-      if (s.teamId.toString() === team._id.toString()) return true; // their team IS this team
+      const teamIdStr = typeof s.teamId === 'object' && s.teamId !== null && s.teamId._id ? s.teamId._id.toString() : s.teamId.toString();
+      if (teamIdStr === team._id.toString()) return true; // their team IS this team
       return false;
     }).filter(s => {
       if (!searchQuery.trim()) return true;
@@ -358,11 +359,9 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
           <p className="text-xs text-slate-500">
-            {validation.isException && !validation.isFullyValid
-              ? '⚠️ Nhóm không đạt chuẩn — Giảng viên có toàn quyền điều chỉnh'
-              : validation.isFullyValid
+            {validation.isFullyValid
               ? '✓ Nhóm hợp lệ (4–6 SV, đủ 2 nhóm ngành)'
-              : 'Nhóm chưa đạt chuẩn'}
+              : '⚠️ Nhóm chưa đạt chuẩn. Không thể lưu thay đổi.'}
           </p>
           <div className="flex gap-2">
             <button
@@ -374,7 +373,7 @@ export default function TeamMemberEditModal({ team, classStudents, onClose, onRe
             </button>
             <button
               onClick={handleSave}
-              disabled={submitting || !hasChanges}
+              disabled={submitting || !hasChanges || !validation.isFullyValid}
               className="px-6 py-2 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary-700 transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
