@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, RefreshCw, Search, Filter, GraduationCap,
-  Users, BookOpen, ChevronRight, Upload, Eye, Calendar,
+  Users, BookOpen, ChevronRight, Upload, Eye, Calendar, LayoutGrid, ClipboardCheck,
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -14,6 +14,7 @@ import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import BulkCreateModal from '../../components/class/BulkCreateModal';
 import ImportStudentsModal from '../../components/class/ImportStudentsModal';
+import ClassDirectionOverview from '../../components/class/ClassDirectionOverview';
 
 const SEMESTERS = ['SP', 'SU', 'FA'];
 const CURRENT_YEAR = new Date().getFullYear();
@@ -64,6 +65,7 @@ export default function ClassManagement() {
   const [filterSem,  setFilterSem]  = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [filterSubj, setFilterSubj] = useState('');
+  const [viewMode, setViewMode] = useState('classes');
 
   // Modals
   const [showBulk,   setShowBulk]   = useState(false);
@@ -144,7 +146,7 @@ export default function ClassManagement() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Class Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{isLecturer ? 'My Classes' : 'Class Management'}</h1>
           <p className="text-slate-500 mt-1">{classes.length} class{classes.length !== 1 ? 'es' : ''} found</p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -165,6 +167,25 @@ export default function ClassManagement() {
           )}
         </div>
       </div>
+
+      {isLecturer && (
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setViewMode('classes')}
+            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${viewMode === 'classes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <LayoutGrid className="h-4 w-4" /> Classes
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('overview')}
+            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${viewMode === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <ClipboardCheck className="h-4 w-4" /> Overview
+          </button>
+        </div>
+      )}
 
       {/* ── Filters ── */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4">
@@ -213,7 +234,9 @@ export default function ClassManagement() {
       </div>
 
       {/* ── Class Grid ── */}
-      {classes.length === 0 ? (
+      {isLecturer && viewMode === 'overview' ? (
+        <ClassDirectionOverview semester={filterSem} year={filterYear} />
+      ) : classes.length === 0 ? (
         <EmptyState
           icon={GraduationCap}
           title="No classes found"

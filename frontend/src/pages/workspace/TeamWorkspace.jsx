@@ -2,15 +2,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Users, Mail, Loader2, FileText,
-  Award, Plus, ArrowLeft, Shield
+  Users, Mail, Loader2,
+  Award, ArrowLeft, Shield
 } from 'lucide-react';
 import { workspaceApi } from '../../api/workspaceApi';
 import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import { useAuth } from '../../hooks/useAuth';
-import Button from '../../components/ui/Button';
-import PitchDeckUpload from './PitchDeckUpload';
-import VersionHistory from './VersionHistory';
 import EvaluationPanel from '../../components/workspace/EvaluationPanel';
 import MentoringPanel from '../../components/workspace/MentoringPanel';
 import SprintPanel from '../../components/workspace/SprintPanel';
@@ -18,14 +15,8 @@ import WeeklyRoadmapPlanner from '../../components/workspace/WeeklyRoadmapPlanne
 import QuickShortcuts from '../../components/workspace/shortcuts/QuickShortcuts';
 import CheckpointSection from '../../components/workspace/checkpoints/CheckpointSection';
 import WorkspaceSelector from '../../components/workspace/WorkspaceSelector';
-
-const statusColors = {
-  DRAFT: 'bg-slate-100 text-slate-600 border border-slate-200',
-  SUBMITTED: 'bg-blue-50 text-blue-600 border border-blue-200',
-  REVIEWED: 'bg-purple-50 text-purple-600 border border-purple-200',
-  APPROVED: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
-  REJECTED: 'bg-red-50 text-red-600 border border-red-200'
-};
+import ProjectDirectionCard from '../../components/workspace/ProjectDirectionCard';
+import { getDisplayTeamName } from '../../utils/teamDisplay';
 
 const clearWorkspaceSelectionCache = () => {
   [
@@ -159,20 +150,21 @@ export default function TeamWorkspace() {
     );
   }
 
-  const { team, class: cls, members, lecturer, mentor, proposal, latestDeck, pitchDecks, versions } = data;
+  const { team, class: cls, members, lecturer, mentor, proposal, latestDeck } = data;
   const privilegedRoles = ['ADMIN', 'LECTURER', 'MENTOR'];
   const isTeamMember = members && members.some(m => m.userId?._id === user?._id);
   const accessMode = workspaceContext?.accessMode || workspaceContext?.selectedWorkspace?.accessMode || null;
   const isReadOnly = accessMode === 'READ_ONLY';
   const isEditable = !isReadOnly && (privilegedRoles.includes(user?.role) || isTeamMember);
-
-  // Build target proposal link
-  const getProposalLink = () => {
-    if (team?._id) {
-      return `/workspace/teams/${team._id}/proposal`;
-    }
-    return `/student/workspace/proposal`;
-  };
+  const currentMember = members?.find((member) => {
+    const memberUserId = member.userId?._id || member.userId;
+    return String(memberUserId || '') === String(user?._id || '')
+      || (user?.email && member.email?.toLowerCase() === user.email.toLowerCase());
+  });
+  const isTeamLeader = Boolean(
+    currentMember && String(team.leaderId?._id || team.leaderId || '') === String(currentMember._id)
+  );
+  const displayTeamName = getDisplayTeamName(team) || 'Unnamed Team';
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -187,11 +179,8 @@ export default function TeamWorkspace() {
               <span className="text-xs font-semibold px-2 py-0.5 bg-primary-50 text-primary border border-primary-100 rounded-md">
                 {cls?.classCode}
               </span>
-              <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 border border-slate-200/40 rounded-md">
-                {cls?.subjectCode}
-              </span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mt-1">{team.teamName} Workspace</h1>
+            <h1 className="text-2xl font-bold text-slate-900 mt-1">{displayTeamName} Workspace</h1>
             <p className="text-sm text-slate-500 mt-0.5">{team.description || 'Startup Workspace'}</p>
           </div>
         </div>
@@ -247,92 +236,14 @@ export default function TeamWorkspace() {
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* Left Side - Proposal & PitchDecks */}
+          {/* Left Side - Proposal & Checkpoints */}
           <div className="lg:col-span-8 space-y-6">
 
-            {/* Proposal Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold text-slate-800">Startup Proposal</h2>
-                </div>
-                {proposal && (
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${statusColors[proposal.status]}`}>
-                    {proposal.status}
-                  </span>
-                )}
-              </div>
-
-              {!proposal ? (
-                <div className="text-center py-8">
-                  <FileText className="w-16 h-16 text-slate-200 mx-auto mb-3" />
-                  <p className="text-slate-500 mb-4">No startup proposal has been initialized yet.</p>
-                  {isEditable ? (
-                    <Button variant="primary" size="sm" icon={Plus} onClick={() => navigate(getProposalLink())}>
-                      Create Proposal
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-slate-400 font-semibold bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">
-                      Read-only: Proposal not initialized
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900">{proposal.startupName || 'Unnamed Startup'}</h3>
-                    {proposal.tagline && <p className="text-sm text-slate-500 mt-1 italic">"{proposal.tagline}"</p>}
-                  </div>
-
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Problem Statement</h4>
-                    <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
-                      {proposal.problem || 'Not specified yet.'}
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Value Proposition</h4>
-                    <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
-                      {proposal.valueProposition || 'Not specified yet.'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-slate-400">
-                      Last updated {new Date(proposal.updatedAt).toLocaleDateString()}
-                    </span>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(getProposalLink() + '?preview=true')}
-                      >
-                        View Full Proposal
-                      </Button>
-                      {isEditable && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => navigate(getProposalLink())}
-                        >
-                          Edit Proposal
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Pitch Decks */}
-            <PitchDeckUpload
-              teamId={team._id}
-              latestDeck={latestDeck}
-              pitchDecks={pitchDecks}
-              isEditable={isEditable}
-              onRefresh={fetchWorkspaceData}
+            <ProjectDirectionCard
+              key={`${team._id}-${team.projectDirectionUpdatedAt || ''}`}
+              team={team}
+              canEdit={!isReadOnly && isTeamLeader}
+              onSaved={() => fetchWorkspaceData(team._id)}
             />
 
             {/* Startup Checkpoints */}
@@ -408,16 +319,6 @@ export default function TeamWorkspace() {
                 </div>
               </div>
             </div>
-
-            {/* Proposal Version History */}
-            {(proposal || versions?.length > 0) && (
-              <VersionHistory
-                proposalId={proposal?._id}
-                versions={versions}
-                isEditable={isEditable && Boolean(proposal)}
-                onRefresh={fetchWorkspaceData}
-              />
-            )}
 
           </div>
         </div>

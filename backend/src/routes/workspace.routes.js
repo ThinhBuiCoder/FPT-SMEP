@@ -11,6 +11,9 @@ router.use(protect);
 router.get("/accessible-teams", ctrl.getAccessibleTeams);
 router.get("/my-team", ctrl.getMyWorkspace);
 router.get("/teams/:teamId", ctrl.getTeamWorkspace);
+router.put("/teams/:teamId/project-direction", ctrl.updateProjectDirection);
+router.put("/teams/:teamId/project-direction/review", ctrl.reviewProjectDirection);
+router.get("/classes/:classId/project-directions", ctrl.getClassProjectDirections);
 
 // Proposal APIs
 router.post("/teams/:teamId/proposal", ctrl.createProposal);

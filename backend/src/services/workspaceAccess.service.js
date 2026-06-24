@@ -213,7 +213,7 @@ const formatWorkspace = (team, accessMode) => {
     teamId: team._id,
     classId: cls._id || team.classId,
     lineageId: team.lineageId,
-    teamName: team.teamName,
+    teamName: team.projectName || team.groupName || team.teamName,
     startupName: team.projectName || team.teamName,
     courseCode: team.courseCode || cls.subjectCode || '',
     semester: team.semester || semesterText(cls),
