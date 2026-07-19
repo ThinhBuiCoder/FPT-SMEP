@@ -13,6 +13,7 @@ router.use(protect);
 router.get('/', ctrl.getSubjects);
 router.get('/active', ctrl.getActiveSubjects);
 router.get('/current-semester', ctrl.getCurrentSemester);
+router.get('/teaching-staff', authorize('ADMIN'), ctrl.getTeachingStaffBySemester);
 
 // Admin-only write routes
 router.post('/', authorize('ADMIN'), ctrl.createSubject);

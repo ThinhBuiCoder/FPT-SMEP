@@ -13,6 +13,7 @@ const PitchDeck = require('../models/PitchDeck');
 const SprintTask = require('../models/SprintTask');
 const Notification = require('../models/Notification');
 const WeeklyTask = require('../models/WeeklyTask');
+const SystemSetting = require('../models/SystemSetting');
 // ─── ADMIN ────────────────────────────────────────────────
 const getAdminDashboard = async () => {
   const [
@@ -77,53 +78,127 @@ const getAdminDashboard = async () => {
 
 // ─── LECTURER ─────────────────────────────────────────────
 const getLecturerDashboard = async (lecturerId) => {
-  const myClasses = await Class.find({ lectureId: lecturerId })
-    .populate({ path: 'lectureId', select: 'name email avatar' });
+  const semesterSetting = await SystemSetting.findOne({ key: 'current_semester' }).lean();
+  const currentSemester = semesterSetting?.value || {
+    semester: 'SP',
+    year: new Date().getFullYear(),
+  };
+
+  const myClasses = await Class.find({
+    lectureId: lecturerId,
+    semester: currentSemester.semester,
+    year: Number(currentSemester.year),
+    status: 'active',
+  })
+    .sort({ subjectCode: 1, classIndex: 1 })
+    .lean();
 
   const classIds = myClasses.map(c => c._id);
-  const myTeams = await Team.find({ classId: { $in: classIds } });
+  const myTeams = await Team.find({
+    classId: { $in: classIds },
+    isArchived: { $ne: true },
+  }).lean();
   const teamIds = myTeams.map(t => t._id);
 
-  const [pendingIdeas, recentEvals, recentSessions, totalTasks, completedTasks] = await Promise.all([
+  const [
+    submittedIdeas,
+    evaluatedIdeaIds,
+    recentEvals,
+    recentSessions,
+    totalTasks,
+    completedTasks,
+    totalStudents,
+    studentCounts,
+    teamCounts,
+  ] = await Promise.all([
     StartupIdea.find({ teamId: { $in: teamIds }, status: 'SUBMITTED' })
-      .populate({ path: 'teamId', select: 'teamName classId', populate: { path: 'classId', select: 'classCode' } })
-      .sort({ submittedAt: -1 }),
+      .populate({
+        path: 'teamId',
+        select: 'teamName teamCode classId',
+        populate: { path: 'classId', select: 'classCode subjectCode semester year' },
+      })
+      .sort({ submittedAt: -1, updatedAt: -1 })
+      .lean(),
+    Evaluation.find({
+      lecturerId,
+      startupIdeaId: { $ne: null },
+    }).distinct('startupIdeaId'),
     Evaluation.find({ lecturerId })
-      .populate({ path: 'teamId', select: 'teamName' })
-      .sort({ createdAt: -1 }).limit(5),
+      .populate({ path: 'teamId', select: 'teamName teamCode' })
+      .sort({ updatedAt: -1 }).limit(5).lean(),
     MentoringSession.find({
       $or: [
         { lecturerId },
         { teamId: { $in: teamIds } }
-      ]
+      ],
+      teamId: { $in: teamIds },
     })
-      .populate('teamId', 'teamName').sort({ meetingDate: -1 }).limit(5),
+      .populate('teamId', 'teamName teamCode')
+      .sort({ meetingDate: -1 }).limit(5).lean(),
     SprintTask.countDocuments({ teamId: { $in: teamIds } }),
     SprintTask.countDocuments({ teamId: { $in: teamIds }, status: 'DONE' }),
+    Student.countDocuments({ classId: { $in: classIds } }),
+    Student.aggregate([
+      { $match: { classId: { $in: classIds } } },
+      { $group: { _id: '$classId', count: { $sum: 1 } } },
+    ]),
+    Team.aggregate([
+      { $match: { classId: { $in: classIds }, isArchived: { $ne: true } } },
+      { $group: { _id: '$classId', count: { $sum: 1 } } },
+    ]),
   ]);
 
-  // Pending evaluations: proposals submitted but not yet evaluated by this lecturer
-  const submittedProposals = await Proposal.find({ teamId: { $in: teamIds }, status: 'SUBMITTED' });
-  const evaluatedTeamIds = await Evaluation.find({ lecturerId, status: 'SUBMITTED' }).distinct('teamId');
-  const pendingReviews = submittedProposals.filter(p => !evaluatedTeamIds.map(id => id.toString()).includes(p.teamId.toString())).length;
+  const evaluatedIdeaIdSet = new Set(evaluatedIdeaIds.map(id => String(id)));
+  const pendingIdeas = submittedIdeas.filter(idea => !evaluatedIdeaIdSet.has(String(idea._id)));
 
   // Team rankings by average evaluation score
   const teamScores = await Promise.all(
     myTeams.map(async (team) => {
-      const evals = await Evaluation.find({ teamId: team._id, status: { $ne: 'DRAFT' } }, 'totalScore');
-      const avg = evals.length ? parseFloat((evals.reduce((s, e) => s + e.totalScore, 0) / evals.length).toFixed(2)) : null;
-      return { team: { id: team._id, name: team.teamName, classId: team.classId }, avgScore: avg };
+      const startupIdeaIds = await StartupIdea.find({ teamId: team._id }).distinct('_id');
+      const evals = await Evaluation.find(
+        {
+          $or: [
+            { teamId: team._id, status: { $ne: 'DRAFT' } },
+            { startupIdeaId: { $in: startupIdeaIds } },
+          ],
+        },
+        'totalScore maxTotalScore'
+      ).lean();
+      const avg = evals.length
+        ? parseFloat((evals.reduce((sum, evaluation) => {
+          const maxScore = Number(evaluation.maxTotalScore) || 10;
+          return sum + ((Number(evaluation.totalScore) || 0) / maxScore) * 100;
+        }, 0) / evals.length).toFixed(2))
+        : null;
+      return {
+        team: { id: team._id, name: team.teamName, classId: team.classId },
+        avgScore: avg,
+      };
     })
   );
 
   const taskProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const studentCountByClass = new Map(studentCounts.map(item => [String(item._id), item.count]));
+  const teamCountByClass = new Map(teamCounts.map(item => [String(item._id), item.count]));
+  const mappedClasses = myClasses.map(cls => ({
+    _id: cls._id,
+    code: cls.classCode,
+    name: cls.subjectCode,
+    subjectCode: cls.subjectCode,
+    semester: cls.semester,
+    year: cls.year,
+    status: cls.status,
+    studentCount: studentCountByClass.get(String(cls._id)) || 0,
+    teamCount: teamCountByClass.get(String(cls._id)) || 0,
+  }));
 
   return {
     totalClasses: myClasses.length,
     totalTeams: myTeams.length,
-    totalStudents: await Student.countDocuments({ classId: { $in: classIds } }),
-    pendingReviews,
-    myClasses,
+    totalStudents,
+    pendingReviews: pendingIdeas.length,
+    currentSemester,
+    myClasses: mappedClasses,
     myTeams,
     pendingIdeas,
     recentEvaluations: recentEvals,

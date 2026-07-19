@@ -112,9 +112,13 @@ exports.getAccessibleTeams = async (req, res) => {
     const list = teams.map((team) => {
       const id = team._id.toString();
       const proposal = proposalByTeam.get(id);
+      const displayTeamName = team.projectName || team.groupName || team.teamName;
       return {
         _id: team._id,
-        teamName: team.teamName,
+        teamName: displayTeamName,
+        originalTeamName: team.teamName,
+        groupName: team.groupName,
+        projectName: team.projectName,
         teamCode: team.teamCode,
         description: team.description,
         lineageId: team.lineageId,
@@ -128,7 +132,7 @@ exports.getAccessibleTeams = async (req, res) => {
         lecturer: team.lectureId,
         memberCount: memberByTeam.get(id) || 0,
         proposalStatus: proposal?.status || null,
-        startupName: proposal?.startupName || null,
+        startupName: proposal?.startupName || team.projectName || null,
         checkpointFileCount: checkpointFilesByTeam.get(id) || 0,
       };
     });

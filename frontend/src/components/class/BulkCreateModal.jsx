@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { X, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Loader2, AlertTriangle, FileSpreadsheet, Upload, Keyboard } from 'lucide-react';
 import { classApi } from '../../api/classApi';
 import { userApi } from '../../api/userApi';
 import { subjectApi } from '../../api/subjectApi';
@@ -8,6 +8,10 @@ import { subjectApi } from '../../api/subjectApi';
 const CURRENT_YR  = new Date().getFullYear();
 
 export default function BulkCreateModal({ lecturers: initialLecturers = [], isLecturer = false, onClose, onCreated }) {
+  const fileInputRef = useRef(null);
+  const [createMode, setCreateMode] = useState('manual');
+  const [excelFile, setExcelFile] = useState(null);
+  const [importResult, setImportResult] = useState(null);
   const [form, setForm] = useState({
     subjectCode: '',
     semester:    'SP',
@@ -67,7 +71,7 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
       }
     };
     fetchUsersAndSubjects();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parseClassIndices = (value) => {
     const numbers = String(value || '')
@@ -98,8 +102,12 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
   };
 
   const validate = () => {
-    if (!form.subjectCode) return 'Subject code is required';
     if (!['SP','SU','FA'].includes(form.semester)) return 'Invalid semester';
+    if (isLecturer && createMode === 'excel') {
+      if (!excelFile) return 'Please select an Excel file';
+      return null;
+    }
+    if (!form.subjectCode) return 'Subject code is required';
     if (isLecturer) {
       const indices = parseClassIndices(form.classIndicesText);
       if (indices.length === 0) return 'Assign Class is required';
@@ -120,6 +128,23 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
     setSubmitting(true);
     setClassConflict(null);
     try {
+      if (isLecturer && createMode === 'excel') {
+        const payload = new FormData();
+        payload.append('file', excelFile);
+        payload.append('semester', form.semester);
+        payload.append('year', form.year);
+        const response = await classApi.importCreate(payload);
+        const data = response?.data || response;
+        setImportResult(data);
+        const classChanges = (data.createdClassCount || 0) + (data.restoredClassCount || 0);
+        if ((data.failedStudentCount || 0) > 0) {
+          toast(`${classChanges} classes ready, ${data.importedStudentCount || 0} students imported, ${data.failedStudentCount} failed`, { icon: '⚠️' });
+        } else {
+          toast.success(`${classChanges} classes ready, ${data.importedStudentCount || 0} students imported`);
+        }
+        return;
+      }
+
       const res = await classApi.bulkCreate({
         subjectCode: form.subjectCode,
         semester:    form.semester,
@@ -192,6 +217,29 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
 
         {/* Body */}
         <div className="p-6 space-y-4">
+          {isLecturer && (
+            <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => { setCreateMode('manual'); setImportResult(null); }}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  createMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                <Keyboard className="h-4 w-4" /> Enter class numbers
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreateMode('excel'); setClassConflict(null); }}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  createMode === 'excel' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                <FileSpreadsheet className="h-4 w-4" /> Import Excel
+              </button>
+            </div>
+          )}
+
           {/* Locked semester info banner */}
           {form.semester && form.year && (
             <div className="flex items-center gap-3 p-3 bg-primary-50 border border-primary-100 rounded-xl">
@@ -207,6 +255,89 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
             </div>
           )}
 
+          {isLecturer && createMode === 'excel' ? (
+            <>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-700">
+                The <strong>Class</strong> column determines the classes to create, for example
+                <strong> EXE101_4</strong> or <strong>EXE201_2</strong>. Each student will be imported into
+                the matching class, and all new classes will be assigned to you.
+              </div>
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const file = event.dataTransfer.files?.[0];
+                  if (!file) return;
+                  if (!/\.(xlsx|xls)$/i.test(file.name)) {
+                    toast.error('Only .xlsx and .xls files are accepted');
+                    return;
+                  }
+                  setExcelFile(file);
+                  setImportResult(null);
+                }}
+                className={`cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition ${
+                  excelFile ? 'border-primary bg-primary-50' : 'border-slate-200 hover:border-primary hover:bg-primary-50/30'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      setExcelFile(file);
+                      setImportResult(null);
+                    }
+                  }}
+                />
+                <Upload className={`mx-auto h-8 w-8 ${excelFile ? 'text-primary' : 'text-slate-300'}`} />
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  {excelFile?.name || 'Drop an Excel file here or click to browse'}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">Required: Class, RollNumber, Email, FullName</p>
+              </div>
+
+              {importResult && (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <p className="text-xl font-bold text-slate-900">{importResult.createdClassCount || 0}</p>
+                      <p className="text-[11px] text-slate-500">Classes created</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-blue-600">{importResult.restoredClassCount || 0}</p>
+                      <p className="text-[11px] text-slate-500">Restored</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-green-600">{importResult.importedStudentCount || 0}</p>
+                      <p className="text-[11px] text-slate-500">Students imported</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-red-500">{importResult.failedStudentCount || 0}</p>
+                      <p className="text-[11px] text-slate-500">Failed</p>
+                    </div>
+                  </div>
+                  {importResult.results?.length > 0 && (
+                    <div className="max-h-36 space-y-1 overflow-y-auto border-t border-slate-200 pt-3">
+                      {importResult.results.map(item => (
+                        <div key={item.classCode} className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-semibold text-slate-700">{item.classCode}</span>
+                          <span className={item.status === 'conflict' ? 'text-red-500' : 'text-slate-500'}>
+                            {item.status} · {item.successCount || 0} imported
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+          <>
           {/* Subject + Semester */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -366,6 +497,8 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
 
         {/* Footer */}
@@ -373,13 +506,26 @@ export default function BulkCreateModal({ lecturers: initialLecturers = [], isLe
           <button onClick={onClose} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-all">
             Cancel
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-          >
-            {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create Classes'}
-          </button>
+          {importResult ? (
+            <button
+              onClick={onCreated}
+              className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-700"
+            >
+              Done
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || (isLecturer && createMode === 'excel' && !excelFile)}
+              className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              {submitting
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+                : isLecturer && createMode === 'excel'
+                  ? <><Upload className="h-4 w-4" /> Create & Import</>
+                  : 'Create Classes'}
+            </button>
+          )}
         </div>
 
         {classConflict && (

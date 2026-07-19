@@ -1,6 +1,8 @@
 // src/controllers/subject.controller.js
 const Subject = require('../models/Subject');
 const SystemSetting = require('../models/SystemSetting');
+const Class = require('../models/Class');
+const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 
 /**
@@ -42,6 +44,84 @@ exports.getActiveSubjects = async (req, res) => {
   } catch (err) {
     console.error('getActiveSubjects error:', err);
     return errorResponse(res, 'Failed to retrieve active subjects', 500);
+  }
+};
+
+/**
+ * GET /api/subjects/teaching-staff
+ * Get lecturers and mentors with their class assignments for a semester.
+ */
+exports.getTeachingStaffBySemester = async (req, res) => {
+  try {
+    const semester = String(req.query.semester || '').trim().toUpperCase();
+    const year = Number(req.query.year);
+
+    if (!['SP', 'SU', 'FA'].includes(semester)) {
+      return errorResponse(res, 'Invalid semester value. Must be SP, SU or FA.', 400);
+    }
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      return errorResponse(res, 'Invalid year value.', 400);
+    }
+
+    const [staff, classes, availableTerms] = await Promise.all([
+      User.find({ role: { $in: ['LECTURER', 'MENTOR'] } })
+        .select('name email avatar role status')
+        .sort({ role: 1, name: 1 })
+        .lean(),
+      Class.find({ semester, year })
+        .select('classCode subjectCode semester year lectureId mentorIds status')
+        .sort({ subjectCode: 1, classIndex: 1, classCode: 1 })
+        .lean(),
+      Class.aggregate([
+        { $group: { _id: { semester: '$semester', year: '$year' } } },
+        { $sort: { '_id.year': -1, '_id.semester': 1 } },
+      ]),
+    ]);
+
+    const assignmentsByUser = new Map();
+    const addAssignment = (userId, cls) => {
+      if (!userId) return;
+      const key = String(userId);
+      if (!assignmentsByUser.has(key)) assignmentsByUser.set(key, []);
+      assignmentsByUser.get(key).push({
+        _id: cls._id,
+        classCode: cls.classCode,
+        subjectCode: cls.subjectCode,
+        status: cls.status,
+      });
+    };
+
+    classes.forEach((cls) => {
+      addAssignment(cls.lectureId, cls);
+      (cls.mentorIds || []).forEach((mentorId) => addAssignment(mentorId, cls));
+    });
+
+    const teachingStaff = staff.map((person) => {
+      const assignments = assignmentsByUser.get(String(person._id)) || [];
+      return {
+        ...person,
+        assignments,
+        classCount: assignments.length,
+        subjectCount: new Set(assignments.map((item) => item.subjectCode)).size,
+      };
+    });
+
+    return successResponse(res, {
+      teachingStaff,
+      summary: {
+        lecturers: teachingStaff.filter((person) => person.role === 'LECTURER').length,
+        mentors: teachingStaff.filter((person) => person.role === 'MENTOR').length,
+        assigned: teachingStaff.filter((person) => person.classCount > 0).length,
+        unassigned: teachingStaff.filter((person) => person.classCount === 0).length,
+        classes: classes.length,
+      },
+      availableTerms: availableTerms.map(({ _id }) => _id),
+      semester,
+      year,
+    }, 'Teaching staff retrieved successfully');
+  } catch (err) {
+    console.error('getTeachingStaffBySemester error:', err);
+    return errorResponse(res, 'Failed to retrieve teaching staff', 500);
   }
 };
 

@@ -6,10 +6,18 @@ export const classApi = {
   getAll:      (params) => axiosClient.get('/classes', { params }),
   getById:     (id)     => axiosClient.get(`/classes/${id}`),
   bulkCreate:  (data)   => axiosClient.post('/classes/bulk-create', data),
+  importCreate: (formData) => axiosClient.post('/classes/import-create', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   reportCodeConflict: (data) => axiosClient.post('/classes/report-code-conflict', data),
   update:      (id, data) => axiosClient.put(`/classes/${id}`, data),
   rename:      (id, classCode) => axiosClient.put(`/classes/${id}/rename`, { classCode }),
   delete:      (id)     => axiosClient.delete(`/classes/${id}`),
+  restore:     (id)     => axiosClient.put(`/classes/${id}/restore`),
+  bulkDelete:  (data)   => axiosClient.delete('/classes/bulk-delete', { data }),
+  bulkRestore: (data)   => axiosClient.put('/classes/bulk-restore', data),
+  bulkPermanentDelete: (data) =>
+    axiosClient.delete('/classes/bulk-permanent-delete', { data }),
 
   // ─── Lecturer Assignment & Schedule ──────────────────────────────────────────
   assignLecture: (id, lectureId) => axiosClient.put(`/classes/${id}/assign-lecture`, { lectureId }),

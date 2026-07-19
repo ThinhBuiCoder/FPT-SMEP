@@ -32,6 +32,7 @@ const classSchema = new mongoose.Schema(
     // Lecturer can lock/unlock student ability to change their major
     isMajorLocked: { type: Boolean, default: false },
     status:        { type: String, enum: ['active', 'disabled'], default: 'active' },
+    archivedAt:    { type: Date, default: null },
   },
   { timestamps: true }
 );
