@@ -7,7 +7,7 @@ const User    = require('../models/User');
 const Subject = require('../models/Subject');
 const notificationService = require('../services/notification.service');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
-const { importStudents }  = require('../services/studentImport.service');
+const { parseExcel, importStudents }  = require('../services/studentImport.service');
 const { sendClassCreatedNotification, sendStudentImportedNotification } = require('../services/email.service');
 const { autoGenerateSchedule, validateScheduleConflict, DAYS, SLOT_TIMES } = require('../services/schedule.service');
 const { createOrUpdateChatGroupForClass } = require('../services/chatGroup.service');
@@ -15,6 +15,7 @@ const { verifyMajors } = require('../services/majorVerify.service');
 const { getProgramGroupFromMajor } = require('../constants/majors');
 const multer  = require('multer');
 const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
 // ─── Multer: memory storage for Excel parsing ─────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -216,6 +217,168 @@ exports.bulkCreateClasses = async (req, res) => {
     }
     console.error(err);
     return errorResponse(res, 'Failed to create classes', 500);
+  }
+};
+
+// Create/reuse classes from the Excel "Class" column and import each row into its class.
+exports.importCreateClasses = async (req, res) => {
+  try {
+    if (!req.file) return errorResponse(res, 'Please upload an Excel file', 400);
+
+    const semester = String(req.body.semester || '').trim().toUpperCase();
+    const year = parseInt(req.body.year, 10);
+    if (!['SP', 'SU', 'FA'].includes(semester)) {
+      return errorResponse(res, 'semester must be SP, SU or FA', 400);
+    }
+    if (!year || year < 2020 || year > 2100) {
+      return errorResponse(res, 'Invalid year', 400);
+    }
+
+    const parsed = parseExcel(req.file.buffer);
+    if (parsed.error) return errorResponse(res, parsed.error, 400);
+    if (!parsed.headers.includes('class')) {
+      return errorResponse(res, 'Missing required column: "Class"', 400);
+    }
+
+    const activeSubjectDocs = await Subject.find({ status: 'active' }).select('subjectCode');
+    const activeSubjects = new Set(activeSubjectDocs.map(subject => subject.subjectCode.toUpperCase()));
+    const rowsByClass = new Map();
+    const rowErrors = [];
+
+    parsed.rows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const rawClassCode = String(row.class || '').trim().toUpperCase();
+      const match = rawClassCode.match(/^([A-Z][A-Z0-9]*)_(\d{1,3})$/);
+
+      if (!rawClassCode) {
+        rowErrors.push({ row: rowNumber, reason: 'Class is required' });
+        return;
+      }
+      if (!match) {
+        rowErrors.push({ row: rowNumber, reason: `Invalid Class "${rawClassCode}". Expected format EXE101_1` });
+        return;
+      }
+
+      const subjectCode = match[1];
+      const classIndex = parseInt(match[2], 10);
+      if (!activeSubjects.has(subjectCode)) {
+        rowErrors.push({ row: rowNumber, reason: `Subject "${subjectCode}" is not active` });
+        return;
+      }
+
+      const classCode = `${subjectCode}_${classIndex}`;
+      if (!rowsByClass.has(classCode)) {
+        rowsByClass.set(classCode, { classCode, subjectCode, classIndex, rows: [] });
+      }
+      rowsByClass.get(classCode).rows.push(row);
+    });
+
+    if (rowsByClass.size === 0) {
+      return errorResponse(res, 'No valid class rows were found in the Excel file', 400, { errors: rowErrors });
+    }
+
+    const results = [];
+    let createdClassCount = 0;
+    let reusedClassCount = 0;
+    let restoredClassCount = 0;
+    let importedStudentCount = 0;
+    let failedStudentCount = rowErrors.length;
+
+    for (const group of rowsByClass.values()) {
+      let cls = await Class.findOne({ classCode: group.classCode, semester, year })
+        .populate('lectureId', 'name email role');
+
+      if (cls && String(cls.lectureId?._id || cls.lectureId || '') !== String(req.user._id)) {
+        const errors = group.rows.map((_, index) => ({
+          row: index + 2,
+          reason: `${group.classCode} belongs to ${cls.lectureId?.name || 'another lecturer'}`,
+        }));
+        rowErrors.push(...errors);
+        failedStudentCount += group.rows.length;
+        results.push({
+          classCode: group.classCode,
+          status: 'conflict',
+          lecturer: cls.lectureId || null,
+          successCount: 0,
+          failedCount: group.rows.length,
+        });
+        continue;
+      }
+
+      let wasCreated = false;
+      let wasRestored = false;
+      if (!cls) {
+        cls = await Class.create({
+          classCode: group.classCode,
+          subjectCode: group.subjectCode,
+          classIndex: group.classIndex,
+          semester,
+          year,
+          lectureId: req.user._id,
+          createdBy: req.user._id,
+          status: 'active',
+        });
+        wasCreated = true;
+        createdClassCount += 1;
+        await autoGenerateSchedule([cls]);
+      } else {
+        if (cls.status === 'disabled') {
+          cls.status = 'active';
+          cls.lectureId = req.user._id;
+          cls.createdBy = cls.createdBy || req.user._id;
+          await cls.save();
+          await autoGenerateSchedule([cls]);
+          wasRestored = true;
+          restoredClassCount += 1;
+        } else {
+          reusedClassCount += 1;
+        }
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(group.rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+      const classBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const importResult = await importStudents(classBuffer, cls._id);
+
+      importedStudentCount += importResult.successCount;
+      failedStudentCount += importResult.failedCount;
+      results.push({
+        classId: cls._id,
+        classCode: cls.classCode,
+        status: wasCreated ? 'created' : wasRestored ? 'restored' : 'reused',
+        successCount: importResult.successCount,
+        failedCount: importResult.failedCount,
+        errors: importResult.errors,
+      });
+
+      Promise.resolve()
+        .then(() => createOrUpdateChatGroupForClass(cls._id, { createdBy: req.user._id }))
+        .catch(error => console.error(`[ImportCreateClasses] Chat update failed for ${cls.classCode}:`, error.message));
+
+      if (importResult.imported?.length) {
+        Promise.resolve()
+          .then(() => sendStudentImportedNotification({ importedStudents: importResult.imported, classInfo: cls }))
+          .catch(error => console.error(`[ImportCreateClasses] Email failed for ${cls.classCode}:`, error.message));
+      }
+    }
+
+    return successResponse(res, {
+      totalRows: parsed.rows.length,
+      createdClassCount,
+      restoredClassCount,
+      reusedClassCount,
+      importedStudentCount,
+      failedStudentCount,
+      results,
+      errors: rowErrors,
+    }, `Created ${createdClassCount}, restored ${restoredClassCount} class(es), and imported ${importedStudentCount} student(s).`, 201);
+  } catch (err) {
+    if (err.code === 11000) {
+      return errorResponse(res, 'A class in this file already exists for the selected semester/year', 409);
+    }
+    console.error('importCreateClasses error:', err);
+    return errorResponse(res, err.message || 'Failed to create classes from Excel', 500);
   }
 };
 
@@ -426,10 +589,266 @@ exports.deleteClass = async (req, res) => {
 
     // Soft delete — set status to disabled
     cls.status = 'disabled';
+    cls.archivedAt = new Date();
     await cls.save();
     return successResponse(res, null, 'Class disabled successfully');
   } catch (err) {
     return errorResponse(res, 'Server error', 500);
+  }
+};
+
+// ─── PUT /api/classes/:id/restore ────────────────────────────────────────────
+exports.restoreClass = async (req, res) => {
+  try {
+    const cls = await Class.findById(req.params.id);
+    if (!cls) return errorResponse(res, 'Class not found', 404);
+
+    if (cls.status !== 'disabled') {
+      return errorResponse(res, 'Class is already active', 400);
+    }
+
+    cls.status = 'active';
+    cls.archivedAt = null;
+    await cls.save();
+
+    const restoredClass = await Class.findById(cls._id)
+      .populate('lectureId', 'name email avatar role')
+      .populate('mentorIds', 'name email avatar role');
+
+    return successResponse(res, { class: restoredClass }, 'Class restored successfully');
+  } catch (err) {
+    console.error('restoreClass error:', err);
+    return errorResponse(res, 'Failed to restore class', 500);
+  }
+};
+
+// Admin bulk restore by semester/year, optionally limited to one subject.
+exports.bulkRestoreClasses = async (req, res) => {
+  try {
+    const semester = String(req.body.semester || '').trim().toUpperCase();
+    const year = parseInt(req.body.year, 10);
+    const subjectCode = String(req.body.subjectCode || '').trim().toUpperCase();
+
+    if (!['SP', 'SU', 'FA'].includes(semester)) {
+      return errorResponse(res, 'semester must be SP, SU or FA', 400);
+    }
+    if (!year || year < 2020 || year > 2100) {
+      return errorResponse(res, 'Invalid year', 400);
+    }
+
+    const query = { semester, year, status: 'disabled' };
+    if (subjectCode) query.subjectCode = subjectCode;
+
+    const result = await Class.updateMany(query, {
+      $set: { status: 'active', archivedAt: null },
+    });
+
+    return successResponse(res, {
+      restoredCount: result.modifiedCount || 0,
+      semester,
+      year,
+      subjectCode: subjectCode || null,
+    }, `${result.modifiedCount || 0} class(es) restored.`);
+  } catch (err) {
+    console.error('bulkRestoreClasses error:', err);
+    return errorResponse(res, 'Failed to restore classes', 500);
+  }
+};
+
+// Admin permanently deletes archived classes and their class-scoped data.
+exports.bulkPermanentlyDeleteClasses = async (req, res) => {
+  try {
+    const semester = String(req.body.semester || '').trim().toUpperCase();
+    const year = parseInt(req.body.year, 10);
+    const subjectCode = String(req.body.subjectCode || '').trim().toUpperCase();
+
+    if (!['SP', 'SU', 'FA'].includes(semester)) {
+      return errorResponse(res, 'semester must be SP, SU or FA', 400);
+    }
+    if (!year || year < 2020 || year > 2100) {
+      return errorResponse(res, 'Invalid year', 400);
+    }
+
+    const classQuery = { semester, year, status: 'disabled' };
+    if (subjectCode) classQuery.subjectCode = subjectCode;
+
+    const archivedClasses = await Class.find(classQuery).select('_id');
+    const classIds = archivedClasses.map(cls => cls._id);
+    if (classIds.length === 0) {
+      return successResponse(res, {
+        permanentlyDeletedCount: 0,
+        semester,
+        year,
+        subjectCode: subjectCode || null,
+      }, 'No archived classes matched the selected scope.');
+    }
+
+    const db = mongoose.connection.db;
+    const [teams, chatGroups, proposals, importBatches, academicDatasets] = await Promise.all([
+      db.collection('teams').find({ classId: { $in: classIds } }, { projection: { _id: 1 } }).toArray(),
+      db.collection('chatgroups').find({ classId: { $in: classIds } }, { projection: { _id: 1 } }).toArray(),
+      db.collection('proposals').find({ classId: { $in: classIds } }, { projection: { _id: 1 } }).toArray(),
+      db.collection('databankimportbatches').find({ classId: { $in: classIds } }, { projection: { _id: 1 } }).toArray(),
+      db.collection('academicdatasets').find({ classId: { $in: classIds } }, { projection: { _id: 1 } }).toArray(),
+    ]);
+
+    const teamIds = teams.map(team => team._id);
+    const chatGroupIds = chatGroups.map(group => group._id);
+    const proposalIds = proposals.map(proposal => proposal._id);
+    const importBatchIds = importBatches.map(batch => batch._id);
+    const academicDatasetIds = academicDatasets.map(dataset => dataset._id);
+
+    const scopedStartupIdeas = teamIds.length
+      ? await db.collection('startupideas').find(
+        { teamId: { $in: teamIds } },
+        { projection: { _id: 1 } },
+      ).toArray()
+      : [];
+    const startupIdeaIds = scopedStartupIdeas.map(idea => idea._id);
+
+    const deleteOperations = [
+      ['students', { classId: { $in: classIds } }],
+      ['checkpointfiles', { classId: { $in: classIds } }],
+      ['checkpointsubmissions', { classId: { $in: classIds } }],
+      ['comments', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['evaluations', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['evaluationhistories', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['mentoringsessions', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['milestones', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['pitchdecks', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['proposalcomments', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['proposalversions', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['sprinttasks', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['weeklytasks', { $or: [{ classId: { $in: classIds } }, { teamId: { $in: teamIds } }] }],
+      ['workshopattendances', { classId: { $in: classIds } }],
+      ['checkpointfeedbacks', { teamId: { $in: teamIds } }],
+      ['shortcuts', { teamId: { $in: teamIds } }],
+      ['messages', { chatGroupId: { $in: chatGroupIds } }],
+      ['aianalyses', { startupIdeaId: { $in: startupIdeaIds } }],
+      ['startupideas', { _id: { $in: startupIdeaIds } }],
+      ['proposals', { _id: { $in: proposalIds } }],
+      ['chatgroups', { _id: { $in: chatGroupIds } }],
+      ['databankfieldhistories', {
+        $or: [
+          { importBatch: { $in: importBatchIds } },
+          { datasetId: { $in: academicDatasetIds } },
+        ],
+      }],
+      ['databanksnapshots', { $or: [
+        { 'scope.classId': { $in: classIds } },
+        { importBatch: { $in: importBatchIds } },
+      ] }],
+      ['databankimportbatches', { _id: { $in: importBatchIds } }],
+      ['academicdatasets', { _id: { $in: academicDatasetIds } }],
+      ['databankauditlogs', { entityId: { $in: classIds } }],
+      ['databankexporttemplates', { 'filters.classId': { $in: classIds } }],
+      ['teams', { _id: { $in: teamIds } }],
+    ];
+
+    await Promise.all(deleteOperations.map(([collection, query]) =>
+      db.collection(collection).deleteMany(query)
+    ));
+
+    await Promise.all([
+      db.collection('workshops').updateMany({}, {
+        $pull: {
+          onlineClassIds: { $in: classIds },
+          offlineClassIds: { $in: classIds },
+          teamIds: { $in: teamIds },
+        },
+      }),
+      db.collection('startuplineages').updateMany(
+        { teamIds: { $in: teamIds } },
+        [
+          {
+            $set: {
+              teamIds: {
+                $filter: {
+                  input: '$teamIds',
+                  as: 'teamId',
+                  cond: { $not: [{ $in: ['$$teamId', teamIds] }] },
+                },
+              },
+            },
+          },
+          {
+            $set: {
+              originalTeamId: {
+                $cond: [
+                  { $in: ['$originalTeamId', teamIds] },
+                  { $arrayElemAt: ['$teamIds', 0] },
+                  '$originalTeamId',
+                ],
+              },
+              currentTeamId: {
+                $cond: [
+                  { $in: ['$currentTeamId', teamIds] },
+                  { $arrayElemAt: ['$teamIds', -1] },
+                  '$currentTeamId',
+                ],
+              },
+            },
+          },
+        ],
+      ),
+    ]);
+    await db.collection('startuplineages').deleteMany({
+      teamIds: { $size: 0 },
+    });
+
+    const classDeleteResult = await Class.deleteMany({ _id: { $in: classIds }, status: 'disabled' });
+
+    return successResponse(res, {
+      permanentlyDeletedCount: classDeleteResult.deletedCount || 0,
+      semester,
+      year,
+      subjectCode: subjectCode || null,
+    }, `${classDeleteResult.deletedCount || 0} class(es) permanently deleted.`);
+  } catch (err) {
+    console.error('bulkPermanentlyDeleteClasses error:', err);
+    return errorResponse(res, 'Failed to permanently delete classes', 500);
+  }
+};
+
+// Admin bulk soft-delete by semester/year, optionally limited to one subject.
+exports.bulkDeleteClasses = async (req, res) => {
+  try {
+    const semester = String(req.body.semester || '').trim().toUpperCase();
+    const year = parseInt(req.body.year, 10);
+    const subjectCode = String(req.body.subjectCode || '').trim().toUpperCase();
+
+    if (!['SP', 'SU', 'FA'].includes(semester)) {
+      return errorResponse(res, 'semester must be SP, SU or FA', 400);
+    }
+    if (!year || year < 2020 || year > 2100) {
+      return errorResponse(res, 'Invalid year', 400);
+    }
+
+    if (subjectCode) {
+      const subject = await Subject.findOne({ subjectCode });
+      if (!subject) return errorResponse(res, `Subject ${subjectCode} was not found`, 404);
+    }
+
+    const query = {
+      semester,
+      year,
+      status: { $ne: 'disabled' },
+    };
+    if (subjectCode) query.subjectCode = subjectCode;
+
+    const result = await Class.updateMany(query, {
+      $set: { status: 'disabled', archivedAt: new Date() },
+    });
+
+    return successResponse(res, {
+      deletedCount: result.modifiedCount || 0,
+      semester,
+      year,
+      subjectCode: subjectCode || null,
+    }, `${result.modifiedCount || 0} class(es) deleted.`);
+  } catch (err) {
+    console.error('bulkDeleteClasses error:', err);
+    return errorResponse(res, 'Failed to delete classes', 500);
   }
 };
 

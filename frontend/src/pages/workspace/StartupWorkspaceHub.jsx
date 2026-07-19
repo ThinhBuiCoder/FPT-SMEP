@@ -12,12 +12,16 @@ import { useAuth } from '../../hooks/useAuth';
 import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
+import { getDisplayTeamName } from '../../utils/teamDisplay';
 
 const roleHint = {
   ADMIN: 'All startup teams in the system',
   LECTURER: 'Teams in classes you teach',
   MENTOR: 'Teams you mentor',
 };
+
+const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const subjectCodeOf = (team) => team.courseCode || team.class?.subjectCode || 'Other';
 
 export default function StartupWorkspaceHub() {
   const navigate = useNavigate();
@@ -57,7 +61,7 @@ export default function StartupWorkspaceHub() {
     const classCode = team.class?.classCode || 'Class';
     const course = team.courseCode || team.class?.subjectCode || '';
     const semester = team.semester || [team.class?.semester, team.class?.year].filter(Boolean).join('');
-    return `${team.teamName} (${classCode}${course ? ` - ${course}` : ''}${semester ? ` - ${semester}` : ''})`;
+    return `${getDisplayTeamName(team)} (${classCode}${course ? ` - ${course}` : ''}${semester ? ` - ${semester}` : ''})`;
   };
 
   const openLinkModal = () => {
@@ -95,14 +99,41 @@ export default function StartupWorkspaceHub() {
     if (!q) return teams;
     return teams.filter((t) => {
       const cls = t.class?.classCode || '';
+      const displayTeamName = getDisplayTeamName(t);
       return (
-        t.teamName?.toLowerCase().includes(q) ||
+        displayTeamName.toLowerCase().includes(q) ||
         t.teamCode?.toLowerCase().includes(q) ||
         t.startupName?.toLowerCase().includes(q) ||
         cls.toLowerCase().includes(q)
       );
     });
   }, [teams, search]);
+
+  const subjectGroups = useMemo(() => {
+    const sorted = [...filtered].sort((a, b) => {
+      const subjectCompare = naturalCollator.compare(subjectCodeOf(a), subjectCodeOf(b));
+      if (subjectCompare !== 0) return subjectCompare;
+
+      const classCompare = naturalCollator.compare(
+        a.class?.classCode || '',
+        b.class?.classCode || ''
+      );
+      if (classCompare !== 0) return classCompare;
+
+      return naturalCollator.compare(a.teamCode || '', b.teamCode || '');
+    });
+
+    return sorted.reduce((groups, team) => {
+      const subjectCode = subjectCodeOf(team);
+      const currentGroup = groups[groups.length - 1];
+      if (currentGroup?.subjectCode === subjectCode) {
+        currentGroup.teams.push(team);
+      } else {
+        groups.push({ subjectCode, teams: [team] });
+      }
+      return groups;
+    }, []);
+  }, [filtered]);
 
   if (loading) {
     return (
@@ -163,64 +194,83 @@ export default function StartupWorkspaceHub() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((team) => (
-            <button
-              key={team._id}
-              type="button"
-              onClick={() => navigate(`/workspace/teams/${team._id}`)}
-              className="group text-left bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary-50 px-2 py-0.5 rounded-md">
-                  {team.class?.classCode || 'Class'}
-                </span>
-                {team.isArchived && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                    <Archive className="w-3 h-3" /> Archived
-                  </span>
-                )}
-                  <h2 className="text-lg font-bold text-slate-900 mt-2 group-hover:text-primary transition-colors truncate">
-                    {team.teamName}
-                  </h2>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">{team.teamCode}</p>
-                  {team.startupName && (
-                    <p className="text-sm text-slate-600 mt-2 truncate">{team.startupName}</p>
-                  )}
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary shrink-0 mt-1" />
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100">
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
-                  <Users className="w-3 h-3" /> {team.memberCount} members
-                </span>
-                {team.proposalStatus && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100">
-                    <FileText className="w-3 h-3" /> {team.proposalStatus}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-orange-50 text-orange-700 border border-orange-100">
-                  <Flag className="w-3 h-3" /> {team.checkpointFileCount} checkpoint file{team.checkpointFileCount !== 1 ? 's' : ''}
+        <div className="space-y-7">
+          {subjectGroups.map((group) => (
+            <section key={group.subjectCode}>
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="text-lg font-bold text-slate-900">{group.subjectCode}</h2>
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs font-semibold text-slate-500">
+                  {group.teams.length} team{group.teams.length !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              {(team.lecturer || team.mentor) && (
-                <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-400">
-                  {team.lecturer && (
-                    <span className="flex items-center gap-1">
-                      <GraduationCap className="w-3 h-3" /> {team.lecturer.name}
-                    </span>
-                  )}
-                  {team.mentor && (
-                    <span className="flex items-center gap-1">
-                      <Award className="w-3 h-3" /> {team.mentor.name}
-                    </span>
-                  )}
-                </div>
-              )}
-            </button>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {group.teams.map((team) => {
+                  const displayTeamName = getDisplayTeamName(team) || 'Unnamed Team';
+                  const showStartupName = team.startupName && team.startupName.trim() !== displayTeamName;
+
+                  return (
+                    <button
+                      key={team._id}
+                      type="button"
+                      onClick={() => navigate(`/workspace/teams/${team._id}`)}
+                      className="group rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <span className="rounded-md bg-primary-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                            {team.class?.classCode || 'Class'}
+                          </span>
+                          {team.isArchived && (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-md border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                              <Archive className="h-3 w-3" /> Archived
+                            </span>
+                          )}
+                          <h3 className="mt-2 truncate text-lg font-bold text-slate-900 transition-colors group-hover:text-primary">
+                            {displayTeamName}
+                          </h3>
+                          <p className="mt-0.5 font-mono text-xs text-slate-400">{team.teamCode}</p>
+                          {showStartupName && (
+                            <p className="mt-2 truncate text-sm text-slate-600">{team.startupName}</p>
+                          )}
+                        </div>
+                        <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-300 group-hover:text-primary" />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">
+                          <Users className="h-3 w-3" /> {team.memberCount} members
+                        </span>
+                        {team.proposalStatus && (
+                          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+                            <FileText className="h-3 w-3" /> {team.proposalStatus}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-orange-100 bg-orange-50 px-2 py-1 text-[10px] font-semibold text-orange-700">
+                          <Flag className="h-3 w-3" /> {team.checkpointFileCount} checkpoint file{team.checkpointFileCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      {(team.lecturer || team.mentor) && (
+                        <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-400">
+                          {team.lecturer && (
+                            <span className="flex items-center gap-1">
+                              <GraduationCap className="h-3 w-3" /> {team.lecturer.name}
+                            </span>
+                          )}
+                          {team.mentor && (
+                            <span className="flex items-center gap-1">
+                              <Award className="h-3 w-3" /> {team.mentor.name}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           ))}
         </div>
       )}

@@ -163,7 +163,9 @@ const EvaluationPage = () => {
                       className={`p-4 cursor-pointer hover:bg-primary-50/30 transition-all ${selectedIdea?._id === idea._id ? 'bg-primary-50/40 border-l-2 border-primary' : ''}`}
                     >
                       <h4 className="font-semibold text-sm text-slate-900">{idea.startupName}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">{idea.teamId?.name} • {idea.teamId?.classId?.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {idea.teamId?.teamName || idea.teamId?.name || 'Unknown team'} · {idea.teamId?.classId?.classCode || idea.teamId?.classId?.name || 'Unknown class'}
+                      </p>
                       <Badge variant="Submitted" size="xs" className="mt-1">Submitted</Badge>
                     </div>
                   ))}
@@ -184,7 +186,9 @@ const EvaluationPage = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900">{selectedIdea.startupName}</h2>
-                    <p className="text-slate-500 text-sm mt-1">{selectedIdea.teamId?.name} • {selectedIdea.teamId?.classId?.name}</p>
+                    <p className="text-slate-500 text-sm mt-1">
+                      {selectedIdea.teamId?.teamName || selectedIdea.teamId?.name || 'Unknown team'} · {selectedIdea.teamId?.classId?.classCode || selectedIdea.teamId?.classId?.name || 'Unknown class'}
+                    </p>
                   </div>
                   <Badge variant={selectedIdea.status} size="sm">{selectedIdea.status}</Badge>
                 </div>

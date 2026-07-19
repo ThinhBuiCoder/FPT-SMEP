@@ -1,10 +1,11 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, RefreshCw, Search, Filter, GraduationCap,
   Users, BookOpen, ChevronRight, Upload, Eye, Calendar, LayoutGrid, ClipboardCheck,
+  Trash2, AlertTriangle, Loader2, Archive, RotateCcw,
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { classApi } from '../../api/classApi';
@@ -66,12 +67,29 @@ export default function ClassManagement() {
   const [filterYear, setFilterYear] = useState('');
   const [filterSubj, setFilterSubj] = useState('');
   const [viewMode, setViewMode] = useState('classes');
+  const [archiveMode, setArchiveMode] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
+  const latestRequestRef = useRef(0);
 
   // Modals
   const [showBulk,   setShowBulk]   = useState(false);
   const [importTarget, setImportTarget] = useState(null); // classId for import
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteSubject, setDeleteSubject] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
+  const [showRestoreAll, setShowRestoreAll] = useState(false);
+  const [restoreSubject, setRestoreSubject] = useState('');
+  const [restoringAll, setRestoringAll] = useState(false);
+  const [showPermanentDelete, setShowPermanentDelete] = useState(false);
+  const [permanentDeleteSubject, setPermanentDeleteSubject] = useState('');
+  const [permanentDeleteConfirmation, setPermanentDeleteConfirmation] = useState('');
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false);
 
   const fetchAll = async () => {
+    const requestId = latestRequestRef.current + 1;
+    latestRequestRef.current = requestId;
     setLoading(true);
     try {
       const params = {};
@@ -79,19 +97,26 @@ export default function ClassManagement() {
       if (filterYear) params.year        = filterYear;
       if (filterSubj) params.subjectCode = filterSubj;
       if (search)     params.search      = search;
+      if (isAdmin && archiveMode) params.status = 'disabled';
 
       const [clsRes, usrRes] = await Promise.all([
         classApi.getAll(params),
         isAdmin ? userApi.getAll({ role: 'LECTURER' }) : Promise.resolve({ users: [] }),
       ]);
 
+      if (requestId !== latestRequestRef.current) return;
+
       setClasses(clsRes?.data?.classes || clsRes?.classes || []);
       const lects = usrRes?.data?.users || usrRes?.users || [];
       setLecturers(lects.filter(u => u.role === 'LECTURER'));
     } catch {
-      toast.error('Failed to load classes');
+      if (requestId === latestRequestRef.current) {
+        toast.error('Failed to load classes');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -112,12 +137,17 @@ export default function ClassManagement() {
         }
       } catch (err) {
         console.error('Failed to load initial config', err);
+      } finally {
+        setFiltersReady(true);
       }
     };
     loadInitialConfig();
   }, []);
 
-  useEffect(() => { fetchAll(); }, [filterSem, filterYear, filterSubj]); // eslint-disable-line
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (filtersReady) fetchAll();
+  }, [filtersReady, filterSem, filterYear, filterSubj, archiveMode]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -135,8 +165,122 @@ export default function ClassManagement() {
     fetchAll();
   };
 
+  const openDeleteAll = () => {
+    setDeleteSubject(filterSubj || '');
+    setDeleteConfirmation('');
+    setShowDeleteAll(true);
+  };
+
+  const handleDeleteAll = async () => {
+    if (!filterSem || !filterYear) {
+      toast.error('Please select a semester and year first');
+      return;
+    }
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Type DELETE to confirm');
+      return;
+    }
+
+    setDeletingAll(true);
+    try {
+      const response = await classApi.bulkDelete({
+        semester: filterSem,
+        year: parseInt(filterYear, 10),
+        subjectCode: deleteSubject || undefined,
+      });
+      const data = response?.data || response;
+      toast.success(`${data.deletedCount || 0} classes deleted`);
+      setShowDeleteAll(false);
+      await fetchAll();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to delete classes');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const handleRestore = async (classId) => {
+    setRestoringId(classId);
+    try {
+      await classApi.restore(classId);
+      toast.success('Class restored successfully');
+      await fetchAll();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to restore class');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const openRestoreAll = () => {
+    setRestoreSubject(filterSubj || '');
+    setShowRestoreAll(true);
+  };
+
+  const handleRestoreAll = async () => {
+    if (!filterSem || !filterYear) {
+      toast.error('Please select a semester and year first');
+      return;
+    }
+
+    setRestoringAll(true);
+    try {
+      const response = await classApi.bulkRestore({
+        semester: filterSem,
+        year: parseInt(filterYear, 10),
+        subjectCode: restoreSubject || undefined,
+      });
+      const data = response?.data || response;
+      toast.success(`${data.restoredCount || 0} classes restored`);
+      setShowRestoreAll(false);
+      await fetchAll();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to restore classes');
+    } finally {
+      setRestoringAll(false);
+    }
+  };
+
+  const openPermanentDelete = () => {
+    setPermanentDeleteSubject(filterSubj || '');
+    setPermanentDeleteConfirmation('');
+    setShowPermanentDelete(true);
+  };
+
+  const handlePermanentDelete = async () => {
+    if (!filterSem || !filterYear) {
+      toast.error('Please select a semester and year first');
+      return;
+    }
+    if (permanentDeleteConfirmation !== 'PERMANENT DELETE') {
+      toast.error('Type PERMANENT DELETE to confirm');
+      return;
+    }
+
+    setPermanentlyDeleting(true);
+    try {
+      const response = await classApi.bulkPermanentDelete({
+        semester: filterSem,
+        year: parseInt(filterYear, 10),
+        subjectCode: permanentDeleteSubject || undefined,
+      });
+      const data = response?.data || response;
+      toast.success(`${data.permanentlyDeletedCount || 0} classes permanently deleted`);
+      setShowPermanentDelete(false);
+      await fetchAll();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to permanently delete classes');
+    } finally {
+      setPermanentlyDeleting(false);
+    }
+  };
+
   const sortedClasses = useMemo(() => sortClasses(classes), [classes]);
   const subjectGroups = useMemo(() => groupClassesBySubject(classes), [classes]);
+  const archivedSubjectCodes = useMemo(
+    () => [...new Set(classes.map(cls => cls.subjectCode).filter(Boolean))].sort(),
+    [classes],
+  );
   const showSubjectGroups = !filterSubj;
 
   if (loading) return <LoadingSkeleton />;
@@ -156,7 +300,51 @@ export default function ClassManagement() {
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
-          {(isAdmin || isLecturer) && (
+          {isAdmin && !archiveMode && (
+            <button
+              type="button"
+              onClick={openDeleteAll}
+              disabled={!filterSem || !filterYear || classes.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" /> Delete All
+            </button>
+          )}
+          {isAdmin && archiveMode && (
+            <button
+              type="button"
+              onClick={openRestoreAll}
+              disabled={!filterSem || !filterYear || classes.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="h-4 w-4" /> Restore All
+            </button>
+          )}
+          {isAdmin && archiveMode && (
+            <button
+              type="button"
+              onClick={openPermanentDelete}
+              disabled={!filterSem || !filterYear || classes.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" /> Delete Permanently
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setArchiveMode(current => !current)}
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                archiveMode
+                  ? 'border-primary bg-primary text-white hover:bg-primary-700'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {archiveMode ? <LayoutGrid className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+              {archiveMode ? 'Active Classes' : 'Archive'}
+            </button>
+          )}
+          {(isAdmin || isLecturer) && !archiveMode && (
             <button
               id="btn-bulk-create"
               onClick={() => setShowBulk(true)}
@@ -239,9 +427,11 @@ export default function ClassManagement() {
       ) : classes.length === 0 ? (
         <EmptyState
           icon={GraduationCap}
-          title="No classes found"
-          description={isAdmin ? 'Use Bulk Create to generate classes by subject code' : 'No classes assigned to you yet'}
-          action={isAdmin ? { label: 'Bulk Create', onClick: () => setShowBulk(true) } : undefined}
+          title={archiveMode ? 'Archive is empty' : 'No classes found'}
+          description={archiveMode
+            ? 'Deleted classes will be stored here and can be restored at any time.'
+            : isAdmin ? 'Use Bulk Create to generate classes by subject code' : 'No classes assigned to you yet'}
+          action={isAdmin && !archiveMode ? { label: 'Bulk Create', onClick: () => setShowBulk(true) } : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -261,8 +451,12 @@ export default function ClassManagement() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-elevated hover:-translate-y-1 transition-all group cursor-pointer"
-                onClick={() => navigate(`/classes/${cls._id}`)}
+                className={`bg-white rounded-2xl border border-slate-200/60 shadow-sm transition-all group ${
+                  archiveMode ? 'opacity-90' : 'cursor-pointer hover:-translate-y-1 hover:shadow-elevated'
+                }`}
+                onClick={() => {
+                  if (!archiveMode) navigate(`/classes/${cls._id}`);
+                }}
               >
                 <div className="p-5">
                   {/* Top row */}
@@ -281,7 +475,9 @@ export default function ClassManagement() {
                       </div>
                       <h3 className="text-xl font-bold text-slate-900">{cls.classCode}</h3>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors mt-1" />
+                    {archiveMode
+                      ? <Archive className="mt-1 h-5 w-5 text-slate-300" />
+                      : <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors mt-1" />}
                   </div>
 
                   {/* Lecturer */}
@@ -360,19 +556,38 @@ export default function ClassManagement() {
 
                 {/* Footer actions */}
                 <div className="border-t border-slate-100 px-5 py-3 flex gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`/classes/${cls._id}`); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs text-secondary hover:text-secondary-dark font-medium transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> View Detail
-                  </button>
-                  {(isAdmin || user?.role === 'LECTURER') && (
+                  {archiveMode ? (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setImportTarget(cls._id); }}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-primary hover:text-primary-dark font-medium transition-colors border-l border-slate-100"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRestore(cls._id);
+                      }}
+                      disabled={restoringId === cls._id}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50"
                     >
-                      <Upload className="w-3.5 h-3.5" /> Import Students
+                      {restoringId === cls._id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <RotateCcw className="h-3.5 w-3.5" />}
+                      Restore Class
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/classes/${cls._id}`); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-xs text-secondary hover:text-secondary-dark font-medium transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View Detail
+                      </button>
+                      {(isAdmin || user?.role === 'LECTURER') && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setImportTarget(cls._id); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs text-primary hover:text-primary-dark font-medium transition-colors border-l border-slate-100"
+                        >
+                          <Upload className="w-3.5 h-3.5" /> Import Students
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </motion.div>
@@ -397,6 +612,232 @@ export default function ClassManagement() {
           onClose={() => setImportTarget(null)}
           onImported={handleImported}
         />
+      )}
+      {showDeleteAll && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => !deletingAll && setShowDeleteAll(false)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Delete Classes</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Classes will be removed from active lists. Existing student and team data will be preserved.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Scope: <strong>{filterSem} {filterYear}</strong>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Subject scope</label>
+                <select
+                  value={deleteSubject}
+                  onChange={(event) => setDeleteSubject(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                >
+                  <option value="">All Subjects</option>
+                  {subjects.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {deleteSubject
+                    ? `${classes.filter(cls => cls.subjectCode === deleteSubject).length} visible class(es) will be deleted.`
+                    : `${classes.length} visible class(es) will be deleted.`}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Type <span className="font-mono text-red-600">DELETE</span> to confirm
+                </label>
+                <input
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  placeholder="DELETE"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAll(false)}
+                disabled={deletingAll}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                disabled={deletingAll || deleteConfirmation !== 'DELETE'}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                {deletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Classes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRestoreAll && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => !restoringAll && setShowRestoreAll(false)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <RotateCcw className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Restore Classes</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Restored classes will return to the active class list with their existing data.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Scope: <strong>{filterSem} {filterYear}</strong>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Subject scope</label>
+                <select
+                  value={restoreSubject}
+                  onChange={(event) => setRestoreSubject(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="">All Subjects</option>
+                  {archivedSubjectCodes.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {restoreSubject
+                    ? `${classes.filter(cls => cls.subjectCode === restoreSubject).length} archived class(es) will be restored.`
+                    : `${classes.length} archived class(es) will be restored.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRestoreAll(false)}
+                disabled={restoringAll}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRestoreAll}
+                disabled={restoringAll}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                {restoringAll
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <RotateCcw className="h-4 w-4" />}
+                Restore Classes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPermanentDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => !permanentlyDeleting && setShowPermanentDelete(false)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Permanently Delete Classes</h2>
+                <p className="mt-1 text-sm leading-6 text-red-600">
+                  This cannot be undone. Classes and all associated students, teams, chats, submissions, and workspace data will be deleted.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                Scope: <strong>{filterSem} {filterYear}</strong>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Subject scope</label>
+                <select
+                  value={permanentDeleteSubject}
+                  onChange={(event) => setPermanentDeleteSubject(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                >
+                  <option value="">All Subjects</option>
+                  {archivedSubjectCodes.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {permanentDeleteSubject
+                    ? `${classes.filter(cls => cls.subjectCode === permanentDeleteSubject).length} archived class(es) will be permanently deleted.`
+                    : `${classes.length} archived class(es) will be permanently deleted.`}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Type <span className="font-mono text-red-700">PERMANENT DELETE</span> to confirm
+                </label>
+                <input
+                  value={permanentDeleteConfirmation}
+                  onChange={(event) => setPermanentDeleteConfirmation(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  placeholder="PERMANENT DELETE"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPermanentDelete(false)}
+                disabled={permanentlyDeleting}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePermanentDelete}
+                disabled={permanentlyDeleting || permanentDeleteConfirmation !== 'PERMANENT DELETE'}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                {permanentlyDeleting
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Trash2 className="h-4 w-4" />}
+                Delete Forever
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

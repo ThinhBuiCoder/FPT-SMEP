@@ -133,7 +133,8 @@ const importStudents = async (buffer, classId) => {
 
   const sameSemesterClasses = await Class.find({
     semester: targetClass.semester,
-    year: targetClass.year
+    year: targetClass.year,
+    status: { $ne: 'disabled' },
   }).select('_id classCode');
   
   const sameSemesterClassIds = sameSemesterClasses.map(c => c._id);
@@ -283,7 +284,9 @@ const importStudents = async (buffer, classId) => {
       email:      emailLower,
       programGroup,
       major,
-      subjectCode: row.subjectcode ? String(row.subjectcode).trim().toUpperCase() : null,
+      subjectCode: row.subjectcode
+        ? String(row.subjectcode).trim().toUpperCase()
+        : targetClass.subjectCode,
       classId,
       userId:    linkedUserId,
       avatarUrl,

@@ -1,6 +1,10 @@
 // src/pages/admin/SubjectManagement.jsx
 import { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Edit, Trash2, BookOpen, RefreshCw, Calendar, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  Search, Filter, Plus, Edit, Trash2, BookOpen, RefreshCw, Calendar, Sparkles,
+  Users, GraduationCap, Mail, Layers3, UserCheck, UserRoundX,
+} from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -12,9 +16,9 @@ import { subjectApi } from '../../api/subjectApi';
 
 const statusBadge = { active: 'Approved', disabled: 'Overdue' };
 const statusLabel = { active: 'Active', disabled: 'Disabled' };
-const termColor = { SP: 'bg-green-100 text-green-700', SU: 'bg-amber-100 text-amber-700', FA: 'bg-blue-100 text-blue-700' };
 
 const SubjectManagement = () => {
+  const [activeSection, setActiveSection] = useState('subjects');
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,6 +34,16 @@ const SubjectManagement = () => {
   const [availableYears, setAvailableYears] = useState([new Date().getFullYear()]);
   const [isDecember, setIsDecember] = useState(false);
   const [savingSemester, setSavingSemester] = useState(false);
+
+  // Teaching staff by semester
+  const [teachingStaff, setTeachingStaff] = useState([]);
+  const [staffSummary, setStaffSummary] = useState({});
+  const [availableTerms, setAvailableTerms] = useState([]);
+  const [staffSemester, setStaffSemester] = useState('SP');
+  const [staffYear, setStaffYear] = useState(new Date().getFullYear());
+  const [staffRole, setStaffRole] = useState('ALL');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffLoading, setStaffLoading] = useState(true);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,7 +77,7 @@ const SubjectManagement = () => {
       const res = await subjectApi.getAll(params);
       const list = res.data?.subjects || res.subjects || [];
       setSubjects(list);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load subjects');
     } finally {
       setLoading(false);
@@ -79,20 +93,60 @@ const SubjectManagement = () => {
       setCurrentSemester(config);
       setSelectedSemester(config.semester);
       setSelectedYear(config.year);
+      setStaffSemester(config.semester);
+      setStaffYear(config.year);
       setAvailableYears(years);
       setIsDecember(isDec);
-    } catch (err) {
+    } catch {
       console.error('Failed to load active semester configuration');
     }
   };
 
+  const fetchTeachingStaff = async () => {
+    try {
+      setStaffLoading(true);
+      const res = await subjectApi.getTeachingStaff(staffSemester, staffYear);
+      const data = res.data || res;
+      setTeachingStaff(data.teachingStaff || []);
+      setStaffSummary(data.summary || {});
+      setAvailableTerms(data.availableTerms || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load lecturers and mentors');
+    } finally {
+      setStaffLoading(false);
+    }
+  };
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSubjects();
   }, [debouncedSearch, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSemester();
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTeachingStaff();
+  }, [staffSemester, staffYear]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredTeachingStaff = teachingStaff.filter((person) => {
+    if (staffRole !== 'ALL' && person.role !== staffRole) return false;
+    const query = staffSearch.trim().toLowerCase();
+    if (!query) return true;
+    return [person.name, person.email, ...person.assignments.map((item) => `${item.classCode} ${item.subjectCode}`)]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(query));
+  });
+
+  const termOptions = [
+    { semester: currentSemester.semester, year: currentSemester.year },
+    ...availableTerms,
+  ].filter((term, index, list) => (
+    list.findIndex((item) => item.semester === term.semester && item.year === term.year) === index
+  ));
 
   const openAddModal = () => {
     setEditingSubject(null);
@@ -122,7 +176,7 @@ const SubjectManagement = () => {
       toast.success(`Subject ${disableTarget.subjectCode} disabled successfully!`);
       setDisableTarget(null);
       fetchSubjects();
-    } catch (err) {
+    } catch {
       toast.error('Failed to disable subject');
     } finally {
       setIsDisabling(false);
@@ -183,22 +237,53 @@ const SubjectManagement = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Subject & Semester</h1>
-          <p className="text-slate-500 mt-1">Manage academic subjects and active semesters</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+            {activeSection === 'subjects' ? 'Subject & Semester' : 'Lecturers & Mentors'}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {activeSection === 'subjects'
+              ? 'Manage academic subjects and active semesters'
+              : 'Review teaching staff assignments for each semester'}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { fetchSubjects(); fetchSemester(); }}
+            onClick={() => { fetchSubjects(); fetchSemester(); fetchTeachingStaff(); }}
             className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all bg-white"
           >
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
-          <Button variant="primary" icon={Plus} onClick={openAddModal}>
-            Add Subject
-          </Button>
+          {activeSection === 'subjects' && (
+            <Button variant="primary" icon={Plus} onClick={openAddModal}>
+              Add Subject
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* Page section navigation */}
+      <div className="inline-flex w-full sm:w-auto p-1.5 bg-slate-100 rounded-2xl border border-slate-200/70">
+        {[
+          { value: 'subjects', label: 'Subject & Semester', icon: BookOpen },
+          { value: 'staff', label: 'Lecturers & Mentors by Semester', icon: Users },
+        ].map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setActiveSection(value)}
+            className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              activeSection === value
+                ? 'bg-white text-primary shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+            }`}
+          >
+            <Icon className="w-4 h-4 shrink-0" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {activeSection === 'subjects' && (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Column: Subjects CRUD */}
         <div className="lg:col-span-3 space-y-6">
@@ -404,6 +489,186 @@ const SubjectManagement = () => {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Teaching staff by semester */}
+      {activeSection === 'staff' && (
+      <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-slate-100">
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-slate-900">Lecturers & Mentors by Semester</h2>
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
+                Track teaching staff and their assigned classes for each semester.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                value={`${staffSemester}-${staffYear}`}
+                onChange={(e) => {
+                  const [semester, year] = e.target.value.split('-');
+                  setStaffSemester(semester);
+                  setStaffYear(Number(year));
+                }}
+              >
+                {termOptions.map((term) => (
+                  <option key={`${term.semester}-${term.year}`} value={`${term.semester}-${term.year}`}>
+                    {term.semester} {term.year}
+                    {term.semester === currentSemester.semester && term.year === currentSemester.year ? ' (Active)' : ''}
+                  </option>
+                ))}
+              </select>
+              <Link
+                to="/admin/classes"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-600 transition-colors"
+              >
+                <Layers3 className="w-4 h-4" />
+                Manage Assignments
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-5">
+            {[
+              { label: 'Lecturers', value: staffSummary.lecturers || 0, icon: GraduationCap, color: 'text-primary bg-primary-50' },
+              { label: 'Mentors', value: staffSummary.mentors || 0, icon: Users, color: 'text-amber-600 bg-amber-50' },
+              { label: 'Assigned', value: staffSummary.assigned || 0, icon: UserCheck, color: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Unassigned', value: staffSummary.unassigned || 0, icon: UserRoundX, color: 'text-rose-600 bg-rose-50' },
+              { label: 'Classes', value: staffSummary.classes || 0, icon: Layers3, color: 'text-blue-600 bg-blue-50' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-900 leading-none">{value}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col md:flex-row gap-3 mb-5">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                placeholder="Search by name, email, class or subject..."
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+              />
+            </div>
+            <div className="relative w-full md:w-52 shrink-0">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                aria-label="Filter teaching staff by role"
+                className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm bg-white outline-none appearance-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                value={staffRole}
+                onChange={(e) => setStaffRole(e.target.value)}
+              >
+                <option value="ALL">All roles</option>
+                <option value="LECTURER">Lecturers only</option>
+                <option value="MENTOR">Mentors only</option>
+              </select>
+            </div>
+          </div>
+
+          {staffLoading ? (
+            <LoadingSkeleton lines={4} />
+          ) : filteredTeachingStaff.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No teaching staff found"
+              description="No lecturer or mentor matches the selected semester and filters."
+            />
+          ) : (
+            <div className="border border-slate-200/70 rounded-2xl overflow-hidden">
+              <div className="hidden md:grid md:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.4fr)] border-b border-slate-100 bg-slate-50/60">
+                <div className="py-3 px-6 text-xs text-slate-400 uppercase font-semibold tracking-wider">
+                  User / Role
+                </div>
+                <div className="py-3 px-6 text-xs text-slate-400 uppercase font-semibold tracking-wider">
+                  Assignment Status / Classes
+                </div>
+              </div>
+              {filteredTeachingStaff.map((person) => (
+                <article
+                  key={person._id}
+                  className="grid grid-cols-1 md:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.4fr)] border-b border-slate-50 last:border-b-0 hover:bg-primary-50/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3 py-3.5 px-6">
+                    {person.avatar ? (
+                      <img src={person.avatar} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                    ) : (
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        person.role === 'LECTURER' ? 'bg-primary-50 text-primary' : 'bg-amber-50 text-amber-600'
+                      }`}>
+                        {person.role === 'LECTURER'
+                          ? <GraduationCap className="w-5 h-5" />
+                          : <Users className="w-5 h-5" />}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-slate-900 truncate">{person.name}</h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          person.role === 'LECTURER'
+                            ? 'bg-primary-50 text-primary'
+                            : 'bg-amber-50 text-amber-700'
+                        }`}>
+                          {person.role}
+                        </span>
+                        {person.status !== 'APPROVED' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                            {person.status}
+                          </span>
+                        )}
+                      </div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-1 truncate">
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        {person.email}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-lg font-bold text-slate-900 leading-none">{person.classCount}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">classes</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center py-3.5 px-6 border-t md:border-t-0 md:border-l border-slate-100">
+                    {person.assignments.length === 0 ? (
+                      <div className="flex items-center gap-2 text-xs text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">
+                        <UserRoundX className="w-4 h-4" />
+                        Not assigned in {staffSemester} {staffYear}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {person.assignments.map((assignment) => (
+                          <span
+                            key={assignment._id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-xs"
+                          >
+                            <strong className="text-slate-800">{assignment.classCode}</strong>
+                            <span className="text-slate-400">·</span>
+                            <span className="text-primary font-medium">{assignment.subjectCode}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      )}
 
       {/* Add / Edit Modal */}
       <Modal

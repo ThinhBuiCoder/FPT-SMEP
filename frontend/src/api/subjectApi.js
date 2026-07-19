@@ -9,4 +9,7 @@ export const subjectApi = {
   delete: (id) => axiosClient.delete(`/subjects/${id}`),
   getCurrentSemester: () => axiosClient.get('/subjects/current-semester'),
   updateCurrentSemester: (semester, year) => axiosClient.post('/subjects/current-semester', { semester, year }),
+  getTeachingStaff: (semester, year) => axiosClient.get('/subjects/teaching-staff', {
+    params: { semester, year },
+  }),
 };

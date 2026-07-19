@@ -31,7 +31,20 @@ const LecturerDashboard = () => {
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState icon={GraduationCap} title="No data found" />;
 
-  const { totalClasses, totalTeams, totalStudents, pendingReviews, myClasses = [], pendingIdeas = [], recentSessions = [], teamRankings = [] } = data;
+  const {
+    totalClasses,
+    totalTeams,
+    totalStudents,
+    pendingReviews,
+    currentSemester,
+    myClasses = [],
+    pendingIdeas = [],
+    recentSessions = [],
+    teamRankings = [],
+  } = data;
+  const semesterLabel = currentSemester
+    ? `${currentSemester.semester} ${currentSemester.year}`
+    : 'Active semester';
 
   const handleReviewIdea = async (idea) => {
     navigate(`/evaluations?ideaId=${idea._id}`);
@@ -42,15 +55,15 @@ const LecturerDashboard = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome back, {user?.name?.split(' ')[0] || 'Lecturer'} 👋</h1>
-          <p className="text-slate-500 mt-1">Here's an overview of your startup classes</p>
+          <p className="text-slate-500 mt-1">Overview for {semesterLabel}</p>
         </div>
         <Button variant="gradient" size="sm" icon={Calendar} onClick={() => navigate('/sessions')}>Schedule Session</Button>
       </motion.div>
 
       {/* Stats */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard title="Active Classes" value={totalClasses || 0} icon={GraduationCap} color="primary" change="This semester" trend="up" />
-        <StatCard title="Mentoring Teams" value={totalTeams || 0} icon={Users} color="secondary" change="All classes" trend="flat" />
+        <StatCard title="Active Classes" value={totalClasses || 0} icon={GraduationCap} color="primary" change={semesterLabel} trend="flat" />
+        <StatCard title="Teams" value={totalTeams || 0} icon={Users} color="secondary" change={semesterLabel} trend="flat" />
         <StatCard title="Pending Reviews" value={pendingReviews || 0} icon={ClipboardList} color="warning" change="Need action" trend={pendingReviews > 0 ? 'up' : 'flat'} />
         <StatCard title="Students" value={totalStudents || 0} icon={BookOpen} color="success" change="Enrolled" trend="flat" />
       </motion.div>
@@ -74,7 +87,9 @@ const LecturerDashboard = () => {
                   <div key={idea._id} className="flex items-center justify-between p-4 rounded-xl bg-amber-50/60 border border-amber-100">
                     <div className="min-w-0 flex-1">
                       <h4 className="font-semibold text-slate-900 truncate">{idea.startupName}</h4>
-                      <p className="text-sm text-slate-500">{idea.teamId?.name} • {idea.teamId?.classId?.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {idea.teamId?.teamName || 'Unknown team'} · {idea.teamId?.classId?.classCode || 'Unknown class'}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
                       <Badge variant="Submitted" size="xs">Submitted</Badge>
@@ -94,12 +109,14 @@ const LecturerDashboard = () => {
             ) : (
               <div className="space-y-3">
                 {myClasses.map(cls => (
-                  <div key={cls._id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all cursor-pointer" onClick={() => navigate(`/lecturer/classes/${cls._id}`)}>
+                  <div key={cls._id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all cursor-pointer" onClick={() => navigate(`/classes/${cls._id}`)}>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center font-bold text-primary text-sm">{cls.code?.slice(0, 3)}</div>
                       <div>
                         <p className="font-semibold text-slate-900">{cls.code}</p>
-                        <p className="text-sm text-slate-500">{cls.name} • {cls.members?.length || 0} students</p>
+                        <p className="text-sm text-slate-500">
+                          {cls.name} · {cls.studentCount || 0} students · {cls.teamCount || 0} teams
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -129,7 +146,7 @@ const LecturerDashboard = () => {
                       <ProgressBar value={t.avgScore || 0} size="xs" />
                     </div>
                     <span className={`text-sm font-bold shrink-0 ${t.avgScore >= 80 ? 'text-green-600' : t.avgScore >= 60 ? 'text-amber-600' : 'text-slate-400'}`}>
-                      {t.avgScore?.toFixed(1) || '—'}
+                      {t.avgScore != null ? t.avgScore.toFixed(1) : '—'}
                     </span>
                   </div>
                 ))}
@@ -147,7 +164,9 @@ const LecturerDashboard = () => {
                 {recentSessions.map(s => (
                   <div key={s._id} className="p-3 rounded-xl border border-slate-100">
                     <p className="text-sm font-semibold text-slate-900 truncate">{s.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{s.teamId?.name} • {s.meetingDate ? new Date(s.meetingDate).toLocaleDateString() : '—'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {s.teamId?.teamName || 'Unknown team'} · {s.meetingDate ? new Date(s.meetingDate).toLocaleDateString() : '—'}
+                    </p>
                   </div>
                 ))}
               </div>
