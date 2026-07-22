@@ -5,6 +5,7 @@ const Class = require('../models/Class');
 const Student = require('../models/Student');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const workspaceAccess = require('../services/workspaceAccess.service');
+const { emitWeeklyTaskChange } = require('../utils/weeklyTaskRealtime');
 
 // ── Role Authorization Helpers ───────────────────────────
 
@@ -505,6 +506,7 @@ const createWeeklyTask = async (req, res) => {
     await task.populate('assigneeStudentId', 'fullName rollNumber email');
     await task.populate('createdBy', 'name email');
 
+    emitWeeklyTaskChange(req, 'created', task);
     return successResponse(res, { task }, 'Weekly task created successfully!', 201);
   } catch (err) {
     if (err.code === 11000) return duplicateTaskResponse(res);
@@ -637,6 +639,7 @@ const updateWeeklyTask = async (req, res) => {
     await task.populate('assigneeStudentId', 'fullName rollNumber email');
     await task.populate('createdBy', 'name email');
 
+    emitWeeklyTaskChange(req, 'updated', task);
     return successResponse(res, { task }, 'Weekly task updated successfully!');
   } catch (err) {
     if (err.code === 11000) return duplicateTaskResponse(res);
@@ -685,6 +688,7 @@ const deleteWeeklyTask = async (req, res) => {
     }
 
     await WeeklyTask.findByIdAndDelete(req.params.id);
+    emitWeeklyTaskChange(req, 'deleted', task);
     return successResponse(res, null, 'Weekly task deleted successfully!');
   } catch (err) {
     if (err.statusCode) return errorResponse(res, err.message, err.statusCode);
@@ -753,6 +757,7 @@ const updateWeeklyTaskStatus = async (req, res) => {
     await task.populate('assigneeStudentId', 'fullName rollNumber email');
     await task.populate('createdBy', 'name email');
 
+    emitWeeklyTaskChange(req, 'status_changed', task);
     return successResponse(res, { task }, 'Task status and checklist updated successfully!');
   } catch (err) {
     if (err.statusCode) return errorResponse(res, err.message, err.statusCode);

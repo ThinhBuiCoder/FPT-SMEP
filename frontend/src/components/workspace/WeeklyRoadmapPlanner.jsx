@@ -14,6 +14,7 @@ import {
   updateWeeklyTaskStatus,
 } from '../../api/weeklyTaskApi';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import { useWeeklyTaskRealtime } from '../../hooks/useWeeklyTaskRealtime';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -600,6 +601,13 @@ export default function WeeklyRoadmapPlanner({
       setLoading(false);
     }
   }, [courseCode, classId, teamId, selectedWeek]);
+
+  useWeeklyTaskRealtime({
+    teamId,
+    classId,
+    courseCode,
+    onChange: fetchTasks,
+  });
 
   useEffect(() => {
     setLoading(true);
