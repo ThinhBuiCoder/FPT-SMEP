@@ -10,10 +10,12 @@ import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const COLORS = ['#034EA2', '#F37021', '#51B848', '#3371b8', '#f58f4d'];
 
 const AdminDashboard = () => {
+  const { isConnected, onlineUserIds } = useRealtime();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,6 +23,7 @@ const AdminDashboard = () => {
   const [trackingDays, setTrackingDays] = useState(7);
   const [onlineData, setOnlineData] = useState(null);
   const navigate = useNavigate();
+  const onlineUsersKey = [...onlineUserIds].sort().join(',');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,7 +53,7 @@ const AdminDashboard = () => {
     fetchTracking();
   }, [trackingDays]);
 
-  // Fetch online users (auto-refresh every 30s)
+  // Refresh immediately for every presence event; keep a 30s fallback poll.
   useEffect(() => {
     const fetchOnline = async () => {
       try {
@@ -63,7 +66,7 @@ const AdminDashboard = () => {
     fetchOnline();
     const interval = setInterval(fetchOnline, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [onlineUsersKey]);
 
   if (loading) return <LoadingSkeleton />;
   if (error) return <EmptyState icon={Activity} title="Error Loading Dashboard" description={error} action={{ label: 'Retry', onClick: () => window.location.reload() }} />;
@@ -338,7 +341,7 @@ const AdminDashboard = () => {
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Online Users</h3>
                 <p className="text-xs text-slate-500">
-                  {onlineData.onlineCount} online of {onlineData.totalUsers} total · auto-refreshes every 30s
+                  {onlineData.onlineCount} online of {onlineData.totalUsers} total · {isConnected ? 'live updates' : 'refreshes every 30s'}
                 </p>
               </div>
             </div>

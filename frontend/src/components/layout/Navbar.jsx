@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Badge from '../ui/Badge';
 import NotificationDropdown from './NotificationDropdown';
+import AvatarImage from '../ui/AvatarImage';
 import { useTheme } from '../../context/ThemeContext';
 import { notificationApi } from '../../api/notificationApi';
 
@@ -143,11 +144,11 @@ const Navbar = ({ onMenuClick }) => {
               </Badge>
             </div>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 overflow-hidden border border-primary-100 flex items-center justify-center shrink-0">
-              {user.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <span className="font-display font-bold text-primary text-[13px]">{user.name?.charAt(0)?.toUpperCase() || 'U'}</span>
-              )}
+              <AvatarImage
+                src={user.avatar}
+                name={user.name}
+                fallbackClassName="font-display text-[13px] text-primary"
+              />
             </div>
             <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform duration-200', showProfileMenu && 'rotate-180')} />
           </button>

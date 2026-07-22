@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import io from 'socket.io-client';
 import { AuthContext } from '../../context/AuthContext';
+import { useRealtime } from '../../context/RealtimeContext';
 import { chatApi } from '../../api/chatApi';
 import {
   MessageSquare, Send, Users, Shield, GraduationCap, Star,
   Search, Loader2, Clock, User, Paperclip, Pencil, X,
   ChevronRight, BadgeCheck, Menu, Smile, RotateCcw, Check,
-  ThumbsUp, PartyPopper, Lightbulb, Heart, Sparkles
+  ThumbsUp, PartyPopper, Lightbulb, Heart, Sparkles, Wifi, WifiOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
 // ─── Role helpers ────────────────────────────────────────────────────────────
 const roleConfig = {
   ADMIN:    { color: 'bg-red-50 text-red-700 border-red-200',     icon: <Shield       className="w-3 h-3 text-red-500 shrink-0" />,     label: 'Admin' },
@@ -347,6 +346,7 @@ function MembersPanel({ chatGroupId, currentUserId, onClose, onNicknameChange })
 // ─── Main GroupChat Component ─────────────────────────────────────────────────
 export default function GroupChat() {
   const { user } = useContext(AuthContext);
+  const { socket, isConnected, connectionError } = useRealtime();
   const [searchParams] = useSearchParams();
   const initialGroupId = searchParams.get('groupId');
 
@@ -369,11 +369,12 @@ export default function GroupChat() {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading]       = useState(false);
+  const [sending, setSending]           = useState(false);
 
   const socketRef        = useRef(null);
   const chatEndRef       = useRef(null);
   const fileInputRef     = useRef(null);
-  const selectedChannelRef = useRef(null); // track current channel for reconnect
+  const selectedChannelRef = useRef(null); // current room id for reconnect/event filtering
   const currentUserId = user?._id || user?.id;
   const currentUserIdString = getEntityId(currentUserId);
 
@@ -383,41 +384,56 @@ export default function GroupChat() {
 
   // ─── Socket.io ───────────────────────────────────────────────────────────
   useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      withCredentials: true,
-      transports: ['websocket', 'polling'],
-    });
+    if (!socket) return undefined;
+
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const handleConnect = () => {
       // Re-join room after connect/reconnect
       if (selectedChannelRef.current) {
-        socket.emit('join_room', selectedChannelRef.current._id);
+        socket.emit('join_room', selectedChannelRef.current);
       }
-    });
+    };
 
-    socket.on('receive_message', (msg) => {
+    const handleReceiveMessage = (msg) => {
+      if (getEntityId(msg?.chatGroupId) !== selectedChannelRef.current) return;
       setMessages(prev => {
         if (prev.some(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
       setTimeout(scrollToBottom, 100);
-    });
+    };
 
-    socket.on('message_updated', (msg) => {
+    const handleMessageUpdated = (msg) => {
+      if (getEntityId(msg?.chatGroupId) !== selectedChannelRef.current) return;
       setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
-    });
+    };
 
-    socket.on('message_revoked', (msg) => {
+    const handleMessageRevoked = (msg) => {
+      if (getEntityId(msg?.chatGroupId) !== selectedChannelRef.current) return;
       setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
-    });
+    };
 
-    socket.on('message_reaction_updated', (msg) => {
+    const handleReactionUpdated = (msg) => {
+      if (getEntityId(msg?.chatGroupId) !== selectedChannelRef.current) return;
       setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
-    });
+    };
 
-    return () => socket.disconnect();
-  }, []);
+    socket.on('connect', handleConnect);
+    socket.on('receive_message', handleReceiveMessage);
+    socket.on('message_updated', handleMessageUpdated);
+    socket.on('message_revoked', handleMessageRevoked);
+    socket.on('message_reaction_updated', handleReactionUpdated);
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('receive_message', handleReceiveMessage);
+      socket.off('message_updated', handleMessageUpdated);
+      socket.off('message_revoked', handleMessageRevoked);
+      socket.off('message_reaction_updated', handleReactionUpdated);
+      if (socketRef.current === socket) socketRef.current = null;
+    };
+  }, [socket]);
 
   // ─── Load Channels ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -441,8 +457,27 @@ export default function GroupChat() {
 
   // ─── Join Room, Load History & build Nickname Map ───────────────────────────
   useEffect(() => {
-    if (!selectedChannel || !socketRef.current) return;
-    selectedChannelRef.current = selectedChannel; // track for reconnect
+    if (!selectedChannel?._id || !socket) return undefined;
+
+    const roomId = getEntityId(selectedChannel._id);
+    const previousRoomId = selectedChannelRef.current;
+
+    if (previousRoomId && previousRoomId !== roomId && socket.connected) {
+      socket.emit('leave_room', previousRoomId);
+    }
+
+    selectedChannelRef.current = roomId;
+    if (socket.connected) socket.emit('join_room', roomId);
+
+    return () => {
+      if (socket.connected) socket.emit('leave_room', roomId);
+      if (selectedChannelRef.current === roomId) selectedChannelRef.current = null;
+    };
+  }, [selectedChannel?._id, socket]);
+
+  useEffect(() => {
+    if (!selectedChannel) return;
+
     const joinAndLoad = async () => {
       setLoadingMessages(true);
       setShowMembers(false);
@@ -453,12 +488,6 @@ export default function GroupChat() {
       setActiveStickerCategory('popular');
       setReactionPickerMessageId(null);
       try {
-        socketRef.current.emit('leave_room', selectedChannel._id);
-        // Only join if socket is already connected; connect handler handles the rest
-        if (socketRef.current.connected) {
-          socketRef.current.emit('join_room', selectedChannel._id);
-        }
-
         // Load messages & members concurrently
         const [msgRes, memberRes] = await Promise.allSettled([
           chatApi.getMessages(selectedChannel._id),
@@ -523,20 +552,57 @@ export default function GroupChat() {
       name: getMemberDisplayName(member),
     }));
 
+  const emitRealtime = (eventName, payload) => new Promise((resolve, reject) => {
+    const activeSocket = socketRef.current;
+    if (!activeSocket?.connected) {
+      reject(new Error('Mất kết nối realtime. Hệ thống đang tự kết nối lại.'));
+      return;
+    }
+
+    activeSocket.timeout(10000).emit(eventName, payload, (timeoutError, response) => {
+      if (timeoutError) {
+        reject(new Error('Máy chủ realtime không phản hồi. Vui lòng thử lại.'));
+        return;
+      }
+      if (!response?.ok) {
+        reject(new Error(response?.error || 'Thao tác realtime thất bại.'));
+        return;
+      }
+      resolve(response);
+    });
+  });
+
   // ─── Send Message ─────────────────────────────────────────────────────────
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!selectedChannel || !socketRef.current) return;
     if (!inputText.trim() && !selectedFile) return;
 
+    if (!currentUserIdString) {
+      toast.error('Không thể gửi tin nhắn: chưa xác thực người dùng.');
+      return;
+    }
+
+    if (!socketRef.current.connected) {
+      toast.error('Mất kết nối realtime. Hệ thống đang tự kết nối lại.');
+      return;
+    }
+
     if (editingMessage) {
-      socketRef.current.emit('edit_message', {
-        messageId: editingMessage._id,
-        senderId: currentUserId,
-        text: inputText.trim(),
-      });
-      setEditingMessage(null);
-      setInputText('');
+      setSending(true);
+      try {
+        await emitRealtime('edit_message', {
+          messageId: editingMessage._id,
+          senderId: currentUserId,
+          text: inputText.trim(),
+        });
+        setEditingMessage(null);
+        setInputText('');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setSending(false);
+      }
       return;
     }
 
@@ -564,31 +630,28 @@ export default function GroupChat() {
     const rawRole = (user?.role || 'STUDENT').toUpperCase();
     const senderRole = validRoles.includes(rawRole) ? rawRole : 'STUDENT';
 
-    if (!currentUserIdString) {
-      toast.error('Không thể gửi tin nhắn: chưa xác thực người dùng.');
-      return;
+    setSending(true);
+    try {
+      await emitRealtime('send_message', {
+        chatGroupId: selectedChannel._id,
+        senderId:    user?._id || user?.id,
+        senderName:  myNickname || user?.name || 'Anonymous',
+        senderRole,
+        text:        inputText.trim(),
+        attachment:  attachmentPayload,
+        mentions:    buildMentions(),
+      });
+      setInputText('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
     }
-
-    if (!socketRef.current?.connected) {
-      toast.error('Mất kết nối real-time. Đang thử kết nối lại...');
-      return;
-    }
-
-    socketRef.current.emit('send_message', {
-      chatGroupId: selectedChannel._id,
-      senderId:    user?._id || user?.id,
-      senderName:  myNickname || user?.name || 'Anonymous',
-      senderRole,
-      text:        inputText.trim(),
-      attachment:  attachmentPayload,
-      mentions:    buildMentions(),
-    });
-    setInputText('');
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSendSticker = ({ emoji, label }) => {
+  const handleSendSticker = async ({ emoji, label }) => {
     if (!selectedChannel || !socketRef.current?.connected || !currentUserIdString) return;
 
     const validRoles = ['ADMIN', 'LECTURER', 'STUDENT', 'MENTOR'];
@@ -596,14 +659,21 @@ export default function GroupChat() {
     const senderRole = validRoles.includes(rawRole) ? rawRole : 'STUDENT';
     const myNickname = nicknameMap[currentUserIdString] || null;
 
-    socketRef.current.emit('send_message', {
-      chatGroupId: selectedChannel._id,
-      senderId: currentUserId,
-      senderName: myNickname || user?.name || 'Anonymous',
-      senderRole,
-      sticker: { emoji, label: label || 'Sticker' },
-    });
-    setShowStickerPicker(false);
+    setSending(true);
+    try {
+      await emitRealtime('send_message', {
+        chatGroupId: selectedChannel._id,
+        senderId: currentUserId,
+        senderName: myNickname || user?.name || 'Anonymous',
+        senderRole,
+        sticker: { emoji, label: label || 'Sticker' },
+      });
+      setShowStickerPicker(false);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleStartEdit = (message) => {
@@ -613,22 +683,30 @@ export default function GroupChat() {
     setShowStickerPicker(false);
   };
 
-  const handleRevokeMessage = (message) => {
+  const handleRevokeMessage = async (message) => {
     if (!socketRef.current?.connected || !currentUserIdString) return;
-    socketRef.current.emit('revoke_message', {
-      messageId: message._id,
-      senderId: currentUserId,
-    });
+    try {
+      await emitRealtime('revoke_message', {
+        messageId: message._id,
+        senderId: currentUserId,
+      });
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
-  const handleReactMessage = (messageId, emoji) => {
+  const handleReactMessage = async (messageId, emoji) => {
     if (!socketRef.current?.connected || !currentUserIdString) return;
-    socketRef.current.emit('react_message', {
-      messageId,
-      userId: currentUserId,
-      emoji,
-    });
     setReactionPickerMessageId(null);
+    try {
+      await emitRealtime('react_message', {
+        messageId,
+        userId: currentUserId,
+        emoji,
+      });
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const filteredChannels = channels.filter(c =>
@@ -767,20 +845,34 @@ export default function GroupChat() {
                 </div>
               </div>
 
-              {/* Toggle Members Panel */}
-              <button
-                onClick={() => setShowMembers(v => !v)}
-                title="View members"
-                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-semibold transition-all cursor-pointer sm:px-3 ${
-                  showMembers
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span className="hidden sm:inline">Members</span>
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <div
+                  className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold sm:flex ${
+                    isConnected
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-amber-50 text-amber-600'
+                  }`}
+                  title={connectionError || 'Realtime connection status'}
+                >
+                  {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+                  {isConnected ? 'Live' : 'Reconnecting'}
+                </div>
+
+                {/* Toggle Members Panel */}
+                <button
+                  onClick={() => setShowMembers(v => !v)}
+                  title="View members"
+                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-semibold transition-all cursor-pointer sm:px-3 ${
+                    showMembers
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="hidden sm:inline">Members</span>
+                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             </div>
 
             {/* Messages + optional Members panel */}
@@ -1033,6 +1125,12 @@ export default function GroupChat() {
 
             {/* Input Form */}
             <div className="shrink-0 space-y-2 border-t border-slate-100 bg-white p-3 sm:p-4">
+              {!isConnected && (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700" role="status">
+                  <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                  {connectionError || 'Connecting to the realtime server...'}
+                </div>
+              )}
               {editingMessage && (
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-xs text-primary">
                   <span className="font-semibold">Editing message</span>
@@ -1107,7 +1205,7 @@ export default function GroupChat() {
                 <button
                   type="button"
                   onClick={() => setShowStickerPicker(v => !v)}
-                  disabled={!!editingMessage}
+                  disabled={!!editingMessage || sending || !isConnected}
                   className="shrink-0 rounded-xl border border-slate-200 p-3 text-slate-500 transition-all hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                   title="Send sticker"
                 >
@@ -1122,11 +1220,11 @@ export default function GroupChat() {
                 />
                 <button
                   type="submit"
-                  disabled={uploading || (!inputText.trim() && !selectedFile)}
+                  disabled={uploading || sending || !isConnected || (!inputText.trim() && !selectedFile)}
                   className="flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-600 disabled:opacity-50 active:scale-95 cursor-pointer sm:px-4"
                 >
-                  <span className="hidden sm:inline">{editingMessage ? 'Save' : 'Send'}</span>
-                  {editingMessage ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{sending ? 'Sending' : editingMessage ? 'Save' : 'Send'}</span>
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : editingMessage ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                 </button>
               </form>
             </div>

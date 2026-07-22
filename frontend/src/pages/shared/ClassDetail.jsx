@@ -282,7 +282,7 @@ export default function ClassDetail() {
       onClick={() => setShowAddStudent(true)}
       className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-xl text-sm hover:bg-primary-50 transition-all font-medium"
     >
-      <UserPlus className="w-4 h-4" /> Thêm 1 SV
+      <UserPlus className="w-4 h-4" /> Add Student
     </button>
   </>
 )}
@@ -300,7 +300,7 @@ export default function ClassDetail() {
               onClick={() => setShowVerify(true)}
               className="flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-600 rounded-xl text-sm hover:bg-indigo-50 transition-all font-medium"
             >
-              <ShieldCheck className="w-4 h-4" /> Kiểm tra Chuyên ngành
+              <ShieldCheck className="w-4 h-4" /> Verify Majors
             </button>
           )}
           {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
@@ -316,7 +316,7 @@ export default function ClassDetail() {
               {togglingLock ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 cls.isMajorLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />
               )}
-              {cls.isMajorLocked ? 'Mở khóa cập nhật' : 'Khóa cập nhật CN'}
+              {cls.isMajorLocked ? 'Unlock Major Updates' : 'Lock Major Updates'}
             </button>
           )}
           {canDeleteClass && (
