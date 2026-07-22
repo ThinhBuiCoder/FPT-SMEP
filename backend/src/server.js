@@ -23,6 +23,10 @@ const io = new Server(server, {
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000,
+    skipMiddlewares: true,
+  },
 });
 
 // ── In-memory presence map: socketId → userId ─────────────────
@@ -46,36 +50,53 @@ io.on('connection', (socket) => {
   console.log(`🔌 New client connected: ${socket.id}`);
 
   // ── Presence: user đăng ký online ──────────────────────────
-  socket.on('user_online', async (userId) => {
+  socket.on('user_online', (userId) => {
     if (!userId) return;
-    onlineUsers.set(socket.id, userId);
-    try {
-      await User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() });
-    } catch (err) {
-      console.warn('[Presence] Could not update online status:', err.message);
-    }
+    const normalizedUserId = userId.toString();
+    onlineUsers.set(socket.id, normalizedUserId);
+
+    // Presence is a realtime signal: broadcast immediately instead of making
+    // every client wait for the database write to finish.
     broadcastOnlineUsers();
+    User.findByIdAndUpdate(normalizedUserId, { isOnline: true, lastSeen: new Date() }).catch((err) => {
+      console.warn('[Presence] Could not update online status:', err.message);
+    });
   });
 
   // User joins their team's chat group room
-  socket.on('join_room', (chatGroupId) => {
-    socket.join(chatGroupId);
-    console.log(`👥 Socket ${socket.id} joined room: ${chatGroupId}`);
+  socket.on('join_room', async (chatGroupId, acknowledge) => {
+    const roomId = chatGroupId?.toString();
+    if (!roomId) {
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid chat room.' });
+      return;
+    }
+
+    await socket.join(roomId);
+    if (typeof acknowledge === 'function') acknowledge({ ok: true, roomId });
+    console.log(`👥 Socket ${socket.id} joined room: ${roomId}`);
   });
 
   // User leaves a room
-  socket.on('leave_room', (chatGroupId) => {
-    socket.leave(chatGroupId);
-    console.log(`🚪 Socket ${socket.id} left room: ${chatGroupId}`);
+  socket.on('leave_room', async (chatGroupId, acknowledge) => {
+    const roomId = chatGroupId?.toString();
+    if (!roomId) {
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid chat room.' });
+      return;
+    }
+
+    await socket.leave(roomId);
+    if (typeof acknowledge === 'function') acknowledge({ ok: true, roomId });
+    console.log(`🚪 Socket ${socket.id} left room: ${roomId}`);
   });
 
   // Real-time message receiver
-  socket.on('send_message', async (data) => {
+  socket.on('send_message', async (data = {}, acknowledge) => {
     try {
       const { chatGroupId, senderId, senderName, senderRole, text, attachment, sticker, mentions } = data;
 
       if (!chatGroupId || !senderId || (!text && !attachment && !sticker)) {
         console.error('⚠️ Invalid send_message data received:', data);
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid message data.' });
         return;
       }
 
@@ -97,22 +118,31 @@ io.on('connection', (socket) => {
         .populate('senderId', 'name email avatar');
 
       // Broadcast to everyone in the room
-      io.to(chatGroupId).emit('receive_message', populated);
+      io.to(chatGroupId.toString()).emit('receive_message', populated);
+      if (typeof acknowledge === 'function') {
+        acknowledge({ ok: true, messageId: populated._id.toString() });
+      }
       console.log(`💬 Message broadcasted in ${chatGroupId}: "${text}" by ${senderName}`);
     } catch (err) {
       console.error('❌ Error handling send_message socket event:', err.message);
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Could not send message.' });
     }
   });
 
   // ── Presence: disconnect ─────────────────────────────────────
-  socket.on('edit_message', async (data) => {
+  socket.on('edit_message', async (data = {}, acknowledge) => {
     try {
       const { messageId, senderId, text } = data;
-      if (!messageId || !senderId || !text?.trim()) return;
+      if (!messageId || !senderId || !text?.trim()) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid message update.' });
+        return;
+      }
 
       const message = await Message.findById(messageId);
-      if (!message || message.isRevoked) return;
-      if (message.senderId.toString() !== senderId.toString()) return;
+      if (!message || message.isRevoked || message.senderId.toString() !== senderId.toString()) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Message cannot be edited.' });
+        return;
+      }
 
       message.text = text.trim();
       message.isEdited = true;
@@ -122,19 +152,26 @@ io.on('connection', (socket) => {
       const populated = await Message.findById(message._id)
         .populate('senderId', 'name email avatar');
       io.to(message.chatGroupId.toString()).emit('message_updated', populated);
+      if (typeof acknowledge === 'function') acknowledge({ ok: true });
     } catch (err) {
       console.error('Error handling edit_message socket event:', err.message);
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Could not edit message.' });
     }
   });
 
-  socket.on('revoke_message', async (data) => {
+  socket.on('revoke_message', async (data = {}, acknowledge) => {
     try {
       const { messageId, senderId } = data;
-      if (!messageId || !senderId) return;
+      if (!messageId || !senderId) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid revoke request.' });
+        return;
+      }
 
       const message = await Message.findById(messageId);
-      if (!message || message.isRevoked) return;
-      if (message.senderId.toString() !== senderId.toString()) return;
+      if (!message || message.isRevoked || message.senderId.toString() !== senderId.toString()) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Message cannot be revoked.' });
+        return;
+      }
 
       message.text = '';
       message.attachment = null;
@@ -147,28 +184,42 @@ io.on('connection', (socket) => {
       const populated = await Message.findById(message._id)
         .populate('senderId', 'name email avatar');
       io.to(message.chatGroupId.toString()).emit('message_revoked', populated);
+      if (typeof acknowledge === 'function') acknowledge({ ok: true });
     } catch (err) {
       console.error('Error handling revoke_message socket event:', err.message);
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Could not revoke message.' });
     }
   });
 
-  socket.on('react_message', async (data) => {
+  socket.on('react_message', async (data = {}, acknowledge) => {
     try {
       const { messageId, userId, emoji } = data;
-      if (!messageId || !userId || !MESSAGE_REACTIONS.has(emoji)) return;
+      if (!messageId || !userId || !MESSAGE_REACTIONS.has(emoji)) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Invalid reaction.' });
+        return;
+      }
 
       const [message, reactingUser] = await Promise.all([
         Message.findById(messageId),
         User.findById(userId).select('name role'),
       ]);
-      if (!message || message.isRevoked || !reactingUser) return;
+      if (!message || message.isRevoked || !reactingUser) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Message cannot be reacted to.' });
+        return;
+      }
 
       const group = await ChatGroup.findById(message.chatGroupId).select('members');
-      if (!group) return;
+      if (!group) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Chat group not found.' });
+        return;
+      }
       const isMember = reactingUser.role === 'ADMIN' || group.members.some(
         (member) => member.userId?.toString() === userId.toString()
       );
-      if (!isMember) return;
+      if (!isMember) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'You are not a member of this chat group.' });
+        return;
+      }
 
       const existingIndex = message.reactions.findIndex(
         (reaction) => reaction.userId.toString() === userId.toString()
@@ -193,26 +244,26 @@ io.on('connection', (socket) => {
         .populate('reactions.userId', 'name avatar');
 
       io.to(message.chatGroupId.toString()).emit('message_reaction_updated', populated);
+      if (typeof acknowledge === 'function') acknowledge({ ok: true });
     } catch (err) {
       console.error('Error handling react_message socket event:', err.message);
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Could not update reaction.' });
     }
   });
 
-  socket.on('disconnect', async () => {
+  socket.on('disconnect', () => {
     const userId = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);
 
     if (userId) {
       // Chỉ set offline nếu user không có socket nào khác đang connect
       const stillOnline = getOnlineUserIds().includes(userId);
-      if (!stillOnline) {
-        try {
-          await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
-        } catch (err) {
-          console.warn('[Presence] Could not update offline status:', err.message);
-        }
-      }
       broadcastOnlineUsers();
+      if (!stillOnline) {
+        User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() }).catch((err) => {
+          console.warn('[Presence] Could not update offline status:', err.message);
+        });
+      }
     }
 
     console.log(`🔌 Client disconnected: ${socket.id}`);
