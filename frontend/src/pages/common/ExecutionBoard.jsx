@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -50,6 +50,10 @@ const getInitialView = () => {
   return stored === 'table' || stored === 'kanban' ? stored : 'kanban';
 };
 
+const getIsDesktopBoard = () => (
+  typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+);
+
 export default function ExecutionBoard() {
   const { user } = useAuth();
   const location = useLocation();
@@ -63,6 +67,14 @@ export default function ExecutionBoard() {
   const [activeTask, setActiveTask] = useState(null);
   const [activeOverStatus, setActiveOverStatus] = useState(null);
   const [view, setView] = useState(getInitialView);
+  const [isDesktopBoard, setIsDesktopBoard] = useState(getIsDesktopBoard);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = (event) => setIsDesktopBoard(event.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const debouncedSearch = useDebounce(filters.search, 180);
   const queryFilters = useMemo(() => ({
@@ -296,7 +308,7 @@ export default function ExecutionBoard() {
             </p>
             <p className="text-xs text-slate-500">
               {view === 'kanban'
-                ? 'Drag tasks across statuses for execution.'
+                ? 'Drag a task card or its grip handle to move it between statuses.'
                 : 'Review task details, deadlines, progress, and notes.'}
             </p>
           </div>
@@ -321,40 +333,41 @@ export default function ExecutionBoard() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <MobileStatusTabs
-            activeStatus={activeMobileStatus}
-            onChange={setActiveMobileStatus}
-            grouped={board.grouped}
-          />
-
-          <div className="grid grid-cols-1 gap-4 md:hidden">
-            <BoardColumn
-              status={activeMobileStatus}
-              tasks={board.grouped?.[activeMobileStatus] || []}
-              permissions={permissions}
-              onEditTask={handleEdit}
-              onDeleteTask={setDeleteTarget}
-              onStatusChange={handleStatusChange}
-              onSwipeStatusChange={handleSwipeStatusChange}
-              enableSwipe
-              activeOverStatus={activeOverStatus}
+          {isDesktopBoard ? (
+            <div className="grid grid-cols-5 gap-4">
+              {STATUSES.map((status) => (
+                <BoardColumn
+                  key={status}
+                  status={status}
+                  tasks={board.grouped?.[status] || []}
+                  permissions={permissions}
+                  onEditTask={handleEdit}
+                  onDeleteTask={setDeleteTarget}
+                  onStatusChange={handleStatusChange}
+                  activeOverStatus={activeOverStatus}
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              <MobileStatusTabs
+                activeStatus={activeMobileStatus}
+                onChange={setActiveMobileStatus}
+                grouped={board.grouped}
               />
-          </div>
-
-          <div className="hidden gap-4 md:grid md:grid-cols-5">
-            {STATUSES.map((status) => (
               <BoardColumn
-                key={status}
-                status={status}
-                tasks={board.grouped?.[status] || []}
+                status={activeMobileStatus}
+                tasks={board.grouped?.[activeMobileStatus] || []}
                 permissions={permissions}
                 onEditTask={handleEdit}
                 onDeleteTask={setDeleteTarget}
                 onStatusChange={handleStatusChange}
+                onSwipeStatusChange={handleSwipeStatusChange}
+                enableSwipe
                 activeOverStatus={activeOverStatus}
               />
-            ))}
-          </div>
+            </>
+          )}
 
           <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
             {activeTask ? (

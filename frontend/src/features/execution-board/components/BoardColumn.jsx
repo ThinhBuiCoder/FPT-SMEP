@@ -27,6 +27,7 @@ function BoardColumn({
   return (
     <motion.section
       ref={setNodeRef}
+      data-board-status={status}
       layout={!reduceMotion}
       transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 36 }}
       className={`flex min-h-[280px] flex-col rounded-xl border bg-slate-50/70 transition-colors ${

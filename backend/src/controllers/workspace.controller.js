@@ -197,6 +197,39 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
     throw new Error("Team not found");
   }
 
+  let inheritedDirectionTeam = null;
+  if (!team.projectDirection && team.lineageId) {
+    inheritedDirectionTeam = await Team.findOne({
+      _id: { $ne: team._id },
+      lineageId: team.lineageId,
+      projectDirection: { $exists: true, $nin: ['', null] },
+    })
+      .populate('classId', 'classCode subjectCode semester year')
+      .populate('projectDirectionUpdatedBy', 'name email role')
+      .populate('projectDirectionReviewedBy', 'name email role')
+      .sort({ projectDirectionUpdatedAt: -1, createdAt: -1 });
+  }
+
+  const teamData = team.toObject();
+  if (inheritedDirectionTeam) {
+    const sourceClass = inheritedDirectionTeam.classId || {};
+    Object.assign(teamData, {
+      projectDirection: inheritedDirectionTeam.projectDirection,
+      projectDirectionUpdatedBy: inheritedDirectionTeam.projectDirectionUpdatedBy,
+      projectDirectionUpdatedAt: inheritedDirectionTeam.projectDirectionUpdatedAt,
+      projectDirectionStatus: inheritedDirectionTeam.projectDirectionStatus,
+      projectDirectionReviewComment: inheritedDirectionTeam.projectDirectionReviewComment,
+      projectDirectionReviewedBy: inheritedDirectionTeam.projectDirectionReviewedBy,
+      projectDirectionReviewedAt: inheritedDirectionTeam.projectDirectionReviewedAt,
+      projectDirectionInheritedFrom: {
+        teamId: inheritedDirectionTeam._id,
+        courseCode: inheritedDirectionTeam.courseCode || sourceClass.subjectCode || '',
+        semester: inheritedDirectionTeam.semester || `${sourceClass.semester || ''}${sourceClass.year || ''}`,
+        classCode: sourceClass.classCode || '',
+      },
+    });
+  }
+
   const cls = await Class.findById(team.classId)
     .populate("lectureId", "name email avatar role")
     .populate("mentorIds", "name email avatar role");
@@ -234,7 +267,7 @@ exports.getTeamWorkspaceDetails = async (teamId) => {
   }
 
   return {
-    team,
+    team: teamData,
     class: cls,
     members: workspaceMembers,
     lecturer: cls?.lectureId || team?.lectureId || null,
