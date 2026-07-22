@@ -9,6 +9,7 @@ const app = require('./app');
 const Message = require('./models/Message');
 const User = require('./models/User');
 const ChatGroup = require('./models/ChatGroup');
+const { getWeeklyTaskRooms } = require('./utils/weeklyTaskRealtime');
 
 const PORT = process.env.PORT || 5000;
 const MESSAGE_REACTIONS = new Set(['👍', '❤️', '😂', '😮', '😢', '👏']);
@@ -67,6 +68,27 @@ io.on('connection', (socket) => {
   socket.on('leave_room', (chatGroupId) => {
     socket.leave(chatGroupId);
     console.log(`🚪 Socket ${socket.id} left room: ${chatGroupId}`);
+  });
+
+  // Weekly roadmap/execution-board subscriptions. Events only contain an
+  // invalidation payload; clients refetch protected REST endpoints for data.
+  socket.on('join_weekly_tasks', async (scope = {}, acknowledge) => {
+    const rooms = getWeeklyTaskRooms(scope);
+    if (rooms.length === 0) {
+      if (typeof acknowledge === 'function') {
+        acknowledge({ ok: false, error: 'A valid team, class or course scope is required.' });
+      }
+      return;
+    }
+
+    await socket.join(rooms);
+    if (typeof acknowledge === 'function') acknowledge({ ok: true, rooms });
+  });
+
+  socket.on('leave_weekly_tasks', async (scope = {}, acknowledge) => {
+    const rooms = getWeeklyTaskRooms(scope);
+    await Promise.all(rooms.map((room) => socket.leave(room)));
+    if (typeof acknowledge === 'function') acknowledge({ ok: true });
   });
 
   // Real-time message receiver

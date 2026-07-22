@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   closestCorners,
   DndContext,
@@ -14,6 +14,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { AlertTriangle, CheckSquare, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useWeeklyTaskRealtime } from '../../hooks/useWeeklyTaskRealtime';
 import { teamWorkspaceApi } from '../../api/teamWorkspaceApi';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -52,6 +53,7 @@ const getInitialView = () => {
 
 export default function ExecutionBoard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const queryTeamId = useMemo(() => new URLSearchParams(location.search).get('teamId'), [location.search]);
 
@@ -87,6 +89,19 @@ export default function ExecutionBoard() {
   const teamMembersQuery = useTeamMembers(teamId);
   const teamMembers = teamMembersQuery.data || [];
   const boardQuery = useTaskBoard({ teamId, filters: queryFilters });
+
+  const handleRealtimeTaskChange = useCallback((event) => {
+    if (event?.taskType !== 'TEAM_TASK' || !teamId) return;
+    queryClient.invalidateQueries({
+      queryKey: ['execution-board', 'task-board', teamId],
+    });
+  }, [queryClient, teamId]);
+
+  useWeeklyTaskRealtime({
+    teamId,
+    enabled: Boolean(teamId),
+    onChange: handleRealtimeTaskChange,
+  });
 
   const board = boardQuery.data || { tasks: [], grouped: EMPTY_GROUPED, summary: null };
   const boardParams = useMemo(() => normalizeFilters(queryFilters), [queryFilters]);
