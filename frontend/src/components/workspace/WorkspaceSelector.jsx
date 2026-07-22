@@ -35,6 +35,7 @@ export default function WorkspaceSelector({ selectedWorkspace, availableWorkspac
     selectedWorkspace.courseCode || 'Workspace',
     selectedWorkspace.semester,
   ].filter(Boolean).join(' - ');
+  const selectedIsReadOnly = selectedWorkspace.accessMode === 'READ_ONLY';
 
   const handleSelect = (teamId) => {
     setOpen(false);
@@ -71,6 +72,10 @@ export default function WorkspaceSelector({ selectedWorkspace, availableWorkspac
               <Archive className="h-3 w-3" />
               Archived
             </span>
+          ) : selectedIsReadOnly ? (
+            <span className="hidden rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 sm:inline-flex">
+              Previous
+            </span>
           ) : (
             <span className="hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 sm:inline-flex">
               Current
@@ -90,6 +95,7 @@ export default function WorkspaceSelector({ selectedWorkspace, availableWorkspac
           <div className="max-h-72 overflow-y-auto p-1" role="listbox" aria-label="Available workspaces">
             {availableWorkspaces.map((workspace) => {
               const isSelected = String(workspace.teamId) === selectedTeamId;
+              const isPrevious = workspace.accessMode === 'READ_ONLY';
               const label = [workspace.courseCode || 'Workspace', workspace.semester].filter(Boolean).join(' - ');
               const subtitle = [workspace.classCode, workspace.teamName].filter(Boolean).join(' | ');
 
@@ -106,7 +112,7 @@ export default function WorkspaceSelector({ selectedWorkspace, availableWorkspac
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      workspace.isArchived ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+                      workspace.isArchived || isPrevious ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
                     }`}>
                       {workspace.isArchived ? <Archive className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
                     </span>

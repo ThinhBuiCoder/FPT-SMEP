@@ -15,9 +15,39 @@ const getCurrentStudentTeam = async (user) => {
     ],
   }).populate('classId', 'semester year status');
 
+  const activeStudents = students.filter(
+    (student) => student.teamId && student.classId && student.classId.status !== 'disabled'
+  );
+
+  const directTeamIds = activeStudents.map((student) => student.teamId);
+  if (directTeamIds.length) {
+    const directTeams = await Team.find({ _id: { $in: directTeamIds } }).select('_id lineageId');
+    const lineageIds = directTeams.map((team) => team.lineageId).filter(Boolean);
+
+    if (lineageIds.length) {
+      const activeLineages = await StartupLineage.find({
+        _id: { $in: lineageIds },
+        status: 'ACTIVE',
+        currentTeamId: { $in: directTeamIds },
+      }).select('currentTeamId');
+      const lineageCurrentTeamIds = new Set(
+        activeLineages.map((lineage) => String(lineage.currentTeamId))
+      );
+      const lineageCurrentStudent = activeStudents.find(
+        (student) => lineageCurrentTeamIds.has(String(student.teamId))
+      );
+
+      if (lineageCurrentStudent) {
+        return Team.findOne({
+          _id: lineageCurrentStudent.teamId,
+          classId: lineageCurrentStudent.classId._id,
+        });
+      }
+    }
+  }
+
   const semesterRank = { SP: 1, SU: 2, FA: 3 };
-  const current = students
-    .filter((student) => student.classId && student.classId.status !== 'disabled')
+  const current = activeStudents
     .sort((a, b) => {
       const yearDiff = Number(b.classId.year || 0) - Number(a.classId.year || 0);
       if (yearDiff) return yearDiff;

@@ -23,9 +23,10 @@ const statusLabels = {
 export default function ProjectDirectionCard({ team, canEdit, onSaved }) {
   const [value, setValue] = useState(team?.projectDirection || '');
   const [saving, setSaving] = useState(false);
+  const inheritedFrom = team?.projectDirectionInheritedFrom;
   const wordCount = useMemo(() => countWords(value), [value]);
   const isValid = wordCount >= 30 && wordCount <= 500;
-  const isUnchanged = value.trim() === (team?.projectDirection || '').trim();
+  const isUnchanged = !inheritedFrom && value.trim() === (team?.projectDirection || '').trim();
 
   const handleSave = async () => {
     if (!isValid || isUnchanged) return;
@@ -64,6 +65,16 @@ export default function ProjectDirectionCard({ team, canEdit, onSaved }) {
           )}
         </div>
       </div>
+
+      {inheritedFrom && (
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          This direction is inherited from{' '}
+          <span className="font-semibold">
+            {[inheritedFrom.courseCode, inheritedFrom.semester].filter(Boolean).join(' - ') || inheritedFrom.classCode || 'the previous workspace'}
+          </span>.
+          {canEdit && ' Save it to adopt the direction for the current workspace, or edit it before saving.'}
+        </div>
+      )}
 
       {canEdit ? (
         <div className="mt-4 space-y-3">

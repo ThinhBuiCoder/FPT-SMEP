@@ -110,6 +110,19 @@ function TaskCard({
       transition,
     };
 
+  const handleCardDragPointerDown = (event) => {
+    if (isOverlay || !canUpdateStatus || enableSwipe || event.pointerType === 'touch') return;
+    if (event.target.closest('button, input, textarea, select, a, [role="menuitem"]')) return;
+    listeners?.onPointerDown?.(event);
+  };
+
+  const handleListeners = enableSwipe
+    ? listeners
+    : {
+      onPointerDown: listeners?.onPointerDown,
+      onKeyDown: listeners?.onKeyDown,
+    };
+
   const resetSwipe = () => {
     swipeStartRef.current = null;
     swipeXRef.current = 0;
@@ -187,7 +200,10 @@ function TaskCard({
       }}
       transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
       style={style}
-      onPointerDown={handlePointerDown}
+      onPointerDown={(event) => {
+        handlePointerDown(event);
+        handleCardDragPointerDown(event);
+      }}
       onPointerMove={handlePointerMove}
       onPointerUp={finishSwipe}
       onPointerCancel={resetSwipe}
@@ -197,9 +213,10 @@ function TaskCard({
         event.stopPropagation();
         suppressClickRef.current = false;
       }}
-      className={`group relative overflow-hidden rounded-lg border bg-slate-100 transition-colors hover:border-slate-300 ${
+      className={`group relative overflow-hidden rounded-lg border bg-slate-100 transition-colors hover:border-slate-300 md:cursor-grab md:active:cursor-grabbing ${
         isOverlay ? 'shadow-2xl ring-2 ring-blue-500/20' : ''
       } ${isOverdue ? 'border-red-200' : 'border-slate-200'}`}
+      data-task-id={task._id}
     >
       {enableSwipe && canUpdateStatus && previousCfg && (
         <div className={`absolute inset-y-0 left-0 flex w-28 items-center gap-1.5 px-3 ${previousCfg.bg} ${previousCfg.text}`}>
@@ -235,9 +252,10 @@ function TaskCard({
                 type="button"
                 ref={setActivatorNodeRef}
                 {...attributes}
-                {...listeners}
-                className="touch-none rounded-md p-1.5 text-slate-300 transition-colors hover:bg-white hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                {...handleListeners}
+                className="touch-none cursor-grab rounded-md p-1.5 text-slate-300 transition-colors hover:bg-white hover:text-slate-600 active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 aria-label={`Drag ${task.title}`}
+                title="Drag task to another status"
               >
                 <GripVertical className="h-3.5 w-3.5" />
               </button>

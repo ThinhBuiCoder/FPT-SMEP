@@ -42,9 +42,34 @@ const getCurrentStudentTeamId = async (user) => {
     teamId: { $ne: null },
   }).populate('classId', 'semester year status');
 
+  const activeStudents = students.filter(
+    (student) => student.teamId && student.classId && student.classId.status !== 'disabled'
+  );
+  const directTeamIds = activeStudents.map((student) => student.teamId);
+
+  if (directTeamIds.length) {
+    const directTeams = await Team.find({ _id: { $in: directTeamIds } }).select('_id lineageId');
+    const lineageIds = directTeams.map((team) => team.lineageId).filter(Boolean);
+
+    if (lineageIds.length) {
+      const activeLineages = await StartupLineage.find({
+        _id: { $in: lineageIds },
+        status: 'ACTIVE',
+        currentTeamId: { $in: directTeamIds },
+      }).select('currentTeamId');
+      const lineageCurrentTeamIds = new Set(
+        activeLineages.map((lineage) => String(lineage.currentTeamId))
+      );
+      const lineageCurrentStudent = activeStudents.find(
+        (student) => lineageCurrentTeamIds.has(String(student.teamId))
+      );
+
+      if (lineageCurrentStudent) return lineageCurrentStudent.teamId;
+    }
+  }
+
   const semesterRank = { SP: 1, SU: 2, FA: 3 };
-  const current = students
-    .filter((student) => student.classId && student.classId.status !== 'disabled')
+  const current = activeStudents
     .sort((a, b) => {
       const yearDiff = Number(b.classId.year || 0) - Number(a.classId.year || 0);
       if (yearDiff) return yearDiff;
@@ -221,7 +246,7 @@ const formatWorkspace = (team, accessMode) => {
     lecturerName: team.lectureId?.name || '',
     mentorNames: team.mentorId?.name ? [team.mentorId.name] : [],
     isArchived: Boolean(team.isArchived),
-    status: team.isArchived ? 'Archived' : 'Current',
+    status: team.isArchived ? 'Archived' : accessMode === ACCESS.READ_ONLY ? 'Previous' : 'Current',
     accessMode,
   };
 };

@@ -66,11 +66,15 @@ exports.getStudentForTeam = async (user, team) => {
 
   const memberStudentIds = (team.members || []).map((member) => member.studentId).filter(Boolean);
   return Student.findOne({
-    ...identityFilter,
-    classId: team.classId,
-    $or: [
-      { teamId: team._id },
-      { _id: { $in: memberStudentIds } },
+    $and: [
+      identityFilter,
+      { classId: team.classId?._id || team.classId },
+      {
+        $or: [
+          { teamId: team._id },
+          { _id: { $in: memberStudentIds } },
+        ],
+      },
     ],
   });
 };
